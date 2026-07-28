@@ -78,11 +78,7 @@ export function PlayerProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        className={className}
-        aria-label={ariaLabel}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
+      <DialogTrigger className={className} aria-label={ariaLabel}>
         {children}
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">

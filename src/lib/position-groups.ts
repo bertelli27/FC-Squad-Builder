@@ -48,7 +48,12 @@ export function positionGroup(position?: string | null): PositionGroup {
 
   const lower = position.toLowerCase();
   if (lower.includes("goalkeeper")) return "Goleiros";
-  if (lower.includes("defen")) return "Zagueiros";
+  // Checked before the generic "back"/"defen" match below: "Centre-Back"
+  // also contains "back" but is a zagueiro, not a lateral.
+  if (lower.includes("left-back") || lower.includes("right-back") || lower.includes("wing-back")) {
+    return "Laterais";
+  }
+  if (lower.includes("defen") || lower.includes("back")) return "Zagueiros";
   if (lower.includes("midfield")) return "Meio-campistas";
   if (lower.includes("attack") || lower.includes("forward") || lower.includes("wing")) {
     return "Atacantes";

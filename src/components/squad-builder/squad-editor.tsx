@@ -6,6 +6,9 @@ import {
   closestCenter,
   useDraggable,
   useDroppable,
+  useSensor,
+  useSensors,
+  PointerSensor,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { toast } from "sonner";
@@ -72,6 +75,16 @@ export function SquadEditor({
 }) {
   const formationSlots = getFormationSlots(formation);
   const [state, setState] = useState<EditorState>(() => buildInitialState(players, formation));
+  // Without a distance threshold, PointerSensor starts tracking a
+  // potential drag on the very first pixel of pointer movement from ANY
+  // pointerdown on a draggable chip — including pointerdown on a nested
+  // button/dialog trigger inside it. That routinely left the sensor in a
+  // stuck capture state after opening a player's profile (clicks on the
+  // dialog's close button and backdrop stopped registering; drag felt
+  // unreliable afterward too, since dnd-kit is this stuck at that point).
+  // Requiring 8px of movement before a drag "activates" is dnd-kit's own
+  // documented fix for draggable items containing interactive children.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   async function persistArrangement(next: EditorState) {
     const payload = [
@@ -207,7 +220,12 @@ export function SquadEditor({
   };
 
   return (
-    <DndContext id="squad-editor" collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      id="squad-editor"
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="relative aspect-[2/3] w-full max-w-md justify-self-center overflow-hidden rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 lg:justify-self-start">
           {/* w-full is load-bearing here, not decorative: justify-self
@@ -460,13 +478,14 @@ function PlayerChip({
           <div className="absolute -top-1 -left-1">{removeButton}</div>
         </div>
         {numberInput}
-        <PlayerProfileDialog
-          player={profileInfo}
-          aria-label={`Ver perfil de ${player.name}`}
-          className="max-w-16 truncate rounded bg-black/60 px-1 text-[10px] text-white"
-        >
+        {/* Plain text, not another profile trigger: Base UI's DialogTrigger
+            owns pointer events in a way dnd-kit can't see through, even
+            without our own stopPropagation — wrapping both the avatar AND
+            the name would leave almost no chip surface draggable. The
+            avatar above is enough of a click target. */}
+        <span className="max-w-16 truncate rounded bg-black/60 px-1 text-[10px] text-white">
           {player.name}
-        </PlayerProfileDialog>
+        </span>
       </div>
     );
   }
@@ -485,14 +504,16 @@ function PlayerChip({
       <PlayerProfileDialog
         player={profileInfo}
         aria-label={`Ver perfil de ${player.name}`}
-        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        className="shrink-0 rounded-full"
       >
         <PlayerAvatar src={player.photoUrl} name={player.name} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-medium">{player.name}</span>
-          <span className="text-muted-foreground truncate text-xs">{player.position}</span>
-        </div>
       </PlayerProfileDialog>
+      {/* Plain text, not another trigger — same reasoning as the pitch
+          variant above: this is the chip's main drag surface. */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-sm font-medium">{player.name}</span>
+        <span className="text-muted-foreground truncate text-xs">{player.position}</span>
+      </div>
       {captainButton}
       {numberInput}
       {player.overall != null && <Badge variant="secondary">{player.overall}</Badge>}
