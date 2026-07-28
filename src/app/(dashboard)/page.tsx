@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlusIcon } from "lucide-react";
 import { squadService } from "@/services/squad.service";
 import { Button } from "@/components/ui/button";
 import { SquadCard } from "@/components/squad-builder/squad-card";
@@ -9,8 +10,21 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Meus elencos</h1>
-        <Button render={<Link href="/squads/new">Criar elenco</Link>} nativeButton={false} />
+        <div className="flex items-baseline gap-2">
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">Meus elencos</h1>
+          {squads.length > 0 && (
+            <span className="text-muted-foreground text-sm">({squads.length})</span>
+          )}
+        </div>
+        <Button
+          render={
+            <Link href="/squads/new">
+              <PlusIcon className="size-4" />
+              Criar elenco
+            </Link>
+          }
+          nativeButton={false}
+        />
       </div>
 
       {squads.length === 0 ? (
@@ -19,7 +33,7 @@ export default async function HomePage() {
           <Button render={<Link href="/squads/new">Criar meu primeiro elenco</Link>} nativeButton={false} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {squads.map((squad) => (
             <SquadCard
               key={squad.id}

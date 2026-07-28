@@ -4,11 +4,12 @@ import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
+import { Search, Shield, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -108,101 +109,122 @@ export function NewSquadForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <Label>Carregar elenco a partir de</Label>
-        <Tabs value={kind} onValueChange={handleKindChange}>
-          <TabsList>
-            <TabsTrigger value="club">Clube</TabsTrigger>
-            <TabsTrigger value="nationalTeam">Seleção</TabsTrigger>
-            <TabsTrigger value="none">Do zero</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <Card className="gap-0 py-0">
+        <CardHeader className="border-b py-3 [.border-b]:pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Shield className="text-primary size-4" />
+            Origem do elenco
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 py-4">
+          <div className="flex flex-col gap-2">
+            <Label>Carregar elenco a partir de</Label>
+            <Tabs value={kind} onValueChange={handleKindChange}>
+              <TabsList>
+                <TabsTrigger value="club">Clube</TabsTrigger>
+                <TabsTrigger value="nationalTeam">Seleção</TabsTrigger>
+                <TabsTrigger value="none">Do zero</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
-      {kind !== "none" && (
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="search">{kind === "club" ? "Buscar clube" : "Buscar seleção"}</Label>
-          <div className="relative">
-            <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+          {kind !== "none" && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="search">{kind === "club" ? "Buscar clube" : "Buscar seleção"}</Label>
+              <div className="relative">
+                <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+                <Input
+                  id="search"
+                  className="pl-9"
+                  placeholder={kind === "club" ? "Ex: Coritiba" : "Ex: Brasil"}
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setSelected(null);
+                  }}
+                  autoComplete="off"
+                />
+              </div>
+
+              {isSearching && <p className="text-muted-foreground text-sm">Buscando…</p>}
+
+              {showResults && (
+                <ul className="divide-border max-h-64 overflow-y-auto rounded-lg border">
+                  {results.map((result) => (
+                    <li key={result.externalId}>
+                      <button
+                        type="button"
+                        onClick={() => selectResult(result)}
+                        className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2 text-left text-sm"
+                      >
+                        {(result.logoUrl ?? result.flagUrl) && (
+                          <Image
+                            src={result.logoUrl ?? result.flagUrl!}
+                            alt=""
+                            width={24}
+                            height={24}
+                            className="size-6 object-contain"
+                            unoptimized
+                          />
+                        )}
+                        <span>{result.name}</span>
+                        {result.country && (
+                          <span className="text-muted-foreground ml-auto">{result.country}</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {selected && (
+                <p className="text-muted-foreground text-sm">
+                  Selecionado:{" "}
+                  <span className="text-foreground font-medium">{selected.name}</span>
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="gap-0 py-0">
+        <CardHeader className="border-b py-3 [.border-b]:pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Settings2 className="text-primary size-4" />
+            Detalhes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 py-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="name">Nome do elenco</Label>
             <Input
-              id="search"
-              className="pl-9"
-              placeholder={kind === "club" ? "Ex: Coritiba" : "Ex: Brasil"}
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSelected(null);
-              }}
-              autoComplete="off"
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Time dos Sonhos"
+              required
             />
           </div>
 
-          {isSearching && <p className="text-muted-foreground text-sm">Buscando…</p>}
-
-          {showResults && (
-            <ul className="divide-border max-h-64 overflow-y-auto rounded-lg border">
-              {results.map((result) => (
-                <li key={result.externalId}>
-                  <button
-                    type="button"
-                    onClick={() => selectResult(result)}
-                    className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2 text-left text-sm"
-                  >
-                    {(result.logoUrl ?? result.flagUrl) && (
-                      <Image
-                        src={result.logoUrl ?? result.flagUrl!}
-                        alt=""
-                        width={24}
-                        height={24}
-                        className="size-6 object-contain"
-                        unoptimized
-                      />
-                    )}
-                    <span>{result.name}</span>
-                    {result.country && (
-                      <span className="text-muted-foreground ml-auto">{result.country}</span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {selected && (
-            <p className="text-muted-foreground text-sm">
-              Selecionado: <span className="text-foreground font-medium">{selected.name}</span>
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="name">Nome do elenco</Label>
-        <Input
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Ex: Time dos Sonhos"
-          required
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="formation">Formação</Label>
-        <Select value={formation} onValueChange={(value) => value && setFormation(value)}>
-          <SelectTrigger id="formation" className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {FORMATIONS.map((f) => (
-              <SelectItem key={f} value={f}>
-                {f}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="formation">Formação</Label>
+            <Select value={formation} onValueChange={(value) => value && setFormation(value)}>
+              <SelectTrigger id="formation" className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FORMATIONS.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {f}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Button type="submit" disabled={isSubmitting} className="w-fit">
         {isSubmitting ? "Criando…" : "Criar elenco"}

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ClubBadge } from "./club-badge";
@@ -46,15 +46,25 @@ export function SquadCard({ squad }: { squad: SquadCardData }) {
 
   return (
     <>
-      <Card className="hover:ring-primary/30 transition-shadow hover:shadow-md">
-        <CardHeader>
+      <Card className="group relative gap-0 overflow-hidden py-0 transition-shadow hover:shadow-md">
+        {/* Accent strip: the one purely decorative touch that makes this
+            read as a "tile" in a dashboard grid rather than a plain card. */}
+        <div className="from-primary to-primary/40 h-1.5 bg-gradient-to-r" />
+        <CardHeader className="py-4">
           <CardTitle className="flex items-center gap-2">
             <ClubBadge src={squad.logoUrl} name={squad.name} size="sm" />
-            <Link href={`/squads/${squad.id}`} className="hover:underline">
+            {/* "Stretched link": after:inset-0 makes the whole card
+                clickable (positioned relative to Card's `relative`),
+                while the delete button below opts back out via its own
+                z-10 so it stays independently clickable. */}
+            <Link
+              href={`/squads/${squad.id}`}
+              className="static after:absolute after:inset-0 hover:underline"
+            >
               {squad.name}
             </Link>
           </CardTitle>
-          <CardAction>
+          <CardAction className="relative z-10 opacity-0 transition-opacity group-hover:opacity-100">
             <Button
               variant="ghost"
               size="icon"
@@ -66,14 +76,15 @@ export function SquadCard({ squad }: { squad: SquadCardData }) {
             </Button>
           </CardAction>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex items-center gap-3 pb-4 text-sm">
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
             {squad.formation}
           </Badge>
+          <span className="text-muted-foreground flex items-center gap-1">
+            <Users className="size-3.5" />
+            {squad.playerCount}
+          </span>
         </CardContent>
-        <CardFooter className="text-muted-foreground text-sm">
-          {squad.playerCount} {squad.playerCount === 1 ? "jogador" : "jogadores"}
-        </CardFooter>
       </Card>
       {dialog}
     </>

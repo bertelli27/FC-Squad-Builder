@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PencilIcon } from "lucide-react";
+import { PencilIcon, Shield, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,29 +67,39 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="squad-name">Nome do elenco</Label>
-            <Input
-              id="squad-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+          <div className="flex flex-col gap-3">
+            <h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+              <Shield className="size-3.5" />
+              Elenco
+            </h3>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="squad-name">Nome do elenco</Label>
+              <Input
+                id="squad-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="squad-logo">URL do escudo</Label>
+              <Input
+                id="squad-logo"
+                type="url"
+                placeholder="https://..."
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="squad-logo">URL do escudo</Label>
-            <Input
-              id="squad-logo"
-              type="url"
-              placeholder="https://..."
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-            />
-          </div>
-
-          <div className="mt-1 flex flex-col gap-3 border-t pt-4">
-            <h3 className="text-muted-foreground text-sm font-medium">Técnico</h3>
+          <div className="flex flex-col gap-3 border-t pt-4">
+            <h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+              <UserRound className="size-3.5" />
+              Técnico
+            </h3>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="coach-name">Nome</Label>

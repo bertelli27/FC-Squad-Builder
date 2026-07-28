@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { SearchIcon, UserPlus, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { OverallBadge } from "@/components/player-card/overall-badge";
-import { ratingStyle } from "@/lib/rating-tier";
-import { cn } from "@/lib/utils";
+import { PlayerRowContent } from "./roster-table";
 import type { SquadPlayerVM } from "./squad-editor";
 
 interface SearchResult {
@@ -212,37 +211,36 @@ export function AddPlayerDialog({
 
         {mode === "search" ? (
           <div className="flex flex-col gap-3">
-            <Input
-              placeholder="Buscar jogador por nome"
-              value={query}
-              onChange={(e) => handleQueryChange(e.target.value)}
-              autoComplete="off"
-              autoFocus
-            />
+            <div className="relative">
+              <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar jogador por nome"
+                value={query}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                autoComplete="off"
+                autoFocus
+              />
+            </div>
 
             {showResults && shown.length === 0 && (
               <p className="text-muted-foreground text-sm">Nenhum resultado na base local.</p>
             )}
 
-            <ul className="flex flex-col gap-2">
+            <ul className="divide-border max-h-72 overflow-y-auto rounded-lg border">
               {shown.map((result) => {
                 const key = `${result.source}:${result.externalId}`;
                 return (
                   <li
                     key={key}
-                    className="hover:border-primary/40 flex items-center gap-3 rounded-lg border p-2 transition-colors"
+                    className="hover:bg-accent/40 flex items-center gap-3 border-t p-2 transition-colors first:border-t-0"
                   >
-                    <PlayerAvatar
-                      src={result.photoUrl}
+                    <PlayerRowContent
+                      photoUrl={result.photoUrl}
                       name={result.name}
-                      className={cn("ring-2", ratingStyle(result.overall).ring)}
+                      position={[result.position, result.club].filter(Boolean).join(" · ")}
+                      overall={result.overall}
                     />
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="font-heading truncate text-base font-bold">{result.name}</span>
-                      <span className="text-muted-foreground truncate text-xs">
-                        {[result.position, result.club].filter(Boolean).join(" · ")}
-                      </span>
-                    </div>
                     <OverallBadge overall={result.overall} />
                     <Button size="sm" disabled={addingId === key} onClick={() => handleAdd(result)}>
                       {addingId === key ? "..." : "Adicionar"}
@@ -264,69 +262,83 @@ export function AddPlayerDialog({
             )}
           </div>
         ) : (
-          <form onSubmit={handleCreate} className="flex flex-col gap-3">
+          <form onSubmit={handleCreate} className="flex flex-col gap-4">
             <p className="text-muted-foreground text-sm">
               Não achou o jogador em nenhuma busca? Cadastre ele manualmente.
             </p>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="custom-name">Nome</Label>
-              <Input
-                id="custom-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+            <div className="flex flex-col gap-3">
+              <h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+                <UserPlus className="size-3.5" />
+                Dados do jogador
+              </h3>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-name">Nome</Label>
+                <Input
+                  id="custom-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-position">Posição</Label>
+                <Select value={position} onValueChange={(v) => setPosition(v ?? "")}>
+                  <SelectTrigger id="custom-position">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {POSITIONS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-number">Número da camisa</Label>
+                <Input
+                  id="custom-number"
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={shirtNumber}
+                  onChange={(e) => setShirtNumber(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="custom-position">Posição</Label>
-              <Select value={position} onValueChange={(v) => setPosition(v ?? "")}>
-                <SelectTrigger id="custom-position">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {POSITIONS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <div className="flex flex-col gap-3 border-t pt-4">
+              <h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+                <ImageIcon className="size-3.5" />
+                Foto e link externo
+              </h3>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="custom-number">Número da camisa</Label>
-              <Input
-                id="custom-number"
-                type="number"
-                min={1}
-                max={99}
-                value={shirtNumber}
-                onChange={(e) => setShirtNumber(e.target.value)}
-              />
-            </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-photo">URL da foto (opcional)</Label>
+                <Input
+                  id="custom-photo"
+                  type="url"
+                  placeholder="https://..."
+                  value={photoUrl}
+                  onChange={(e) => setPhotoUrl(e.target.value)}
+                />
+              </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="custom-photo">URL da foto (opcional)</Label>
-              <Input
-                id="custom-photo"
-                type="url"
-                placeholder="https://..."
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="custom-link">Link externo (ogol, transfermarket...)</Label>
-              <Input
-                id="custom-link"
-                type="url"
-                placeholder="https://..."
-                value={externalLink}
-                onChange={(e) => setExternalLink(e.target.value)}
-              />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-link">Link externo (ogol, transfermarket...)</Label>
+                <Input
+                  id="custom-link"
+                  type="url"
+                  placeholder="https://..."
+                  value={externalLink}
+                  onChange={(e) => setExternalLink(e.target.value)}
+                />
+              </div>
             </div>
 
             <Button type="submit" disabled={creating} className="w-fit">

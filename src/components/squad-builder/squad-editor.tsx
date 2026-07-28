@@ -12,15 +12,15 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { toast } from "sonner";
-import { XIcon } from "lucide-react";
+import { XIcon, Volleyball, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFormationSlots } from "@/lib/formations";
-import { groupPlayersByPosition } from "@/lib/position-groups";
 import { ratingStyle } from "@/lib/rating-tier";
 import { PlayerProfileDialog } from "@/components/player-card/player-profile-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
-import { OverallBadge } from "@/components/player-card/overall-badge";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { RosterTable } from "./roster-table";
 import { AddPlayerDialog } from "./add-player-dialog";
 
 export interface SquadPlayerVM {
@@ -234,45 +234,54 @@ export function SquadEditor({
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div
-          className="relative aspect-[2/3] w-full max-w-md justify-self-center overflow-hidden rounded-xl shadow-lg ring-1 ring-black/10 lg:justify-self-start"
-          style={{
-            // Mown-grass stripes instead of a flat gradient — the pitch
-            // keeps this same grass tone in both light and dark mode by
-            // design (it's meant to read as turf, not follow the app's
-            // background token).
-            background:
-              "repeating-linear-gradient(180deg, oklch(0.5 0.15 145) 0px, oklch(0.5 0.15 145) 40px, oklch(0.46 0.15 145) 40px, oklch(0.46 0.15 145) 80px)",
-          }}
-        >
-          {/* w-full is load-bearing here, not decorative: justify-self
-              (center/start) opts this grid item out of the default
-              stretch sizing, so without an explicit width the div sizes
-              to its content. Every child is `absolute` and contributes
-              ~0 to that, which made the whole pitch (and aspect-[2/3]'s
-              height, computed from that near-zero width) collapse to a
-              tiny box with every chip crammed into one corner. */}
-          <PitchLines />
-          {formationSlots.map((s) => (
-            <DroppableSlot
-              key={s.slot}
-              slotKey={s.slot}
-              label={s.label}
-              x={s.x}
-              y={s.y}
-              player={state.slots[s.slot]}
-              {...chipHandlers}
-            />
-          ))}
-        </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <Card className="gap-0 py-0">
+          <CardHeader className="border-b py-3 [.border-b]:pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Volleyball className="text-primary size-4" />
+              Campo tático
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex justify-center py-4">
+            <div
+              className="relative aspect-[2/3] w-full max-w-md overflow-hidden rounded-xl shadow-lg ring-1 ring-black/10"
+              style={{
+                // Mown-grass stripes instead of a flat gradient — the pitch
+                // keeps this same grass tone in both light and dark mode by
+                // design (it's meant to read as turf, not follow the app's
+                // background token).
+                background:
+                  "repeating-linear-gradient(180deg, oklch(0.5 0.15 145) 0px, oklch(0.5 0.15 145) 40px, oklch(0.46 0.15 145) 40px, oklch(0.46 0.15 145) 80px)",
+              }}
+            >
+              <PitchLines />
+              {formationSlots.map((s) => (
+                <DroppableSlot
+                  key={s.slot}
+                  slotKey={s.slot}
+                  label={s.label}
+                  x={s.x}
+                  y={s.y}
+                  player={state.slots[s.slot]}
+                  {...chipHandlers}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-        <BenchPanel
-          squadId={squadId}
-          bench={state.bench}
-          onPlayerAdded={handlePlayerAdded}
-          {...chipHandlers}
-        />
+        <Card className="gap-0 py-0">
+          <CardHeader className="flex-row items-center justify-between border-b py-3 [.border-b]:pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="text-primary size-4" />
+              Elenco ({state.bench.length})
+            </CardTitle>
+            <AddPlayerDialog squadId={squadId} onAdded={handlePlayerAdded} />
+          </CardHeader>
+          <CardContent className="p-3">
+            <RosterTable bench={state.bench} {...chipHandlers} />
+          </CardContent>
+        </Card>
       </div>
       {confirmDialog}
     </DndContext>
@@ -319,7 +328,6 @@ function DroppableSlot({
       {player ? (
         <PlayerChip
           player={player}
-          variant="pitch"
           onNumberChange={onNumberChange}
           onCaptainToggle={onCaptainToggle}
           onRemove={onRemove}
@@ -338,70 +346,13 @@ function DroppableSlot({
   );
 }
 
-function BenchPanel({
-  squadId,
-  bench,
-  onNumberChange,
-  onCaptainToggle,
-  onRemove,
-  onPlayerAdded,
-}: {
-  squadId: string;
-  bench: SquadPlayerVM[];
-  onNumberChange: (id: string, value: string) => void;
-  onCaptainToggle: (id: string, value: boolean) => void;
-  onRemove: (id: string) => void;
-  onPlayerAdded: (player: SquadPlayerVM) => void;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: "bench" });
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <h2 className="font-heading text-sm font-semibold">Reservas ({bench.length})</h2>
-        <AddPlayerDialog squadId={squadId} onAdded={onPlayerAdded} />
-      </div>
-      <div
-        ref={setNodeRef}
-        className={cn(
-          "flex min-h-24 flex-col gap-2 rounded-xl border border-dashed p-2",
-          isOver && "border-primary bg-accent",
-        )}
-      >
-        {bench.length === 0 && (
-          <p className="text-muted-foreground p-2 text-sm">Arraste um jogador para cá.</p>
-        )}
-        {groupPlayersByPosition(bench).map(({ group, players }) => (
-          <div key={group} className="flex flex-col gap-2">
-            <h3 className="text-muted-foreground border-primary/40 border-l-2 px-2 text-xs font-semibold tracking-wide uppercase">
-              {group}
-            </h3>
-            {players.map((player) => (
-              <PlayerChip
-                key={player.id}
-                player={player}
-                variant="bench"
-                onNumberChange={onNumberChange}
-                onCaptainToggle={onCaptainToggle}
-                onRemove={onRemove}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function PlayerChip({
   player,
-  variant,
   onNumberChange,
   onCaptainToggle,
   onRemove,
 }: {
   player: SquadPlayerVM;
-  variant: "pitch" | "bench";
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
@@ -468,49 +419,6 @@ function PlayerChip({
   // untouched, and an actual drag never does. That's what makes "click
   // opens the profile, drag moves the player" work without extra state.
 
-  if (variant === "pitch") {
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        className={cn(
-          "flex w-20 cursor-grab touch-none flex-col items-center gap-1",
-          isDragging && "z-50 opacity-50",
-        )}
-      >
-        <div className="relative">
-          <PlayerProfileDialog
-            player={profileInfo}
-            aria-label={`Ver perfil de ${player.name}`}
-            className="block rounded-full"
-          >
-            <PlayerAvatar
-              src={player.photoUrl}
-              name={player.name}
-              size="lg"
-              // Ring color reflects the player's overall tier (gold/green/
-              // blue/plain) — same idea as an EA FC card's border color.
-              className={cn("bg-background shadow-md ring-2", ratingStyle(player.overall).ring)}
-            />
-          </PlayerProfileDialog>
-          <div className="absolute -top-1 -right-1">{captainButton}</div>
-          <div className="absolute -top-1 -left-1">{removeButton}</div>
-        </div>
-        {numberInput}
-        {/* Plain text, not another profile trigger: Base UI's DialogTrigger
-            owns pointer events in a way dnd-kit can't see through, even
-            without our own stopPropagation — wrapping both the avatar AND
-            the name would leave almost no chip surface draggable. The
-            avatar above is enough of a click target. */}
-        <span className="font-heading max-w-20 truncate rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
-          {player.name}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div
       ref={setNodeRef}
@@ -518,31 +426,37 @@ function PlayerChip({
       {...listeners}
       {...attributes}
       className={cn(
-        "bg-card hover:border-primary/40 flex cursor-grab touch-none items-center gap-2 rounded-lg border p-2 transition-colors",
+        "flex w-20 cursor-grab touch-none flex-col items-center gap-1",
         isDragging && "z-50 opacity-50",
       )}
     >
-      <PlayerProfileDialog
-        player={profileInfo}
-        aria-label={`Ver perfil de ${player.name}`}
-        className="shrink-0 rounded-full"
-      >
-        <PlayerAvatar
-          src={player.photoUrl}
-          name={player.name}
-          className={cn("ring-2", ratingStyle(player.overall).ring)}
-        />
-      </PlayerProfileDialog>
-      {/* Plain text, not another trigger — same reasoning as the pitch
-          variant above: this is the chip's main drag surface. */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="font-heading truncate text-base font-bold">{player.name}</span>
-        <span className="text-muted-foreground truncate text-xs">{player.position}</span>
+      <div className="relative">
+        <PlayerProfileDialog
+          player={profileInfo}
+          aria-label={`Ver perfil de ${player.name}`}
+          className="block rounded-full"
+        >
+          <PlayerAvatar
+            src={player.photoUrl}
+            name={player.name}
+            size="lg"
+            // Ring color reflects the player's overall tier (gold/green/
+            // blue/plain) — same idea as an EA FC card's border color.
+            className={cn("bg-background shadow-md ring-2", ratingStyle(player.overall).ring)}
+          />
+        </PlayerProfileDialog>
+        <div className="absolute -top-1 -right-1">{captainButton}</div>
+        <div className="absolute -top-1 -left-1">{removeButton}</div>
       </div>
-      {captainButton}
       {numberInput}
-      <OverallBadge overall={player.overall} />
-      {removeButton}
+      {/* Plain text, not another profile trigger: Base UI's DialogTrigger
+          owns pointer events in a way dnd-kit can't see through, even
+          without our own stopPropagation — wrapping both the avatar AND
+          the name would leave almost no chip surface draggable. The
+          avatar above is enough of a click target. */}
+      <span className="font-heading max-w-20 truncate rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
+        {player.name}
+      </span>
     </div>
   );
 }

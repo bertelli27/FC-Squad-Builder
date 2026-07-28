@@ -12,11 +12,11 @@ export function CoachCard({
   if (!coachName) return null;
 
   return (
-    <div className="flex w-fit items-center gap-3 rounded-lg border p-3">
+    <div className="flex w-fit items-center gap-3">
       <PlayerAvatar src={coachPhotoUrl} name={coachName} />
       <div className="flex flex-col">
         <span className="text-muted-foreground text-xs">Técnico</span>
-        <span className="text-sm font-medium">{coachName}</span>
+        <span className="font-heading text-sm font-bold">{coachName}</span>
       </div>
       {coachExternalLink && (
         <a
