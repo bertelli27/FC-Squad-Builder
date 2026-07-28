@@ -9,16 +9,19 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { toast } from "sonner";
+import { Info } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getFormationSlots } from "@/lib/formations";
+import { PlayerProfileDialog } from "@/components/player-card/player-profile-dialog";
 
 export interface SquadPlayerVM {
   id: string;
   name: string;
   photoUrl?: string | null;
   position?: string | null;
+  club?: string | null;
   overall?: number | null;
   shirtNumber?: number | null;
   isCaptain: boolean;
@@ -350,6 +353,17 @@ function PlayerChip({
     </button>
   );
 
+  const infoButton = (
+    <PlayerProfileDialog
+      name={player.name}
+      club={player.club}
+      aria-label="Ver perfil do jogador"
+      className="flex size-4 items-center justify-center rounded-full bg-black/30 text-white"
+    >
+      <Info className="size-3" />
+    </PlayerProfileDialog>
+  );
+
   if (variant === "pitch") {
     return (
       <div
@@ -368,6 +382,7 @@ function PlayerChip({
             <AvatarFallback>{initials(player.name)}</AvatarFallback>
           </Avatar>
           <div className="absolute -top-1 -right-1">{captainButton}</div>
+          <div className="absolute -bottom-1 -left-1">{infoButton}</div>
         </div>
         {numberInput}
         <span className="max-w-16 truncate rounded bg-black/60 px-1 text-[10px] text-white">
@@ -396,6 +411,7 @@ function PlayerChip({
         <span className="truncate text-sm font-medium">{player.name}</span>
         <span className="text-muted-foreground truncate text-xs">{player.position}</span>
       </div>
+      {infoButton}
       {captainButton}
       {numberInput}
       {player.overall != null && <Badge variant="secondary">{player.overall}</Badge>}

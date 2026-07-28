@@ -26,8 +26,14 @@ function loadRows(): KaggleRatingsRow[] {
 }
 
 function matchesFilters(player: Player, filters: PlayerSearchFilters): boolean {
-  if (filters.name && !player.name.toLowerCase().includes(filters.name.toLowerCase())) {
-    return false;
+  if (filters.name) {
+    const name = player.name.toLowerCase();
+    const search = filters.name.toLowerCase();
+    // Bidirectional: catches both "search is a substring of the stored
+    // name" (typical search-as-you-type) and the reverse — Kaggle often
+    // stores just a common name (e.g. "Alisson") while a caller searches
+    // the fuller name from another source (e.g. "Alisson Becker").
+    if (!name.includes(search) && !search.includes(name)) return false;
   }
   if (filters.position && player.position !== filters.position) return false;
   if (

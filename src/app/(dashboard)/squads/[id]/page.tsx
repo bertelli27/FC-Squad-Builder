@@ -26,6 +26,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
             name: sp.cachedPlayer.name,
             photoUrl: sp.cachedPlayer.photoUrl,
             position: sp.cachedPlayer.position,
+            club: sp.cachedPlayer.club,
             overall: sp.cachedPlayer.overall,
             shirtNumber: sp.shirtNumber,
             isCaptain: sp.isCaptain,
