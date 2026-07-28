@@ -72,7 +72,7 @@ export function RosterTable({ bench, ...handlers }: { bench: SquadPlayerVM[] } &
         <p className="text-muted-foreground p-4 text-sm">Arraste um jogador para cá.</p>
       ) : (
         <table className="w-full table-fixed border-collapse text-sm">
-          <thead className="bg-muted/50 text-muted-foreground sticky top-0 z-10 text-[11px] uppercase">
+          <thead className="bg-muted/50 text-muted-foreground font-heading sticky top-0 z-10 text-[11px] uppercase">
             <tr>
               <th className="w-7"></th>
               <th className="px-2 py-2 text-left font-semibold">Jogador</th>
@@ -103,7 +103,7 @@ function RosterGroup({
       <tr className="bg-muted/30">
         <td
           colSpan={6}
-          className="text-muted-foreground border-primary/40 border-l-2 px-2 py-1 text-[10px] font-semibold tracking-wide uppercase"
+          className="text-muted-foreground font-heading border-primary/40 border-l-2 px-2 py-1 text-[10px] font-semibold tracking-wide uppercase"
         >
           {group}
         </td>
@@ -116,12 +116,15 @@ function RosterGroup({
 }
 
 function RosterRow({ player, onNumberChange, onCaptainToggle, onRemove }: { player: SquadPlayerVM } & RosterHandlers) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  // No transform/translate here on purpose: CSS transforms on <tr> render
+  // inconsistently across engines (table-row boxes aren't a normal
+  // transformable element the way a <div> is), which is what made
+  // dragging a bench player look completely static until it dropped. The
+  // actual moving visual comes from DragOverlay in squad-editor.tsx; this
+  // row just dims in place while its clone follows the cursor.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: player.id,
   });
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
 
   const profileInfo = {
     name: player.name,
@@ -135,10 +138,9 @@ function RosterRow({ player, onNumberChange, onCaptainToggle, onRemove }: { play
   return (
     <tr
       ref={setNodeRef}
-      style={style}
       className={cn(
         "hover:bg-accent/30 border-t transition-colors",
-        isDragging && "bg-accent relative z-50 opacity-60",
+        isDragging && "opacity-30",
       )}
     >
       <td className="text-center">

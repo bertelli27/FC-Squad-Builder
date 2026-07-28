@@ -157,7 +157,7 @@ function ProfileContent({
               if (value == null) return [];
               return (
                 <div key={key} className="flex flex-col items-center rounded-lg border p-2">
-                  <span className="text-lg font-semibold">{value}</span>
+                  <span className="font-heading text-lg font-bold">{value}</span>
                   <span className="text-muted-foreground text-xs">{label}</span>
                 </div>
               );
@@ -170,7 +170,7 @@ function ProfileContent({
               if (present.length === 0) return null;
               return (
                 <div key={label}>
-                  <h3 className="text-muted-foreground mb-1 text-xs font-medium uppercase">
+                  <h3 className="text-muted-foreground font-heading mb-1 text-xs font-semibold uppercase">
                     {label}
                   </h3>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">

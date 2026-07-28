@@ -268,7 +268,7 @@ export function AddPlayerDialog({
             </p>
 
             <div className="flex flex-col gap-3">
-              <h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+              <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
                 <UserPlus className="size-3.5" />
                 Dados do jogador
               </h3>
@@ -313,7 +313,7 @@ export function AddPlayerDialog({
             </div>
 
             <div className="flex flex-col gap-3 border-t pt-4">
-              <h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+              <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
                 <ImageIcon className="size-3.5" />
                 Foto e link externo
               </h3>

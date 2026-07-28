@@ -68,7 +68,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-3">
-            <h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+            <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
               <Shield className="size-3.5" />
               Elenco
             </h3>
@@ -96,7 +96,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
           </div>
 
           <div className="flex flex-col gap-3 border-t pt-4">
-            <h3 className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+            <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
               <UserRound className="size-3.5" />
               Técnico
             </h3>

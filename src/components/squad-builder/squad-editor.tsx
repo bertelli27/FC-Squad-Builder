@@ -3,12 +3,14 @@
 import { useState } from "react";
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   PointerSensor,
+  type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { toast } from "sonner";
@@ -88,6 +90,18 @@ export function SquadEditor({
   // documented fix for draggable items containing interactive children.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
+  const [activePlayer, setActivePlayer] = useState<SquadPlayerVM | null>(null);
+
+  function findPlayer(id: string): SquadPlayerVM | null {
+    for (const key of Object.keys(state.slots)) {
+      if (state.slots[key]?.id === id) return state.slots[key];
+    }
+    return state.bench.find((p) => p.id === id) ?? null;
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    setActivePlayer(findPlayer(String(event.active.id)));
+  }
 
   async function persistArrangement(next: EditorState) {
     const payload = [
@@ -112,6 +126,7 @@ export function SquadEditor({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    setActivePlayer(null);
     const { active, over } = event;
     if (!over) return;
     const activeId = String(active.id);
@@ -232,7 +247,9 @@ export function SquadEditor({
       id="squad-editor"
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={() => setActivePlayer(null)}
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Card className="gap-0 py-0">
@@ -283,6 +300,17 @@ export function SquadEditor({
           </CardContent>
         </Card>
       </div>
+      {/* The floating clone that actually follows the cursor during a
+          drag. Both drag sources (pitch chip, roster table row) just show
+          reduced opacity in place via `isDragging` — neither one moves
+          itself anymore. That matters most for the table: CSS transforms
+          on <tr> render inconsistently across engines (a table-row box
+          isn't a normal transformable element the way a <div> is), which
+          is exactly why dragging a bench player used to show no movement
+          at all until it dropped. */}
+      <DragOverlay dropAnimation={null}>
+        {activePlayer ? <DragOverlayChip player={activePlayer} /> : null}
+      </DragOverlay>
       {confirmDialog}
     </DndContext>
   );
@@ -346,6 +374,23 @@ function DroppableSlot({
   );
 }
 
+/** Floating clone rendered inside DragOverlay — same look as the pitch chip's avatar+name, without any of its interactive/draggable wiring (the overlay is purely visual). */
+function DragOverlayChip({ player }: { player: SquadPlayerVM }) {
+  return (
+    <div className="flex w-20 cursor-grabbing flex-col items-center gap-1">
+      <PlayerAvatar
+        src={player.photoUrl}
+        name={player.name}
+        size="lg"
+        className={cn("bg-background shadow-xl ring-2", ratingStyle(player.overall).ring)}
+      />
+      <span className="font-heading max-w-20 truncate rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
+        {player.name}
+      </span>
+    </div>
+  );
+}
+
 function PlayerChip({
   player,
   onNumberChange,
@@ -357,12 +402,9 @@ function PlayerChip({
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: player.id,
   });
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
 
   const numberInput = (
     <input
@@ -422,12 +464,11 @@ function PlayerChip({
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...listeners}
       {...attributes}
       className={cn(
         "flex w-20 cursor-grab touch-none flex-col items-center gap-1",
-        isDragging && "z-50 opacity-50",
+        isDragging && "opacity-30",
       )}
     >
       <div className="relative">
