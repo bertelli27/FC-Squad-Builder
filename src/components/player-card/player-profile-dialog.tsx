@@ -9,9 +9,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PlayerAvatar } from "./player-avatar";
-import { Badge } from "@/components/ui/badge";
+import { OverallBadge } from "./overall-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MAIN_ATTRIBUTES, ATTRIBUTE_GROUPS, ATTRIBUTE_LABELS } from "@/lib/attribute-labels";
+import { ratingStyle } from "@/lib/rating-tier";
+import { cn } from "@/lib/utils";
 import type { Player } from "@/types/domain";
 
 export interface KnownPlayerInfo {
@@ -109,11 +111,20 @@ function ProfileContent({
   attributesLoading: boolean;
 }) {
   const attributes = player.attributes;
+  const tier = ratingStyle(player.overall);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-4">
-        <PlayerAvatar src={player.photoUrl} name={player.name} size="lg" />
+      {/* -mx-4 -mt-4 bleeds to the dialog's edges, same convention as
+          DialogFooter's own bleed — gives the tier-colored gradient a
+          proper "player card" banner feel instead of a boxed-in strip. */}
+      <div className={cn("-mx-4 -mt-4 flex items-center gap-4 rounded-t-xl p-4 pb-3", tier.banner)}>
+        <PlayerAvatar
+          src={player.photoUrl}
+          name={player.name}
+          size="lg"
+          className={cn("ring-2", tier.ring)}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-muted-foreground truncate text-sm">
             {[player.position, player.club, player.nationality].filter(Boolean).join(" · ")}
@@ -122,11 +133,7 @@ function ProfileContent({
             <span className="text-muted-foreground text-xs">{player.age} anos</span>
           )}
         </div>
-        {player.overall != null && (
-          <Badge variant="secondary" className="text-base">
-            {player.overall}
-          </Badge>
-        )}
+        <OverallBadge overall={player.overall} className="h-7 px-2.5 text-base" />
       </div>
 
       {player.externalLink && (

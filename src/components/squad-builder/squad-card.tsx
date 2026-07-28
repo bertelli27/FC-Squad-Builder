@@ -37,7 +37,7 @@ export function SquadCard({ squad }: { squad: SquadCardData }) {
   }
 
   return (
-    <Card>
+    <Card className="hover:ring-primary/30 transition-shadow hover:shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ClubBadge src={squad.logoUrl} name={squad.name} size="sm" />
@@ -58,7 +58,9 @@ export function SquadCard({ squad }: { squad: SquadCardData }) {
         </CardAction>
       </CardHeader>
       <CardContent>
-        <Badge variant="secondary">{squad.formation}</Badge>
+        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+          {squad.formation}
+        </Badge>
       </CardContent>
       <CardFooter className="text-muted-foreground text-sm">
         {squad.playerCount} {squad.playerCount === 1 ? "jogador" : "jogadores"}

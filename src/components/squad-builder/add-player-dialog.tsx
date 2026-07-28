@@ -19,8 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
+import { OverallBadge } from "@/components/player-card/overall-badge";
+import { ratingStyle } from "@/lib/rating-tier";
+import { cn } from "@/lib/utils";
 import type { SquadPlayerVM } from "./squad-editor";
 
 interface SearchResult {
@@ -226,17 +228,22 @@ export function AddPlayerDialog({
               {shown.map((result) => {
                 const key = `${result.source}:${result.externalId}`;
                 return (
-                  <li key={key} className="flex items-center gap-3 rounded-lg border p-2">
-                    <PlayerAvatar src={result.photoUrl} name={result.name} />
+                  <li
+                    key={key}
+                    className="hover:border-primary/40 flex items-center gap-3 rounded-lg border p-2 transition-colors"
+                  >
+                    <PlayerAvatar
+                      src={result.photoUrl}
+                      name={result.name}
+                      className={cn("ring-2", ratingStyle(result.overall).ring)}
+                    />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-sm font-medium">{result.name}</span>
                       <span className="text-muted-foreground truncate text-xs">
                         {[result.position, result.club].filter(Boolean).join(" · ")}
                       </span>
                     </div>
-                    {result.overall != null && (
-                      <Badge variant="secondary">{result.overall}</Badge>
-                    )}
+                    <OverallBadge overall={result.overall} />
                     <Button size="sm" disabled={addingId === key} onClick={() => handleAdd(result)}>
                       {addingId === key ? "..." : "Adicionar"}
                     </Button>

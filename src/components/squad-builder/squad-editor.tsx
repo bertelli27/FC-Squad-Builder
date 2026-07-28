@@ -13,12 +13,13 @@ import {
 } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { XIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getFormationSlots } from "@/lib/formations";
 import { groupPlayersByPosition } from "@/lib/position-groups";
+import { ratingStyle } from "@/lib/rating-tier";
 import { PlayerProfileDialog } from "@/components/player-card/player-profile-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
+import { OverallBadge } from "@/components/player-card/overall-badge";
 import { AddPlayerDialog } from "./add-player-dialog";
 
 export interface SquadPlayerVM {
@@ -227,7 +228,17 @@ export function SquadEditor({
       onDragEnd={handleDragEnd}
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="relative aspect-[2/3] w-full max-w-md justify-self-center overflow-hidden rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 lg:justify-self-start">
+        <div
+          className="relative aspect-[2/3] w-full max-w-md justify-self-center overflow-hidden rounded-xl shadow-lg ring-1 ring-black/10 lg:justify-self-start"
+          style={{
+            // Mown-grass stripes instead of a flat gradient — the pitch
+            // keeps this same grass tone in both light and dark mode by
+            // design (it's meant to read as turf, not follow the app's
+            // background token).
+            background:
+              "repeating-linear-gradient(180deg, oklch(0.5 0.15 145) 0px, oklch(0.5 0.15 145) 40px, oklch(0.46 0.15 145) 40px, oklch(0.46 0.15 145) 80px)",
+          }}
+        >
           {/* w-full is load-bearing here, not decorative: justify-self
               (center/start) opts this grid item out of the default
               stretch sizing, so without an explicit width the div sizes
@@ -262,10 +273,10 @@ export function SquadEditor({
 
 function PitchLines() {
   return (
-    <div className="pointer-events-none absolute inset-0 opacity-40">
-      <div className="absolute inset-3 rounded-sm border border-white/60" />
-      <div className="absolute top-1/2 right-3 left-3 border-t border-white/60" />
-      <div className="absolute top-1/2 left-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />
+    <div className="pointer-events-none absolute inset-0 opacity-50">
+      <div className="absolute inset-3 rounded-sm border border-white/70" />
+      <div className="absolute top-1/2 right-3 left-3 border-t border-white/70" />
+      <div className="absolute top-1/2 left-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70" />
     </div>
   );
 }
@@ -309,7 +320,7 @@ function DroppableSlot({
         <div
           className={cn(
             "flex size-14 items-center justify-center rounded-full border-2 border-dashed border-white/50 text-xs font-medium text-white/80",
-            isOver && "border-white bg-white/10",
+            isOver && "border-primary bg-primary/25 text-white",
           )}
         >
           {label}
@@ -339,7 +350,7 @@ function BenchPanel({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-muted-foreground text-sm font-medium">Reservas ({bench.length})</h2>
+        <h2 className="font-heading text-sm font-semibold">Reservas ({bench.length})</h2>
         <AddPlayerDialog squadId={squadId} onAdded={onPlayerAdded} />
       </div>
       <div
@@ -354,7 +365,7 @@ function BenchPanel({
         )}
         {groupPlayersByPosition(bench).map(({ group, players }) => (
           <div key={group} className="flex flex-col gap-2">
-            <h3 className="text-muted-foreground px-1 text-xs font-semibold tracking-wide uppercase">
+            <h3 className="text-muted-foreground border-primary/40 border-l-2 px-2 text-xs font-semibold tracking-wide uppercase">
               {group}
             </h3>
             {players.map((player) => (
@@ -415,8 +426,8 @@ function PlayerChip({
       onClick={() => onCaptainToggle(player.id, !player.isCaptain)}
       aria-label={player.isCaptain ? "Remover capitão" : "Definir como capitão"}
       className={cn(
-        "flex size-4 items-center justify-center rounded-full text-[10px] font-bold",
-        player.isCaptain ? "bg-yellow-400 text-black" : "bg-black/30 text-white",
+        "flex size-4 items-center justify-center rounded-full text-[10px] font-bold backdrop-blur-sm",
+        player.isCaptain ? "bg-amber-400 text-amber-950" : "bg-black/35 text-white",
       )}
     >
       C
@@ -429,7 +440,7 @@ function PlayerChip({
       onPointerDown={(e) => e.stopPropagation()}
       onClick={() => onRemove(player.id)}
       aria-label="Remover do elenco"
-      className="flex size-4 items-center justify-center rounded-full bg-black/30 text-white"
+      className="flex size-4 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm"
     >
       <XIcon className="size-2.5" />
     </button>
@@ -471,7 +482,9 @@ function PlayerChip({
               src={player.photoUrl}
               name={player.name}
               size="lg"
-              className="bg-background ring-2 ring-white"
+              // Ring color reflects the player's overall tier (gold/green/
+              // blue/plain) — same idea as an EA FC card's border color.
+              className={cn("bg-background shadow-md ring-2", ratingStyle(player.overall).ring)}
             />
           </PlayerProfileDialog>
           <div className="absolute -top-1 -right-1">{captainButton}</div>
@@ -483,7 +496,7 @@ function PlayerChip({
             without our own stopPropagation — wrapping both the avatar AND
             the name would leave almost no chip surface draggable. The
             avatar above is enough of a click target. */}
-        <span className="max-w-16 truncate rounded bg-black/60 px-1 text-[10px] text-white">
+        <span className="max-w-16 truncate rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
           {player.name}
         </span>
       </div>
@@ -497,7 +510,7 @@ function PlayerChip({
       {...listeners}
       {...attributes}
       className={cn(
-        "bg-card flex cursor-grab touch-none items-center gap-3 rounded-lg border p-2",
+        "bg-card hover:border-primary/40 flex cursor-grab touch-none items-center gap-3 rounded-lg border p-2 transition-colors",
         isDragging && "z-50 opacity-50",
       )}
     >
@@ -506,7 +519,11 @@ function PlayerChip({
         aria-label={`Ver perfil de ${player.name}`}
         className="shrink-0 rounded-full"
       >
-        <PlayerAvatar src={player.photoUrl} name={player.name} />
+        <PlayerAvatar
+          src={player.photoUrl}
+          name={player.name}
+          className={cn("ring-2", ratingStyle(player.overall).ring)}
+        />
       </PlayerProfileDialog>
       {/* Plain text, not another trigger — same reasoning as the pitch
           variant above: this is the chip's main drag surface. */}
@@ -516,7 +533,7 @@ function PlayerChip({
       </div>
       {captainButton}
       {numberInput}
-      {player.overall != null && <Badge variant="secondary">{player.overall}</Badge>}
+      <OverallBadge overall={player.overall} />
       {removeButton}
     </div>
   );

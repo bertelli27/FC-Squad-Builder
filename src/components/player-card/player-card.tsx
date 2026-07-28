@@ -1,5 +1,5 @@
 import { PlayerAvatar } from "./player-avatar";
-import { Badge } from "@/components/ui/badge";
+import { OverallBadge } from "./overall-badge";
 
 export interface PlayerCardData {
   name: string;
@@ -32,7 +32,7 @@ export function PlayerCard({ player }: { player: PlayerCardData }) {
         </span>
       )}
 
-      {player.overall != null && <Badge variant="secondary">{player.overall}</Badge>}
+      <OverallBadge overall={player.overall} />
     </div>
   );
 }

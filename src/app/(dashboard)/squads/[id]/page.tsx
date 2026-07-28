@@ -15,7 +15,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
     <div className="flex flex-col gap-8">
       <div className="flex items-center gap-3">
         <ClubBadge src={squad.logoUrl} name={squad.name} />
-        <h1 className="text-2xl font-semibold tracking-tight">{squad.name}</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">{squad.name}</h1>
         <FormationSelector squadId={squad.id} formation={squad.formation} />
         <EditSquadDialog
           squad={{
