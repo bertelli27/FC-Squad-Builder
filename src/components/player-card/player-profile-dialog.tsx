@@ -23,42 +23,65 @@ function initials(name: string): string {
     .join("");
 }
 
+export interface KnownPlayerInfo {
+  name: string;
+  club?: string | null;
+  position?: string | null;
+  photoUrl?: string | null;
+  overall?: number | null;
+}
+
 export function PlayerProfileDialog({
-  name,
-  club,
+  player: known,
   className,
   "aria-label": ariaLabel,
   children,
 }: {
-  name: string;
-  club?: string | null;
+  player: KnownPlayerInfo;
   className?: string;
   "aria-label"?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [player, setPlayer] = useState<Player | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [enriched, setEnriched] = useState<Player | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (!next || player || status === "loading") return;
+    if (!next || fetched || loading) return;
 
-    setStatus("loading");
-    const params = new URLSearchParams({ name });
-    if (club) params.set("club", club);
+    setLoading(true);
+    const params = new URLSearchParams({ name: known.name });
+    if (known.club) params.set("club", known.club);
 
     fetch(`/api/players/profile?${params}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("not found");
-        return res.json();
-      })
-      .then((data) => {
-        setPlayer(data.player);
-        setStatus("idle");
-      })
-      .catch(() => setStatus("error"));
+      .then((res) => (res.ok ? res.json() : null))
+      // A miss here isn't an error to surface — it just means no source had
+      // a *confident* match (see ProviderRegistry.pickBestMatch), so we
+      // fall back to showing what was already known from the squad data.
+      .then((data) => setEnriched(data?.player ?? null))
+      .catch(() => {})
+      .finally(() => {
+        setLoading(false);
+        setFetched(true);
+      });
   }
+
+  // Known (trusted, came straight from the club/national-team roster) is
+  // the baseline; enrichment only fills in what's still missing (chiefly
+  // attributes, plus nationality/age which rosters don't carry).
+  const displayed: Player = {
+    id: enriched?.id ?? "",
+    source: enriched?.source ?? "",
+    externalId: enriched?.externalId ?? "",
+    name: known.name,
+    club: known.club ?? undefined,
+    position: known.position ?? undefined,
+    photoUrl: known.photoUrl ?? undefined,
+    overall: known.overall ?? undefined,
+    ...enriched,
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -71,36 +94,31 @@ export function PlayerProfileDialog({
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{player?.name ?? name}</DialogTitle>
+          <DialogTitle>{displayed.name}</DialogTitle>
         </DialogHeader>
 
-        {status === "loading" && <ProfileSkeleton />}
-        {status === "error" && (
-          <p className="text-muted-foreground text-sm">Não foi possível carregar o perfil.</p>
-        )}
-        {player && <ProfileContent player={player} />}
+        <ProfileContent player={displayed} attributesLoading={loading} />
       </DialogContent>
     </Dialog>
   );
 }
 
-function ProfileSkeleton() {
+function AttributesSkeleton() {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-4">
-        <Skeleton className="size-16 shrink-0 rounded-full" />
-        <div className="flex flex-1 flex-col gap-2">
-          <Skeleton className="h-3 w-40" />
-          <Skeleton className="h-3 w-24" />
-        </div>
-      </div>
+    <div className="flex flex-col gap-3">
       <Skeleton className="h-16 w-full" />
-      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-24 w-full" />
     </div>
   );
 }
 
-function ProfileContent({ player }: { player: Player }) {
+function ProfileContent({
+  player,
+  attributesLoading,
+}: {
+  player: Player;
+  attributesLoading: boolean;
+}) {
   const attributes = player.attributes;
 
   return (
@@ -125,7 +143,9 @@ function ProfileContent({ player }: { player: Player }) {
         )}
       </div>
 
-      {attributes ? (
+      {attributesLoading ? (
+        <AttributesSkeleton />
+      ) : attributes ? (
         <>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {MAIN_ATTRIBUTES.flatMap(({ key, label }) => {

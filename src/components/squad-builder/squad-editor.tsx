@@ -355,8 +355,13 @@ function PlayerChip({
 
   const infoButton = (
     <PlayerProfileDialog
-      name={player.name}
-      club={player.club}
+      player={{
+        name: player.name,
+        club: player.club,
+        position: player.position,
+        photoUrl: player.photoUrl,
+        overall: player.overall,
+      }}
       aria-label="Ver perfil do jogador"
       className="flex size-4 items-center justify-center rounded-full bg-black/30 text-white"
     >

@@ -51,16 +51,16 @@ function pickDefined<T extends object>(...sources: Array<T | null | undefined>):
   return result as T | null;
 }
 
-// Prefers the candidate whose club matches the given hint; falls back to
-// the first result (best-effort ranking from the source itself) otherwise.
+// When a club hint is given, ONLY a candidate matching it is accepted —
+// silently falling back to "the first result anyway" is how a same-named
+// homonym (e.g. searching "Fabinho" turning up the Al-Ittihad Fabinho
+// instead of a lower-profile club's own player of the same name) ends up
+// misattributed with confidently-wrong ratings. No match beats a wrong
+// match. Without a club hint there's nothing to filter by, so the
+// source's own best-effort first result is the only option.
 function pickBestMatch(candidates: Player[], context?: { club?: string }): Player | undefined {
-  if (context?.club) {
-    const clubMatch = candidates.find(
-      (c) => c.club?.toLowerCase() === context.club!.toLowerCase(),
-    );
-    if (clubMatch) return clubMatch;
-  }
-  return candidates[0];
+  if (!context?.club) return candidates[0];
+  return candidates.find((c) => c.club?.toLowerCase() === context.club!.toLowerCase());
 }
 
 export const providerRegistry = {
