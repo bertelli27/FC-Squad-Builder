@@ -39,6 +39,7 @@ export async function cachePlayer(player: Player): Promise<void> {
     overall: player.overall,
     potential: player.potential,
     age: player.age,
+    externalLink: player.externalLink,
     rawData: toJson(player),
     expiresAt: defaultExpiresAt(),
   });

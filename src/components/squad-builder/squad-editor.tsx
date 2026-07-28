@@ -13,6 +13,7 @@ import { XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getFormationSlots } from "@/lib/formations";
+import { groupPlayersByPosition } from "@/lib/position-groups";
 import { PlayerProfileDialog } from "@/components/player-card/player-profile-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { AddPlayerDialog } from "./add-player-dialog";
@@ -28,6 +29,7 @@ export interface SquadPlayerVM {
   isCaptain: boolean;
   isStarter: boolean;
   positionSlot?: string | null;
+  externalLink?: string | null;
 }
 
 interface EditorState {
@@ -325,15 +327,22 @@ function BenchPanel({
         {bench.length === 0 && (
           <p className="text-muted-foreground p-2 text-sm">Arraste um jogador para cá.</p>
         )}
-        {bench.map((player) => (
-          <PlayerChip
-            key={player.id}
-            player={player}
-            variant="bench"
-            onNumberChange={onNumberChange}
-            onCaptainToggle={onCaptainToggle}
-            onRemove={onRemove}
-          />
+        {groupPlayersByPosition(bench).map(({ group, players }) => (
+          <div key={group} className="flex flex-col gap-2">
+            <h3 className="text-muted-foreground px-1 text-xs font-semibold tracking-wide uppercase">
+              {group}
+            </h3>
+            {players.map((player) => (
+              <PlayerChip
+                key={player.id}
+                player={player}
+                variant="bench"
+                onNumberChange={onNumberChange}
+                onCaptainToggle={onCaptainToggle}
+                onRemove={onRemove}
+              />
+            ))}
+          </div>
         ))}
       </div>
     </div>
@@ -407,6 +416,7 @@ function PlayerChip({
     position: player.position,
     photoUrl: player.photoUrl,
     overall: player.overall,
+    externalLink: player.externalLink,
   };
   // No onPointerDown/stopPropagation here on purpose: dnd-kit only starts a
   // drag past a small movement threshold, and doesn't fire a `click` event

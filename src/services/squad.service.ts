@@ -90,8 +90,14 @@ function assignStartingXI(
 // though the schema only stores the bare externalId, not its source.
 async function getBaseClubLogo(baseClubRef: string | null): Promise<string | undefined> {
   if (!baseClubRef) return undefined;
-  const club = await clubDataService.getClub("api-football", baseClubRef);
-  return club?.logoUrl;
+  // A rate-limited/unreachable API-Football must not take the whole page
+  // down with it — this is decorative (a badge), not essential data.
+  try {
+    const club = await clubDataService.getClub("api-football", baseClubRef);
+    return club?.logoUrl;
+  } catch {
+    return undefined;
+  }
 }
 
 export const squadService = {
@@ -232,4 +238,89 @@ export const squadService = {
   async removePlayerFromSquad(squadId: string, playerId: string) {
     await prisma.squadPlayer.delete({ where: { id: playerId, squadId } });
   },
+
+  /**
+   * Creates a player that exists only in this app (not backed by any
+   * provider) — for when a search across Kaggle/API-Football/TheSportsDB
+   * still doesn't find who the user wants. Added straight to the bench;
+   * `expiresAt` is set far in the future since there's no source to ever
+   * refresh it from.
+   */
+  async createCustomPlayer(
+    squadId: string,
+    input: {
+      name: string;
+      position?: string;
+      photoUrl?: string;
+      externalLink?: string;
+      shirtNumber?: number;
+    },
+  ) {
+    const externalId = crypto.randomUUID();
+    const cached = await cacheRepository.upsertPlayer(CUSTOM_PLAYER_SOURCE, externalId, {
+      name: input.name,
+      position: input.position,
+      photoUrl: input.photoUrl,
+      externalLink: input.externalLink,
+      rawData: { custom: true },
+      expiresAt: new Date(Date.now() + CUSTOM_PLAYER_TTL_MS),
+    });
+
+    const { _max } = await prisma.squadPlayer.aggregate({
+      where: { squadId },
+      _max: { order: true },
+    });
+
+    return prisma.squadPlayer.create({
+      data: {
+        squadId,
+        cachedPlayerId: cached.id,
+        isStarter: false,
+        shirtNumber: input.shirtNumber,
+        order: (_max.order ?? -1) + 1,
+      },
+      include: { cachedPlayer: true },
+    });
+  },
+
+  /**
+   * Switches formation and remaps the current starting XI onto the new
+   * formation's slots (same greedy category match as initial squad
+   * creation), preserving who's a starter — captain/number/bench are
+   * untouched. Bench players are left alone.
+   */
+  async changeFormation(squadId: string, formation: string) {
+    const squad = await prisma.squad.findUnique({
+      where: { id: squadId },
+      include: { players: { include: { cachedPlayer: true } } },
+    });
+    if (!squad) return null;
+
+    const starters = squad.players.filter((p) => p.isStarter);
+    const assignments = assignStartingXI(
+      starters.map((p) => ({
+        cachedPlayerId: p.cachedPlayerId,
+        position: p.cachedPlayer.position ?? undefined,
+        overall: p.cachedPlayer.overall ?? undefined,
+      })),
+      formation,
+    );
+    const byCachedPlayerId = new Map(starters.map((p) => [p.cachedPlayerId, p]));
+
+    await prisma.$transaction([
+      prisma.squad.update({ where: { id: squadId }, data: { formation } }),
+      ...assignments.map((a) => {
+        const original = byCachedPlayerId.get(a.cachedPlayerId)!;
+        return prisma.squadPlayer.update({
+          where: { id: original.id },
+          data: { positionSlot: a.positionSlot, isStarter: a.isStarter, order: a.order },
+        });
+      }),
+    ]);
+
+    return squadService.getSquad(squadId);
+  },
 };
+
+const CUSTOM_PLAYER_SOURCE = "custom";
+const CUSTOM_PLAYER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;

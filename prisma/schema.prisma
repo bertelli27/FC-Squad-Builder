@@ -13,21 +13,22 @@ datasource db {
 // ── CACHE (somente leitura, espelha as APIs) ──────────────
 
 model CachedPlayer {
-  id          String   @id @default(cuid())
-  source      String // "sofifa" | "api-football" | "thesportsdb"
-  externalId  String
-  name        String
-  photoUrl    String?
-  nationality String?
-  position    String?
-  club        String?
-  league      String?
-  overall     Int?
-  potential   Int?
-  age         Int?
-  rawData     Json // payload bruto, para reprocessar sem rechamar a API
-  fetchedAt   DateTime @default(now())
-  expiresAt   DateTime
+  id           String   @id @default(cuid())
+  source       String // "kaggle-fc26" | "api-football" | "thesportsdb" | "custom"
+  externalId   String
+  name         String
+  photoUrl     String?
+  nationality  String?
+  position     String?
+  club         String?
+  league       String?
+  overall      Int?
+  potential    Int?
+  age          Int?
+  externalLink String? // link externo informado manualmente (ex: ogol, transfermarket) para jogadores "custom"
+  rawData      Json // payload bruto, para reprocessar sem rechamar a API
+  fetchedAt    DateTime @default(now())
+  expiresAt    DateTime
 
   squadPlayers SquadPlayer[]
 

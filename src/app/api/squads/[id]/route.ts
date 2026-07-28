@@ -16,10 +16,19 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (!existing) return NextResponse.json({ error: "Squad not found" }, { status: 404 });
 
   const body = await request.json().catch(() => null);
-  const squad = await squadService.updateSquad(id, {
-    name: typeof body?.name === "string" ? body.name : undefined,
-    formation: typeof body?.formation === "string" ? body.formation : undefined,
-  });
+  const name = typeof body?.name === "string" ? body.name : undefined;
+  const formation = typeof body?.formation === "string" ? body.formation : undefined;
+
+  if (name !== undefined) {
+    await squadService.updateSquad(id, { name });
+  }
+
+  // Changing formation remaps the starting XI onto the new slot set
+  // (see squadService.changeFormation), not just a plain field update.
+  const squad =
+    formation !== undefined && formation !== existing.formation
+      ? await squadService.changeFormation(id, formation)
+      : await squadService.getSquad(id);
 
   return NextResponse.json({ squad });
 }

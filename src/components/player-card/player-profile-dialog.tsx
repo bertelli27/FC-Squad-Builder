@@ -20,6 +20,7 @@ export interface KnownPlayerInfo {
   position?: string | null;
   photoUrl?: string | null;
   overall?: number | null;
+  externalLink?: string | null;
 }
 
 export function PlayerProfileDialog({
@@ -71,6 +72,7 @@ export function PlayerProfileDialog({
     position: known.position ?? undefined,
     photoUrl: known.photoUrl ?? undefined,
     overall: known.overall ?? undefined,
+    externalLink: known.externalLink ?? undefined,
     ...enriched,
   };
 
@@ -130,6 +132,17 @@ function ProfileContent({
           </Badge>
         )}
       </div>
+
+      {player.externalLink && (
+        <a
+          href={player.externalLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary text-sm underline underline-offset-2"
+        >
+          Ver mais (link externo) →
+        </a>
+      )}
 
       {attributesLoading ? (
         <AttributesSkeleton />

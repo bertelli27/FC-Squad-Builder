@@ -31,6 +31,7 @@ export function cachedPlayerToDomain(row: CachedPlayer): Player {
     overall: row.overall ?? undefined,
     potential: row.potential ?? undefined,
     age: row.age ?? undefined,
+    externalLink: row.externalLink ?? undefined,
   };
 }
 

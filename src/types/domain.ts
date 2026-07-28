@@ -12,6 +12,7 @@ export interface Player {
   potential?: number;
   age?: number;
   attributes?: Record<string, number>; // crossing, dribbling, etc.
+  externalLink?: string; // link externo (ex: ogol, transfermarket), informado manualmente para jogadores "custom"
 }
 
 export interface Club {
