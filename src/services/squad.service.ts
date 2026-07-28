@@ -30,7 +30,10 @@ async function resolveBase(
 
 export const squadService = {
   async listSquads() {
-    return prisma.squad.findMany({ orderBy: { updatedAt: "desc" } });
+    return prisma.squad.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: { _count: { select: { players: true } } },
+    });
   },
 
   async getSquad(id: string) {
