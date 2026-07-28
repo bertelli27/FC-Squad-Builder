@@ -15,7 +15,7 @@ export interface SquadCardData {
   name: string;
   formation: string;
   playerCount: number;
-  baseClubLogoUrl?: string | null;
+  logoUrl?: string | null;
 }
 
 export function SquadCard({ squad }: { squad: SquadCardData }) {
@@ -40,7 +40,7 @@ export function SquadCard({ squad }: { squad: SquadCardData }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ClubBadge src={squad.baseClubLogoUrl} name={squad.name} size="sm" />
+          <ClubBadge src={squad.logoUrl} name={squad.name} size="sm" />
           <Link href={`/squads/${squad.id}`} className="hover:underline">
             {squad.name}
           </Link>

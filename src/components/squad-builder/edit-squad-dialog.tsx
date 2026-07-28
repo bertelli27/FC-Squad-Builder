@@ -1,0 +1,133 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { PencilIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+export interface EditableSquadData {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  coachName?: string | null;
+  coachPhotoUrl?: string | null;
+  coachExternalLink?: string | null;
+}
+
+export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(squad.name);
+  const [logoUrl, setLogoUrl] = useState(squad.logoUrl ?? "");
+  const [coachName, setCoachName] = useState(squad.coachName ?? "");
+  const [coachPhotoUrl, setCoachPhotoUrl] = useState(squad.coachPhotoUrl ?? "");
+  const [coachExternalLink, setCoachExternalLink] = useState(squad.coachExternalLink ?? "");
+  const [saving, setSaving] = useState(false);
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) {
+      toast.error("O elenco precisa de um nome.");
+      return;
+    }
+
+    setSaving(true);
+    fetch(`/api/squads/${squad.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, logoUrl, coachName, coachPhotoUrl, coachExternalLink }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then(() => {
+        toast.success("Elenco atualizado.");
+        setOpen(false);
+        router.refresh();
+      })
+      .catch(() => toast.error("Não foi possível salvar."))
+      .finally(() => setSaving(false));
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Editar elenco"
+        onClick={() => setOpen(true)}
+      >
+        <PencilIcon className="size-4" />
+      </Button>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar elenco</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="squad-name">Nome do elenco</Label>
+            <Input
+              id="squad-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="squad-logo">URL do escudo</Label>
+            <Input
+              id="squad-logo"
+              type="url"
+              placeholder="https://..."
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+            />
+          </div>
+
+          <div className="mt-1 flex flex-col gap-3 border-t pt-4">
+            <h3 className="text-muted-foreground text-sm font-medium">Técnico</h3>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="coach-name">Nome</Label>
+              <Input
+                id="coach-name"
+                value={coachName}
+                onChange={(e) => setCoachName(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="coach-photo">URL da foto</Label>
+              <Input
+                id="coach-photo"
+                type="url"
+                placeholder="https://..."
+                value={coachPhotoUrl}
+                onChange={(e) => setCoachPhotoUrl(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="coach-link">Link externo</Label>
+              <Input
+                id="coach-link"
+                type="url"
+                placeholder="https://..."
+                value={coachExternalLink}
+                onChange={(e) => setCoachExternalLink(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <Button type="submit" disabled={saving} className="w-fit">
+            {saving ? "Salvando…" : "Salvar"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

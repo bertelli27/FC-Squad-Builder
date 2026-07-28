@@ -71,10 +71,17 @@ model CachedNationalTeam {
 model Squad {
   id          String   @id @default(cuid())
   name        String // "Coritiba", "Barcelona 2011", "Time dos Sonhos"
-  baseClubRef String? // externalId do CachedClub/CachedNationalTeam de origem
+  baseClubRef String? // externalId do CachedClub/CachedNationalTeam de origem, se carregado de um clube/seleção real
+  logoUrl     String? // escudo do elenco — copiado do clube de origem na criação (se houver) e editável livremente depois; nunca buscado ao vivo
   formation   String   @default("4-3-3")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  // Técnico: dado inteiramente manual, sem fonte externa (nenhum provider cobre técnicos).
+  coachName         String?
+  coachPhotoUrl     String?
+  coachExternalLink String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   players SquadPlayer[]
 }

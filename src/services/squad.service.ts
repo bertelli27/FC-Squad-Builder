@@ -16,17 +16,22 @@ export interface CreateSquadInput {
 
 async function resolveBase(
   base: NonNullable<CreateSquadInput["base"]>,
-): Promise<{ externalId: string; players: Player[] } | null> {
+): Promise<{ externalId: string; logoUrl?: string; players: Player[] } | null> {
   if (base.kind === "club") {
     const club = await clubDataService.resolveClub(base.name);
     if (!club) return null;
-    return { externalId: club.externalId, players: await clubDataService.getClubSquad(club) };
+    return {
+      externalId: club.externalId,
+      logoUrl: club.logoUrl,
+      players: await clubDataService.getClubSquad(club),
+    };
   }
 
   const team = await nationalTeamDataService.resolveNationalTeam(base.name);
   if (!team) return null;
   return {
     externalId: team.externalId,
+    logoUrl: team.flagUrl,
     players: await nationalTeamDataService.getNationalTeamSquad(team),
   };
 }
@@ -83,44 +88,19 @@ function assignStartingXI(
   return [...starters, ...bench];
 }
 
-// resolveBase always resolves clubs through providerRegistry.resolveClub,
-// which takes its identity (source/externalId) from API-Football whenever
-// it has anything at all (see ProviderRegistry's pickDefined source
-// order) — so a squad's baseClubRef is reliably an API-Football id even
-// though the schema only stores the bare externalId, not its source.
-async function getBaseClubLogo(baseClubRef: string | null): Promise<string | undefined> {
-  if (!baseClubRef) return undefined;
-  // A rate-limited/unreachable API-Football must not take the whole page
-  // down with it — this is decorative (a badge), not essential data.
-  try {
-    const club = await clubDataService.getClub("api-football", baseClubRef);
-    return club?.logoUrl;
-  } catch {
-    return undefined;
-  }
-}
-
 export const squadService = {
   async listSquads() {
-    const squads = await prisma.squad.findMany({
+    return prisma.squad.findMany({
       orderBy: { updatedAt: "desc" },
       include: { _count: { select: { players: true } } },
     });
-    return Promise.all(
-      squads.map(async (squad) => ({
-        ...squad,
-        baseClubLogoUrl: await getBaseClubLogo(squad.baseClubRef),
-      })),
-    );
   },
 
   async getSquad(id: string) {
-    const squad = await prisma.squad.findUnique({
+    return prisma.squad.findUnique({
       where: { id },
       include: { players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } } },
     });
-    if (!squad) return null;
-    return { ...squad, baseClubLogoUrl: await getBaseClubLogo(squad.baseClubRef) };
   },
 
   /**
@@ -128,13 +108,23 @@ export const squadService = {
    * o elenco base automaticamente") and assigning a starting XI across the
    * chosen formation's slots by position. Numbering/captain are left unset
    * — that's the tactical editor's job (roadmap step 11).
+   *
+   * If loaded from a real club/national team, its badge/flag is copied
+   * into `logoUrl` as a one-time convenience default — never re-fetched
+   * live afterward (see updateSquad for editing it, including for
+   * from-scratch squads that never had one to begin with).
    */
   async createSquad(input: CreateSquadInput) {
     const resolved = input.base ? await resolveBase(input.base) : null;
     const formation = input.formation ?? "4-3-3";
 
     const squad = await prisma.squad.create({
-      data: { name: input.name, formation, baseClubRef: resolved?.externalId },
+      data: {
+        name: input.name,
+        formation,
+        baseClubRef: resolved?.externalId,
+        logoUrl: resolved?.logoUrl,
+      },
     });
 
     if (resolved && resolved.players.length > 0) {
@@ -162,7 +152,17 @@ export const squadService = {
     return squad;
   },
 
-  async updateSquad(id: string, data: { name?: string; formation?: string }) {
+  async updateSquad(
+    id: string,
+    data: {
+      name?: string;
+      formation?: string;
+      logoUrl?: string | null;
+      coachName?: string | null;
+      coachPhotoUrl?: string | null;
+      coachExternalLink?: string | null;
+    },
+  ) {
     return prisma.squad.update({ where: { id }, data });
   },
 

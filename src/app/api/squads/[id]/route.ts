@@ -3,6 +3,13 @@ import { squadService } from "@/services/squad.service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+// undefined = field not sent, leave untouched; "" or null = clear it.
+function optionalStringField(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return typeof value === "string" ? value : undefined;
+}
+
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   const squad = await squadService.getSquad(id);
@@ -16,11 +23,21 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (!existing) return NextResponse.json({ error: "Squad not found" }, { status: 404 });
 
   const body = await request.json().catch(() => null);
-  const name = typeof body?.name === "string" ? body.name : undefined;
+  const name = typeof body?.name === "string" && body.name.trim() ? body.name : undefined;
   const formation = typeof body?.formation === "string" ? body.formation : undefined;
+  const logoUrl = optionalStringField(body?.logoUrl);
+  const coachName = optionalStringField(body?.coachName);
+  const coachPhotoUrl = optionalStringField(body?.coachPhotoUrl);
+  const coachExternalLink = optionalStringField(body?.coachExternalLink);
 
-  if (name !== undefined) {
-    await squadService.updateSquad(id, { name });
+  if (
+    name !== undefined ||
+    logoUrl !== undefined ||
+    coachName !== undefined ||
+    coachPhotoUrl !== undefined ||
+    coachExternalLink !== undefined
+  ) {
+    await squadService.updateSquad(id, { name, logoUrl, coachName, coachPhotoUrl, coachExternalLink });
   }
 
   // Changing formation remaps the starting XI onto the new slot set
