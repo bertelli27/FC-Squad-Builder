@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── CACHE (somente leitura, espelha as APIs) ──────────────
+
+model CachedPlayer {
+  id          String   @id @default(cuid())
+  source      String // "sofifa" | "api-football" | "thesportsdb"
+  externalId  String
+  name        String
+  photoUrl    String?
+  nationality String?
+  position    String?
+  club        String?
+  league      String?
+  overall     Int?
+  potential   Int?
+  age         Int?
+  rawData     Json // payload bruto, para reprocessar sem rechamar a API
+  fetchedAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  squadPlayers SquadPlayer[]
+
+  @@unique([source, externalId])
+  @@index([name])
+  @@index([club])
+  @@index([league])
+}
+
+model CachedClub {
+  id         String   @id @default(cuid())
+  source     String
+  externalId String
+  name       String
+  league     String?
+  country    String?
+  logoUrl    String?
+  rawData    Json
+  fetchedAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@unique([source, externalId])
+}
+
+model CachedNationalTeam {
+  id         String   @id @default(cuid())
+  source     String
+  externalId String
+  name       String
+  flagUrl    String?
+  rawData    Json
+  fetchedAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@unique([source, externalId])
+}
+
+// ── DADOS DO USUÁRIO (customizações) ──────────────────────
+
+model Squad {
+  id          String   @id @default(cuid())
+  name        String // "Coritiba", "Barcelona 2011", "Time dos Sonhos"
+  baseClubRef String? // externalId do CachedClub/CachedNationalTeam de origem
+  formation   String   @default("4-3-3")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  players SquadPlayer[]
+}
+
+model SquadPlayer {
+  id             String       @id @default(cuid())
+  squadId        String
+  squad          Squad        @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  cachedPlayerId String
+  cachedPlayer   CachedPlayer @relation(fields: [cachedPlayerId], references: [id])
+  shirtNumber    Int?
+  isCaptain      Boolean      @default(false)
+  isStarter      Boolean      @default(true) // false = banco de reservas
+  positionSlot   String? // posição na formação, ex: "LW", "CB1"
+  order          Int          @default(0)
+
+  @@unique([squadId, cachedPlayerId])
+}
