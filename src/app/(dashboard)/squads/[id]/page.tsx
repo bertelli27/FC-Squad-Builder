@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { squadService } from "@/services/squad.service";
 import { Badge } from "@/components/ui/badge";
 import { SquadEditor } from "@/components/squad-builder/squad-editor";
+import { ClubBadge } from "@/components/squad-builder/club-badge";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,6 +12,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center gap-3">
+        <ClubBadge src={squad.baseClubLogoUrl} name={squad.name} />
         <h1 className="text-2xl font-semibold tracking-tight">{squad.name}</h1>
         <Badge variant="secondary">{squad.formation}</Badge>
       </div>

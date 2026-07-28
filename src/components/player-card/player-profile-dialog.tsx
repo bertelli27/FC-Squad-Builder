@@ -8,20 +8,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PlayerAvatar } from "./player-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MAIN_ATTRIBUTES, ATTRIBUTE_GROUPS, ATTRIBUTE_LABELS } from "@/lib/attribute-labels";
 import type { Player } from "@/types/domain";
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
 
 export interface KnownPlayerInfo {
   name: string;
@@ -124,10 +115,7 @@ function ProfileContent({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
-        <Avatar size="lg" className="size-16">
-          {player.photoUrl && <AvatarImage src={player.photoUrl} alt={player.name} />}
-          <AvatarFallback className="text-base">{initials(player.name)}</AvatarFallback>
-        </Avatar>
+        <PlayerAvatar src={player.photoUrl} name={player.name} size="lg" />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-muted-foreground truncate text-sm">
             {[player.position, player.club, player.nationality].filter(Boolean).join(" · ")}

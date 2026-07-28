@@ -4,6 +4,7 @@ import { getFormationSlots } from "@/lib/formations";
 import { normalizePositionCategory } from "@/lib/position-category";
 import { clubDataService } from "./club-data.service";
 import { nationalTeamDataService } from "./national-team-data.service";
+import { playerDataService } from "./player-data.service";
 import type { Player } from "@/types/domain";
 
 export interface CreateSquadInput {
@@ -82,19 +83,38 @@ function assignStartingXI(
   return [...starters, ...bench];
 }
 
+// resolveBase always resolves clubs through providerRegistry.resolveClub,
+// which takes its identity (source/externalId) from API-Football whenever
+// it has anything at all (see ProviderRegistry's pickDefined source
+// order) — so a squad's baseClubRef is reliably an API-Football id even
+// though the schema only stores the bare externalId, not its source.
+async function getBaseClubLogo(baseClubRef: string | null): Promise<string | undefined> {
+  if (!baseClubRef) return undefined;
+  const club = await clubDataService.getClub("api-football", baseClubRef);
+  return club?.logoUrl;
+}
+
 export const squadService = {
   async listSquads() {
-    return prisma.squad.findMany({
+    const squads = await prisma.squad.findMany({
       orderBy: { updatedAt: "desc" },
       include: { _count: { select: { players: true } } },
     });
+    return Promise.all(
+      squads.map(async (squad) => ({
+        ...squad,
+        baseClubLogoUrl: await getBaseClubLogo(squad.baseClubRef),
+      })),
+    );
   },
 
   async getSquad(id: string) {
-    return prisma.squad.findUnique({
+    const squad = await prisma.squad.findUnique({
       where: { id },
       include: { players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } } },
     });
+    if (!squad) return null;
+    return { ...squad, baseClubLogoUrl: await getBaseClubLogo(squad.baseClubRef) };
   },
 
   /**
@@ -172,5 +192,44 @@ export const squadService = {
       });
     }
     return prisma.squadPlayer.update({ where: { id: playerId, squadId }, data });
+  },
+
+  /**
+   * Adds any player (identified by source+externalId, from a player
+   * search — Kaggle catalog or a live API-Football/TheSportsDB lookup) to
+   * the squad's bench. Idempotent: adding a player already in the squad
+   * just returns their existing row instead of erroring.
+   */
+  async addPlayerToSquad(squadId: string, ref: { source: string; externalId: string }) {
+    const player = await playerDataService.getPlayer(ref.source, ref.externalId);
+    if (!player) return null;
+
+    const cached = await cacheRepository.getPlayer(ref.source, ref.externalId);
+    if (!cached) return null;
+
+    const existing = await prisma.squadPlayer.findUnique({
+      where: { squadId_cachedPlayerId: { squadId, cachedPlayerId: cached.id } },
+      include: { cachedPlayer: true },
+    });
+    if (existing) return existing;
+
+    const { _max } = await prisma.squadPlayer.aggregate({
+      where: { squadId },
+      _max: { order: true },
+    });
+
+    return prisma.squadPlayer.create({
+      data: {
+        squadId,
+        cachedPlayerId: cached.id,
+        isStarter: false,
+        order: (_max.order ?? -1) + 1,
+      },
+      include: { cachedPlayer: true },
+    });
+  },
+
+  async removePlayerFromSquad(squadId: string, playerId: string) {
+    await prisma.squadPlayer.delete({ where: { id: playerId, squadId } });
   },
 };

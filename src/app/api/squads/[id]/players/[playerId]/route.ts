@@ -23,3 +23,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const player = await squadService.updateSquadPlayer(id, playerId, { shirtNumber, isCaptain });
   return NextResponse.json({ player });
 }
+
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+  const { id, playerId } = await params;
+  await squadService.removePlayerFromSquad(id, playerId);
+  return new NextResponse(null, { status: 204 });
+}

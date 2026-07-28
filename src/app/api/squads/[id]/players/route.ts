@@ -33,3 +33,23 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const squad = await squadService.getSquad(id);
   return NextResponse.json({ squad });
 }
+
+export async function POST(request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
+  const body = await request.json().catch(() => null);
+
+  if (typeof body?.source !== "string" || typeof body?.externalId !== "string") {
+    return NextResponse.json(
+      { error: "'source' and 'externalId' are required" },
+      { status: 400 },
+    );
+  }
+
+  const player = await squadService.addPlayerToSquad(id, {
+    source: body.source,
+    externalId: body.externalId,
+  });
+  if (!player) return NextResponse.json({ error: "Player not found" }, { status: 404 });
+
+  return NextResponse.json({ player }, { status: 201 });
+}

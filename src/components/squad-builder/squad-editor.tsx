@@ -9,12 +9,13 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { toast } from "sonner";
-import { Info } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getFormationSlots } from "@/lib/formations";
 import { PlayerProfileDialog } from "@/components/player-card/player-profile-dialog";
+import { PlayerAvatar } from "@/components/player-card/player-avatar";
+import { AddPlayerDialog } from "./add-player-dialog";
 
 export interface SquadPlayerVM {
   id: string;
@@ -32,15 +33,6 @@ export interface SquadPlayerVM {
 interface EditorState {
   slots: Record<string, SquadPlayerVM | null>;
   bench: SquadPlayerVM[];
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }
 
 function buildInitialState(players: SquadPlayerVM[], formation: string): EditorState {
@@ -186,7 +178,31 @@ export function SquadEditor({
     if (!res.ok) toast.error("Não foi possível definir o capitão.");
   }
 
-  const chipHandlers = { onNumberChange: handleNumberChange, onCaptainToggle: handleCaptainToggle };
+  async function handleRemove(playerId: string) {
+    if (!confirm("Remover este jogador do elenco?")) return;
+
+    setState((prev) => {
+      const slots = { ...prev.slots };
+      for (const key of Object.keys(slots)) {
+        if (slots[key]?.id === playerId) slots[key] = null;
+      }
+      return { slots, bench: prev.bench.filter((p) => p.id !== playerId) };
+    });
+
+    const res = await fetch(`/api/squads/${squadId}/players/${playerId}`, { method: "DELETE" });
+    if (!res.ok) toast.error("Não foi possível remover o jogador.");
+  }
+
+  function handlePlayerAdded(player: SquadPlayerVM) {
+    setState((prev) => ({ ...prev, bench: [...prev.bench, player] }));
+    toast.success(`${player.name} adicionado ao elenco.`);
+  }
+
+  const chipHandlers = {
+    onNumberChange: handleNumberChange,
+    onCaptainToggle: handleCaptainToggle,
+    onRemove: handleRemove,
+  };
 
   return (
     <DndContext id="squad-editor" collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -206,7 +222,12 @@ export function SquadEditor({
           ))}
         </div>
 
-        <BenchPanel bench={state.bench} {...chipHandlers} />
+        <BenchPanel
+          squadId={squadId}
+          bench={state.bench}
+          onPlayerAdded={handlePlayerAdded}
+          {...chipHandlers}
+        />
       </div>
     </DndContext>
   );
@@ -230,6 +251,7 @@ function DroppableSlot({
   player,
   onNumberChange,
   onCaptainToggle,
+  onRemove,
 }: {
   slotKey: string;
   label: string;
@@ -238,6 +260,7 @@ function DroppableSlot({
   player: SquadPlayerVM | null;
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
+  onRemove: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot:${slotKey}` });
 
@@ -253,6 +276,7 @@ function DroppableSlot({
           variant="pitch"
           onNumberChange={onNumberChange}
           onCaptainToggle={onCaptainToggle}
+          onRemove={onRemove}
         />
       ) : (
         <div
@@ -269,19 +293,28 @@ function DroppableSlot({
 }
 
 function BenchPanel({
+  squadId,
   bench,
   onNumberChange,
   onCaptainToggle,
+  onRemove,
+  onPlayerAdded,
 }: {
+  squadId: string;
   bench: SquadPlayerVM[];
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
+  onRemove: (id: string) => void;
+  onPlayerAdded: (player: SquadPlayerVM) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "bench" });
 
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="text-muted-foreground text-sm font-medium">Reservas ({bench.length})</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-muted-foreground text-sm font-medium">Reservas ({bench.length})</h2>
+        <AddPlayerDialog squadId={squadId} onAdded={onPlayerAdded} />
+      </div>
       <div
         ref={setNodeRef}
         className={cn(
@@ -299,6 +332,7 @@ function BenchPanel({
             variant="bench"
             onNumberChange={onNumberChange}
             onCaptainToggle={onCaptainToggle}
+            onRemove={onRemove}
           />
         ))}
       </div>
@@ -311,11 +345,13 @@ function PlayerChip({
   variant,
   onNumberChange,
   onCaptainToggle,
+  onRemove,
 }: {
   player: SquadPlayerVM;
   variant: "pitch" | "bench";
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
+  onRemove: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: player.id,
@@ -353,21 +389,30 @@ function PlayerChip({
     </button>
   );
 
-  const infoButton = (
-    <PlayerProfileDialog
-      player={{
-        name: player.name,
-        club: player.club,
-        position: player.position,
-        photoUrl: player.photoUrl,
-        overall: player.overall,
-      }}
-      aria-label="Ver perfil do jogador"
+  const removeButton = (
+    <button
+      type="button"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={() => onRemove(player.id)}
+      aria-label="Remover do elenco"
       className="flex size-4 items-center justify-center rounded-full bg-black/30 text-white"
     >
-      <Info className="size-3" />
-    </PlayerProfileDialog>
+      <XIcon className="size-2.5" />
+    </button>
   );
+
+  const profileInfo = {
+    name: player.name,
+    club: player.club,
+    position: player.position,
+    photoUrl: player.photoUrl,
+    overall: player.overall,
+  };
+  // No onPointerDown/stopPropagation here on purpose: dnd-kit only starts a
+  // drag past a small movement threshold, and doesn't fire a `click` event
+  // after a drag completes — so a plain click already reaches this trigger
+  // untouched, and an actual drag never does. That's what makes "click
+  // opens the profile, drag moves the player" work without extra state.
 
   if (variant === "pitch") {
     return (
@@ -382,17 +427,29 @@ function PlayerChip({
         )}
       >
         <div className="relative">
-          <Avatar size="lg" className="bg-background ring-2 ring-white">
-            {player.photoUrl && <AvatarImage src={player.photoUrl} alt={player.name} />}
-            <AvatarFallback>{initials(player.name)}</AvatarFallback>
-          </Avatar>
+          <PlayerProfileDialog
+            player={profileInfo}
+            aria-label={`Ver perfil de ${player.name}`}
+            className="block rounded-full"
+          >
+            <PlayerAvatar
+              src={player.photoUrl}
+              name={player.name}
+              size="lg"
+              className="bg-background ring-2 ring-white"
+            />
+          </PlayerProfileDialog>
           <div className="absolute -top-1 -right-1">{captainButton}</div>
-          <div className="absolute -bottom-1 -left-1">{infoButton}</div>
+          <div className="absolute -top-1 -left-1">{removeButton}</div>
         </div>
         {numberInput}
-        <span className="max-w-16 truncate rounded bg-black/60 px-1 text-[10px] text-white">
+        <PlayerProfileDialog
+          player={profileInfo}
+          aria-label={`Ver perfil de ${player.name}`}
+          className="max-w-16 truncate rounded bg-black/60 px-1 text-[10px] text-white"
+        >
           {player.name}
-        </span>
+        </PlayerProfileDialog>
       </div>
     );
   }
@@ -408,18 +465,21 @@ function PlayerChip({
         isDragging && "z-50 opacity-50",
       )}
     >
-      <Avatar>
-        {player.photoUrl && <AvatarImage src={player.photoUrl} alt={player.name} />}
-        <AvatarFallback>{initials(player.name)}</AvatarFallback>
-      </Avatar>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-medium">{player.name}</span>
-        <span className="text-muted-foreground truncate text-xs">{player.position}</span>
-      </div>
-      {infoButton}
+      <PlayerProfileDialog
+        player={profileInfo}
+        aria-label={`Ver perfil de ${player.name}`}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      >
+        <PlayerAvatar src={player.photoUrl} name={player.name} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-medium">{player.name}</span>
+          <span className="text-muted-foreground truncate text-xs">{player.position}</span>
+        </div>
+      </PlayerProfileDialog>
       {captainButton}
       {numberInput}
       {player.overall != null && <Badge variant="secondary">{player.overall}</Badge>}
+      {removeButton}
     </div>
   );
 }

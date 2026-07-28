@@ -8,12 +8,14 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ClubBadge } from "./club-badge";
 
 export interface SquadCardData {
   id: string;
   name: string;
   formation: string;
   playerCount: number;
+  baseClubLogoUrl?: string | null;
 }
 
 export function SquadCard({ squad }: { squad: SquadCardData }) {
@@ -37,7 +39,8 @@ export function SquadCard({ squad }: { squad: SquadCardData }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <ClubBadge src={squad.baseClubLogoUrl} name={squad.name} size="sm" />
           <Link href={`/squads/${squad.id}`} className="hover:underline">
             {squad.name}
           </Link>

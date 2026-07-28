@@ -28,6 +28,7 @@ export default async function HomePage() {
                 name: squad.name,
                 formation: squad.formation,
                 playerCount: squad._count.players,
+                baseClubLogoUrl: squad.baseClubLogoUrl,
               }}
             />
           ))}

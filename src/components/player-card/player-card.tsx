@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PlayerAvatar } from "./player-avatar";
 import { Badge } from "@/components/ui/badge";
 
 export interface PlayerCardData {
@@ -11,22 +11,10 @@ export interface PlayerCardData {
   isCaptain?: boolean;
 }
 
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
-
 export function PlayerCard({ player }: { player: PlayerCardData }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border p-3">
-      <Avatar size="lg">
-        {player.photoUrl && <AvatarImage src={player.photoUrl} alt={player.name} />}
-        <AvatarFallback>{initials(player.name)}</AvatarFallback>
-      </Avatar>
+      <PlayerAvatar src={player.photoUrl} name={player.name} size="lg" />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm font-medium">
