@@ -17,7 +17,7 @@ export function PlayerCard({ player }: { player: PlayerCardData }) {
       <PlayerAvatar src={player.photoUrl} name={player.name} size="lg" />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-medium">
+        <span className="font-heading truncate text-base font-bold">
           {player.name}
           {player.isCaptain && <span className="text-muted-foreground ml-1">(C)</span>}
         </span>
@@ -27,7 +27,7 @@ export function PlayerCard({ player }: { player: PlayerCardData }) {
       </div>
 
       {player.shirtNumber != null && (
-        <span className="text-muted-foreground w-6 shrink-0 text-right text-sm tabular-nums">
+        <span className="font-heading text-foreground w-8 shrink-0 text-right text-lg font-bold tabular-nums">
           {player.shirtNumber}
         </span>
       )}

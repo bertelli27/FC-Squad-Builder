@@ -85,7 +85,7 @@ export function PlayerProfileDialog({
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{displayed.name}</DialogTitle>
+          <DialogTitle className="text-xl font-bold">{displayed.name}</DialogTitle>
         </DialogHeader>
 
         <ProfileContent player={displayed} attributesLoading={loading} />

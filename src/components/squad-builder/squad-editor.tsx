@@ -227,7 +227,7 @@ export function SquadEditor({
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div
           className="relative aspect-[2/3] w-full max-w-md justify-self-center overflow-hidden rounded-xl shadow-lg ring-1 ring-black/10 lg:justify-self-start"
           style={{
@@ -415,7 +415,7 @@ function PlayerChip({
       onPointerDown={(e) => e.stopPropagation()}
       placeholder="#"
       autoComplete="off"
-      className="bg-background/90 text-foreground w-9 rounded text-center text-xs outline-none"
+      className="bg-background/90 text-foreground font-heading w-10 shrink-0 rounded-md py-0.5 text-center text-lg font-bold outline-none"
     />
   );
 
@@ -468,7 +468,7 @@ function PlayerChip({
         {...listeners}
         {...attributes}
         className={cn(
-          "flex w-16 cursor-grab touch-none flex-col items-center gap-1",
+          "flex w-20 cursor-grab touch-none flex-col items-center gap-1",
           isDragging && "z-50 opacity-50",
         )}
       >
@@ -496,7 +496,7 @@ function PlayerChip({
             without our own stopPropagation — wrapping both the avatar AND
             the name would leave almost no chip surface draggable. The
             avatar above is enough of a click target. */}
-        <span className="max-w-16 truncate rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
+        <span className="font-heading max-w-20 truncate rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
           {player.name}
         </span>
       </div>
@@ -510,7 +510,7 @@ function PlayerChip({
       {...listeners}
       {...attributes}
       className={cn(
-        "bg-card hover:border-primary/40 flex cursor-grab touch-none items-center gap-3 rounded-lg border p-2 transition-colors",
+        "bg-card hover:border-primary/40 flex cursor-grab touch-none items-center gap-2 rounded-lg border p-2 transition-colors",
         isDragging && "z-50 opacity-50",
       )}
     >
@@ -528,7 +528,7 @@ function PlayerChip({
       {/* Plain text, not another trigger — same reasoning as the pitch
           variant above: this is the chip's main drag surface. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-medium">{player.name}</span>
+        <span className="font-heading truncate text-base font-bold">{player.name}</span>
         <span className="text-muted-foreground truncate text-xs">{player.position}</span>
       </div>
       {captainButton}

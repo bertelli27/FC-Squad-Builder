@@ -238,7 +238,7 @@ export function AddPlayerDialog({
                       className={cn("ring-2", ratingStyle(result.overall).ring)}
                     />
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-sm font-medium">{result.name}</span>
+                      <span className="font-heading truncate text-base font-bold">{result.name}</span>
                       <span className="text-muted-foreground truncate text-xs">
                         {[result.position, result.club].filter(Boolean).join(" · ")}
                       </span>
