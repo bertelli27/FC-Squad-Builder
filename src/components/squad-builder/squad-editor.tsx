@@ -209,7 +209,14 @@ export function SquadEditor({
   return (
     <DndContext id="squad-editor" collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="relative aspect-[2/3] max-w-md justify-self-center overflow-hidden rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 lg:justify-self-start">
+        <div className="relative aspect-[2/3] w-full max-w-md justify-self-center overflow-hidden rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 lg:justify-self-start">
+          {/* w-full is load-bearing here, not decorative: justify-self
+              (center/start) opts this grid item out of the default
+              stretch sizing, so without an explicit width the div sizes
+              to its content. Every child is `absolute` and contributes
+              ~0 to that, which made the whole pitch (and aspect-[2/3]'s
+              height, computed from that near-zero width) collapse to a
+              tiny box with every chip crammed into one corner. */}
           <PitchLines />
           {formationSlots.map((s) => (
             <DroppableSlot
