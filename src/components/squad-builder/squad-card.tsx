@@ -8,6 +8,7 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ClubBadge } from "./club-badge";
 
 export interface SquadCardData {
@@ -21,9 +22,16 @@ export interface SquadCardData {
 export function SquadCard({ squad }: { squad: SquadCardData }) {
   const router = useRouter();
   const [isDeleting, startDeleting] = useTransition();
+  const { confirm, dialog } = useConfirmDialog();
 
-  function handleDelete() {
-    if (!confirm(`Excluir o elenco "${squad.name}"? Essa ação não pode ser desfeita.`)) return;
+  async function handleDelete() {
+    const ok = await confirm({
+      title: `Excluir o elenco "${squad.name}"?`,
+      description: "Essa ação não pode ser desfeita.",
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
 
     startDeleting(async () => {
       const res = await fetch(`/api/squads/${squad.id}`, { method: "DELETE" });
@@ -37,34 +45,37 @@ export function SquadCard({ squad }: { squad: SquadCardData }) {
   }
 
   return (
-    <Card className="hover:ring-primary/30 transition-shadow hover:shadow-md">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClubBadge src={squad.logoUrl} name={squad.name} size="sm" />
-          <Link href={`/squads/${squad.id}`} className="hover:underline">
-            {squad.name}
-          </Link>
-        </CardTitle>
-        <CardAction>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Excluir elenco"
-            disabled={isDeleting}
-            onClick={handleDelete}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-          {squad.formation}
-        </Badge>
-      </CardContent>
-      <CardFooter className="text-muted-foreground text-sm">
-        {squad.playerCount} {squad.playerCount === 1 ? "jogador" : "jogadores"}
-      </CardFooter>
-    </Card>
+    <>
+      <Card className="hover:ring-primary/30 transition-shadow hover:shadow-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClubBadge src={squad.logoUrl} name={squad.name} size="sm" />
+            <Link href={`/squads/${squad.id}`} className="hover:underline">
+              {squad.name}
+            </Link>
+          </CardTitle>
+          <CardAction>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Excluir elenco"
+              disabled={isDeleting}
+              onClick={handleDelete}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+            {squad.formation}
+          </Badge>
+        </CardContent>
+        <CardFooter className="text-muted-foreground text-sm">
+          {squad.playerCount} {squad.playerCount === 1 ? "jogador" : "jogadores"}
+        </CardFooter>
+      </Card>
+      {dialog}
+    </>
   );
 }

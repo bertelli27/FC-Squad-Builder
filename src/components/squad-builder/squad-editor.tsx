@@ -20,6 +20,7 @@ import { ratingStyle } from "@/lib/rating-tier";
 import { PlayerProfileDialog } from "@/components/player-card/player-profile-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { OverallBadge } from "@/components/player-card/overall-badge";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AddPlayerDialog } from "./add-player-dialog";
 
 export interface SquadPlayerVM {
@@ -86,6 +87,7 @@ export function SquadEditor({
   // Requiring 8px of movement before a drag "activates" is dnd-kit's own
   // documented fix for draggable items containing interactive children.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
 
   async function persistArrangement(next: EditorState) {
     const payload = [
@@ -195,7 +197,12 @@ export function SquadEditor({
   }
 
   async function handleRemove(playerId: string) {
-    if (!confirm("Remover este jogador do elenco?")) return;
+    const ok = await confirm({
+      title: "Remover este jogador do elenco?",
+      confirmLabel: "Remover",
+      destructive: true,
+    });
+    if (!ok) return;
 
     setState((prev) => {
       const slots = { ...prev.slots };
@@ -267,6 +274,7 @@ export function SquadEditor({
           {...chipHandlers}
         />
       </div>
+      {confirmDialog}
     </DndContext>
   );
 }
