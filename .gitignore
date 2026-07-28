@@ -42,6 +42,9 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# raw ratings datasets (personal use only, never redistribute)
+/data
+
 # AI agent local settings / auto-installed skill packs
 .claude/settings.local.json
 .claude/skills/

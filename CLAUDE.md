@@ -15,33 +15,38 @@ Permitir criar quantos elencos quiser (ex: "Coritiba", "Liverpool", "Brasil", "B
 
 ## 3. Fontes de dados
 
-### 3.1 Fonte principal — SoFIFA (ratings de EA Sports FC)
+### 3.1 Fonte principal — Dataset estático Kaggle (ratings de EA Sports FC)
 
-**Não existe API pública oficial do SoFIFA.** Decisão: acessar o endpoint interno usado pelo próprio frontend deles (`sofifa.com/document?...`), que retorna JSON estruturado com overall, potential, atributos detalhados, etc. Esse endpoint **não é documentado nem versionado publicamente** — pode mudar sem aviso.
+**SoFIFA foi descartado como fonte.** O `robots.txt` do site bloqueia explicitamente bots de IA (inclusive `ClaudeBot`), e o `robots.txt` do site oficial `ea.com` vai além, proibindo por escrito qualquer scraping/uso programático de conteúdo para fins de IA. Ambos tornam inviável construir um provider que faça scraping ao vivo dessas fontes.
 
-Mitigações obrigatórias na implementação:
-- Isolar 100% do acesso dentro de `SofifaProvider` — nenhuma outra parte do código sabe da existência desse endpoint.
-- Requests com espaçamento (throttling) e User-Agent identificável, respeitando robots/ToS na medida do possível.
-- Cache agressivo no Postgres para minimizar chamadas repetidas.
-- Tratar falhas de parsing/schema-change de forma graciosa (fallback pra dados já cacheados, nunca quebrar a aplicação).
+Decisão: usar um **dataset estático baixado do Kaggle** ("EA Sports FC 26 Player Ratings", `justdhia/ea-sports-fc-26-player-ratings`) como fonte de ratings/atributos. O CSV (`data/ea_fc26_players.csv`, ~16.200 jogadores) é baixado manualmente pelo usuário (requer conta Kaggle) e nunca commitado no repositório (`/data` está no `.gitignore`) — uso estritamente pessoal, sem redistribuição.
+
+Diferente de um provider "live", essa fonte é importada em lote para o cache via script (`npm run import:ratings` → `scripts/import-ratings.ts`), que lê o CSV e faz upsert em `CachedPlayer` com `source = "kaggle-fc26"`. Atualizar os ratings (nova versão do jogo, nova temporada) significa baixar um CSV novo e rodar o script de novo — não há chamada de rede em tempo de request para essa fonte.
+
+Limitação conhecida: o dataset não inclui `potential` (rating de potencial, conceito de career mode) nem foto do jogador — esses campos ficam `undefined` nessa fonte e dependem do fallback de outras fontes (seção 3.4).
+
+Mitigações mantidas do desenho original:
+- Isolar 100% do parsing dentro de `kaggle-ratings.normalizer.ts` / `kaggle-ratings.provider.ts` — nenhuma outra parte do código conhece o formato do CSV.
+- Tratar falhas de parsing de forma graciosa (nunca quebrar a aplicação).
 - Uso estritamente pessoal, sem redistribuição dos dados.
 
 ### 3.2 Fonte secundária — API-Football (API-Sports)
 
-Cobertura ampla (1.236+ ligas, seleções, clubes, fotos de jogador, escudos). Free tier: **100 requests/dia**. Suficiente para uso pessoal dado o cache agressivo. Usada para: dados de clube, seleção, e para completar/substituir foto e metadados quando o SoFIFA não tiver.
+Cobertura ampla (1.236+ ligas, seleções, clubes, fotos de jogador, escudos). Free tier: **100 requests/dia**. Suficiente para uso pessoal dado o cache agressivo. Usada para: dados de clube, seleção, e para completar/substituir foto e metadados quando o dataset Kaggle não tiver.
 
 ### 3.3 Fonte terciária (fallback) — TheSportsDB
 
-Free tier generoso, base crowd-sourced, forte em logos/badges/fotos de jogador e bandeiras de seleção. Usada como **último fallback** quando SoFIFA e API-Football não têm o dado (principalmente fotos e escudos).
+Free tier generoso, base crowd-sourced, forte em logos/badges/fotos de jogador e bandeiras de seleção. Usada como **último fallback** quando API-Football não tem o dado (principalmente fotos e escudos).
 
 ### 3.4 Ordem de resolução por tipo de dado
 
 | Dado | 1ª fonte | 2ª fonte | 3ª fonte |
 |---|---|---|---|
-| Ratings/atributos (overall, potential, skills) | SoFIFA | — | — |
-| Nome, posição, idade, nacionalidade | SoFIFA | API-Football | TheSportsDB |
-| Foto do jogador | SoFIFA | API-Football | TheSportsDB |
-| Dados de clube (nome, liga, país) | API-Football | SoFIFA | TheSportsDB |
+| Ratings/atributos (overall, skills) | Dataset Kaggle | — | — |
+| Potential | — (não disponível em nenhuma fonte atual) | — | — |
+| Nome, posição, idade, nacionalidade | Dataset Kaggle | API-Football | TheSportsDB |
+| Foto do jogador | API-Football | TheSportsDB | — |
+| Dados de clube (nome, liga, país) | API-Football | Dataset Kaggle | TheSportsDB |
 | Escudo do clube | API-Football | TheSportsDB | — |
 | Dados de seleção | API-Football | TheSportsDB | — |
 | Bandeira da seleção | API-Football | TheSportsDB | — |
@@ -65,7 +70,7 @@ CacheRepository (Prisma) ──► PostgreSQL
    ▼
 ProviderRegistry
    │
-   ├─► SofifaProvider          (implementa PlayerProvider / ClubProvider)
+   ├─► KaggleRatingsProvider   (implementa PlayerProvider; lê dataset estático, sem rede)
    ├─► ApiFootballProvider     (implementa PlayerProvider / ClubProvider / NationalTeamProvider)
    └─► TheSportsDbProvider     (implementa PlayerProvider / ClubProvider / NationalTeamProvider, fallback)
 ```
@@ -287,7 +292,7 @@ fc-squad-builder/
 │   ├── services/
 │   │   ├── providers/
 │   │   │   ├── provider.interface.ts
-│   │   │   ├── sofifa.provider.ts
+│   │   │   ├── kaggle-ratings.provider.ts   # lê data/*.csv, sem rede
 │   │   │   ├── api-football.provider.ts
 │   │   │   └── thesportsdb.provider.ts
 │   │   ├── provider-registry.ts         # ordem de resolução/fallback (ver seção 3.4)
@@ -300,11 +305,14 @@ fc-squad-builder/
 │   ├── lib/
 │   │   ├── prisma.ts
 │   │   └── normalizers/
-│   │       ├── sofifa.normalizer.ts
+│   │       ├── kaggle-ratings.normalizer.ts
 │   │       ├── api-football.normalizer.ts
 │   │       └── thesportsdb.normalizer.ts
 │   └── types/
 │       └── domain.ts
+├── scripts/
+│   └── import-ratings.ts                # `npm run import:ratings` — importa data/*.csv pro CachedPlayer
+├── data/                                 # CSV baixado do Kaggle (gitignored, nunca commitado)
 └── .env
 ```
 
@@ -335,10 +343,10 @@ Garantia central do projeto: **o cache é só um espelho local, nunca é editado
 
 ## 9. Roadmap sugerido de implementação
 
-1. Setup do projeto (Next.js + TS + Tailwind + shadcn/ui) e `docker-compose` do Postgres
+1. Setup do projeto (Next.js + TS + Tailwind + shadcn/ui) e Postgres
 2. `schema.prisma` + migração inicial
 3. Camada de tipos (`types/domain.ts`) e interfaces de provider
-4. `SofifaProvider` isolado + normalizer + teste manual de busca de um jogador
+4. `KaggleRatingsProvider` isolado + normalizer + `scripts/import-ratings.ts` (concluído — ver seção 3.1)
 5. `ApiFootballProvider` + `TheSportsDbProvider` + normalizers
 6. `ProviderRegistry` com a lógica de fallback da seção 3.4
 7. `CacheRepository` + lógica de expiração
