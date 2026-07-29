@@ -308,8 +308,18 @@ export function SquadEditor({
               it can't contribute to that sizing at all: this Card's own
               natural height collapses to just its header, so the row ends
               up sized by the pitch alone, and the table fills whatever
-              height this panel is then stretched to, scrolling inside it. */}
-          <CardContent className="relative min-h-0 flex-1">
+              height this panel is then stretched to, scrolling inside it.
+
+              This only works because the grid stretches this Card to match
+              the pitch panel's height — which only happens in the lg:
+              side-by-side layout below. Below lg the two panels stack in
+              separate grid rows (no sibling to stretch against), so this
+              Card's height would collapse to just its header and the
+              absolutely-positioned table — contributing nothing to that
+              collapsed height — would vanish entirely. p-3 here (padding
+              instead of the desktop inset-3 trick) reserves real space for
+              it on mobile; see roster-table.tsx's matching lg: override. */}
+          <CardContent className="relative min-h-0 flex-1 p-3 lg:p-0">
             <RosterTable bench={state.bench} squadId={squadId} {...chipHandlers} />
           </CardContent>
         </Card>

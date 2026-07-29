@@ -69,12 +69,17 @@ export function RosterTable({
     <div
       ref={setNodeRef}
       className={cn(
-        // Absolutely positioned within squad-editor.tsx's `relative`
-        // CardContent (inset-3 matches that content area's old p-3) —
-        // see the comment there for why: this keeps the table's own
-        // content height from ever influencing the panel's size, so it
+        // Absolutely positioned only from lg: up, matching squad-editor.tsx's
+        // CardContent (`relative`, padded on mobile, unpadded + lg:p-0 on
+        // desktop where this inset-3 stands in for that padding instead) —
+        // see the comment there for why: this keeps the table's own content
+        // height from ever influencing the panel's size on desktop, so it
         // just fills whatever height the panel ends up being and scrolls.
-        "absolute inset-3 min-h-24 overflow-y-auto rounded-lg border",
+        // Below lg the two panels stack (no sibling to stretch this Card's
+        // height against), so the table stays in normal flow there instead —
+        // sized by its own content, capped with its own max-height so a long
+        // bench still scrolls internally rather than growing forever.
+        "static max-h-[28rem] min-h-24 overflow-y-auto rounded-lg border lg:absolute lg:inset-3 lg:max-h-none",
         isOver && "border-primary bg-accent/40",
       )}
     >
