@@ -17,10 +17,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Image too large (max 4.5MB)" }, { status: 400 });
   }
 
-  const blob = await put(file.name, file, {
-    access: "public",
-    addRandomSuffix: true,
-  });
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json(
+      { error: "Blob storage isn't configured (missing BLOB_READ_WRITE_TOKEN)" },
+      { status: 500 },
+    );
+  }
 
-  return NextResponse.json({ url: blob.url });
+  try {
+    const blob = await put(file.name, file, {
+      access: "public",
+      addRandomSuffix: true,
+    });
+    return NextResponse.json({ url: blob.url });
+  } catch (error) {
+    console.error("Blob upload failed:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: `Upload failed: ${message}` }, { status: 500 });
+  }
 }
