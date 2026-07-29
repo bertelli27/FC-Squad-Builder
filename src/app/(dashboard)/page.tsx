@@ -4,6 +4,15 @@ import { squadService } from "@/services/squad.service";
 import { Button } from "@/components/ui/button";
 import { SquadCard } from "@/components/squad-builder/squad-card";
 
+// Without this, Next prerenders this page as static HTML at build time
+// (it has no params/cookies/etc. to force dynamic rendering on its own) —
+// fine for a marketing page, wrong for a private dashboard listing
+// whatever squads/logos exist *right now*. That's exactly why an
+// uploaded club badge showed correctly on the squad's own page (always
+// server-rendered per request) but not here: this route kept serving
+// the HTML generated back at deploy time.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const squads = await squadService.listSquads();
 
