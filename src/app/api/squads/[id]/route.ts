@@ -29,15 +29,24 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const coachName = optionalStringField(body?.coachName);
   const coachPhotoUrl = optionalStringField(body?.coachPhotoUrl);
   const coachExternalLink = optionalStringField(body?.coachExternalLink);
+  const notes = optionalStringField(body?.notes);
 
   if (
     name !== undefined ||
     logoUrl !== undefined ||
     coachName !== undefined ||
     coachPhotoUrl !== undefined ||
-    coachExternalLink !== undefined
+    coachExternalLink !== undefined ||
+    notes !== undefined
   ) {
-    await squadService.updateSquad(id, { name, logoUrl, coachName, coachPhotoUrl, coachExternalLink });
+    await squadService.updateSquad(id, {
+      name,
+      logoUrl,
+      coachName,
+      coachPhotoUrl,
+      coachExternalLink,
+      notes,
+    });
   }
 
   // Changing formation remaps the starting XI onto the new slot set

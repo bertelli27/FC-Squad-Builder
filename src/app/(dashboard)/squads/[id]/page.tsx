@@ -5,6 +5,7 @@ import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { FormationSelector } from "@/components/squad-builder/formation-selector";
 import { EditSquadDialog } from "@/components/squad-builder/edit-squad-dialog";
 import { CoachCard } from "@/components/squad-builder/coach-card";
+import { SquadNotes } from "@/components/squad-builder/squad-notes";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
@@ -64,6 +65,8 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
           externalLink: sp.cachedPlayer.externalLink,
         }))}
       />
+
+      <SquadNotes squadId={squad.id} notes={squad.notes} />
     </div>
   );
 }

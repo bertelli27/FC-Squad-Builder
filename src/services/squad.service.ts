@@ -161,6 +161,7 @@ export const squadService = {
       coachName?: string | null;
       coachPhotoUrl?: string | null;
       coachExternalLink?: string | null;
+      notes?: string | null;
     },
   ) {
     return prisma.squad.update({ where: { id }, data });
