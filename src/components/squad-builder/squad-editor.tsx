@@ -290,7 +290,7 @@ export function SquadEditor({
           </CardContent>
         </Card>
 
-        <Card className="gap-0 py-0">
+        <Card className="min-h-0 gap-0 py-0">
           <CardHeader className="flex-row items-center justify-between border-b py-3 [.border-b]:pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="text-primary size-4" />
@@ -298,7 +298,18 @@ export function SquadEditor({
             </CardTitle>
             <AddPlayerDialog squadId={squadId} onAdded={handlePlayerAdded} />
           </CardHeader>
-          <CardContent className="p-3">
+          {/* relative + the roster table absolutely positioned (inset-3)
+              inside it: min-h-0/flex-1 alone weren't enough, because CSS
+              Grid's auto row-height is driven by each item's *max-content*
+              size regardless of min-height — a long bench list was still
+              inflating the grid row (and dragging the pitch panel along
+              with it) even with min-h-0 set everywhere in the chain.
+              Taking the scrollable table out of normal flow entirely means
+              it can't contribute to that sizing at all: this Card's own
+              natural height collapses to just its header, so the row ends
+              up sized by the pitch alone, and the table fills whatever
+              height this panel is then stretched to, scrolling inside it. */}
+          <CardContent className="relative min-h-0 flex-1">
             <RosterTable bench={state.bench} squadId={squadId} {...chipHandlers} />
           </CardContent>
         </Card>

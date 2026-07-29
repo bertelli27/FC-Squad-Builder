@@ -69,7 +69,12 @@ export function RosterTable({
     <div
       ref={setNodeRef}
       className={cn(
-        "max-h-[32rem] min-h-24 overflow-y-auto rounded-lg border",
+        // Absolutely positioned within squad-editor.tsx's `relative`
+        // CardContent (inset-3 matches that content area's old p-3) —
+        // see the comment there for why: this keeps the table's own
+        // content height from ever influencing the panel's size, so it
+        // just fills whatever height the panel ends up being and scrolls.
+        "absolute inset-3 min-h-24 overflow-y-auto rounded-lg border",
         isOver && "border-primary bg-accent/40",
       )}
     >
