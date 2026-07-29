@@ -393,7 +393,7 @@ function DragOverlayChip({ player }: { player: SquadPlayerVM }) {
         size="lg"
         className={cn("bg-background shadow-xl ring-2", ratingStyle(player.overall).ring)}
       />
-      <span className="font-heading max-w-20 truncate rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
+      <span className="font-heading max-w-24 rounded-lg bg-black/60 px-2 py-1 text-center text-xs leading-tight font-bold text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
         {player.name}
       </span>
     </div>
@@ -511,8 +511,11 @@ function PlayerChip({
           owns pointer events in a way dnd-kit can't see through, even
           without our own stopPropagation — wrapping both the avatar AND
           the name would leave almost no chip surface draggable. The
-          avatar above is enough of a click target. */}
-      <span className="font-heading max-w-20 truncate rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
+          avatar above is enough of a click target.
+          No truncate: the whole name should always be readable on the
+          pitch, so a long one wraps onto a second line instead of
+          getting cut short with an ellipsis. */}
+      <span className="font-heading max-w-24 rounded-lg bg-black/60 px-2 py-1 text-center text-xs leading-tight font-bold text-white shadow-sm ring-1 ring-white/10 backdrop-blur-sm">
         {player.name}
       </span>
     </div>
