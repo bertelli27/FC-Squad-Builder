@@ -4,11 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2, Users, Star } from "lucide-react";
+import { Trash2, Users, Star, MoreVertical, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { ClubBadge } from "./club-badge";
 
@@ -33,6 +39,7 @@ export function SquadCard({
 }) {
   const router = useRouter();
   const [isDeleting, startDeleting] = useTransition();
+  const [isDuplicating, startDuplicating] = useTransition();
   const { confirm, dialog } = useConfirmDialog();
 
   async function handleDelete() {
@@ -52,6 +59,19 @@ export function SquadCard({
       }
       toast.success(`Elenco "${squad.name}" excluído.`);
       router.refresh();
+    });
+  }
+
+  function handleDuplicate() {
+    startDuplicating(async () => {
+      const res = await fetch(`/api/squads/${squad.id}/duplicate`, { method: "POST" });
+      if (!res.ok) {
+        toast.error("Não foi possível duplicar o elenco.");
+        return;
+      }
+      const { squad: copy } = await res.json();
+      toast.success(`Elenco "${copy.name}" criado.`);
+      router.push(`/squads/${copy.id}`);
     });
   }
 
@@ -91,16 +111,30 @@ export function SquadCard({
                 )}
               />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Excluir elenco"
-              disabled={isDeleting}
-              onClick={handleDelete}
-              className="opacity-0 transition-opacity group-hover:opacity-100"
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Mais ações"
+                    className="opacity-0 transition-opacity group-hover:opacity-100 aria-expanded:opacity-100"
+                  >
+                    <MoreVertical className="size-4" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={isDuplicating} onClick={handleDuplicate}>
+                  <Copy className="size-4" />
+                  Duplicar
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive" disabled={isDeleting} onClick={handleDelete}>
+                  <Trash2 className="size-4" />
+                  Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </CardAction>
         </CardHeader>
         <CardContent className="flex items-center gap-3 pb-4 text-sm">

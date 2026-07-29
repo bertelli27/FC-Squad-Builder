@@ -200,6 +200,52 @@ export const squadService = {
     await prisma.squad.delete({ where: { id } });
   },
 
+  /**
+   * Clones a squad's settings and lineup — not its players' underlying
+   * data, since CachedPlayer is a read-only mirror (§7): both squads end
+   * up pointing at the exact same cachedPlayerId rows, only the
+   * SquadPlayer "lineup" rows (number, captain, starter/bench, slot,
+   * order) are duplicated.
+   */
+  async duplicateSquad(id: string) {
+    const original = await prisma.squad.findUnique({
+      where: { id },
+      include: { players: true, tags: true },
+    });
+    if (!original) return null;
+
+    const copy = await prisma.squad.create({
+      data: {
+        name: `${original.name} (Cópia)`,
+        formation: original.formation,
+        baseClubRef: original.baseClubRef,
+        logoUrl: original.logoUrl,
+        coachName: original.coachName,
+        coachPhotoUrl: original.coachPhotoUrl,
+        coachExternalLink: original.coachExternalLink,
+        notes: original.notes,
+        categoryId: original.categoryId,
+        tags: original.tags.length ? { connect: original.tags.map((t) => ({ id: t.id })) } : undefined,
+      },
+    });
+
+    if (original.players.length > 0) {
+      await prisma.squadPlayer.createMany({
+        data: original.players.map((p) => ({
+          squadId: copy.id,
+          cachedPlayerId: p.cachedPlayerId,
+          shirtNumber: p.shirtNumber,
+          isCaptain: p.isCaptain,
+          isStarter: p.isStarter,
+          positionSlot: p.positionSlot,
+          order: p.order,
+        })),
+      });
+    }
+
+    return squadService.getSquad(copy.id);
+  },
+
   /** Bulk-persists a new field/bench arrangement after a drag-and-drop change. */
   async updateSquadPlayers(
     squadId: string,
