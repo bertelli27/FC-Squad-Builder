@@ -20,6 +20,7 @@ export interface SquadCardData {
   logoUrl?: string | null;
   isFavorite: boolean;
   categoryId: string | null;
+  tags: { id: string; name: string }[];
 }
 
 export function SquadCard({

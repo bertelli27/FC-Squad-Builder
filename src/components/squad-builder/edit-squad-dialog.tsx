@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ImageUrlInput } from "@/components/ui/image-url-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CategorySelect } from "./category-select";
+import { TagsInput } from "./tags-input";
 
 export interface EditableSquadData {
   id: string;
@@ -19,6 +20,7 @@ export interface EditableSquadData {
   coachPhotoUrl?: string | null;
   coachExternalLink?: string | null;
   categoryId?: string | null;
+  tags?: { id: string; name: string }[];
 }
 
 export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
@@ -30,6 +32,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
   const [coachPhotoUrl, setCoachPhotoUrl] = useState(squad.coachPhotoUrl ?? "");
   const [coachExternalLink, setCoachExternalLink] = useState(squad.coachExternalLink ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(squad.categoryId ?? null);
+  const [tagNames, setTagNames] = useState<string[]>(squad.tags?.map((t) => t.name) ?? []);
   const [saving, setSaving] = useState(false);
 
   function handleSubmit(event: React.FormEvent) {
@@ -43,7 +46,15 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
     fetch(`/api/squads/${squad.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, logoUrl, coachName, coachPhotoUrl, coachExternalLink, categoryId }),
+      body: JSON.stringify({
+        name,
+        logoUrl,
+        coachName,
+        coachPhotoUrl,
+        coachExternalLink,
+        categoryId,
+        tagNames,
+      }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then(() => {
@@ -91,6 +102,11 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
             <div className="flex flex-col gap-1.5">
               <Label>Categoria</Label>
               <CategorySelect value={categoryId} onChange={setCategoryId} />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Tags</Label>
+              <TagsInput value={tagNames} onChange={setTagNames} />
             </div>
           </div>
 

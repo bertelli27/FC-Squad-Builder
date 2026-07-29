@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CategorySelect } from "./category-select";
+import { TagsInput } from "./tags-input";
 
 const FORMATIONS = ["4-3-3", "4-4-2", "4-2-3-1", "3-5-2", "4-1-4-1", "3-4-3", "5-3-2"];
 
@@ -41,6 +42,7 @@ export function NewSquadForm() {
   const [name, setName] = useState("");
   const [formation, setFormation] = useState(FORMATIONS[0]);
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [tagNames, setTagNames] = useState<string[]>([]);
   const [isSubmitting, startSubmitting] = useTransition();
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export function NewSquadForm() {
           formation,
           base: kind !== "none" && selected ? { kind, name: selected.name } : undefined,
           categoryId,
+          tagNames,
         }),
       });
 
@@ -230,6 +233,11 @@ export function NewSquadForm() {
           <div className="flex flex-col gap-2">
             <Label>Categoria</Label>
             <CategorySelect value={categoryId} onChange={setCategoryId} />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Tags</Label>
+            <TagsInput value={tagNames} onChange={setTagNames} />
           </div>
         </CardContent>
       </Card>

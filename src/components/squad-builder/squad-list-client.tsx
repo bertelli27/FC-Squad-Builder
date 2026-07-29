@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -16,6 +18,11 @@ import { SquadCard, type SquadCardData } from "./squad-card";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import type { CategoryOption } from "./category-select";
 
+export interface TagOption {
+  id: string;
+  name: string;
+}
+
 const ALL_CATEGORIES = "__all__";
 const NO_CATEGORY = "__none__";
 const UNCATEGORIZED_LABEL = "Outros";
@@ -23,9 +30,11 @@ const UNCATEGORIZED_LABEL = "Outros";
 export function SquadListClient({
   squads: initialSquads,
   categories,
+  tags,
 }: {
   squads: SquadCardData[];
   categories: CategoryOption[];
+  tags: TagOption[];
 }) {
   // Owned as local state (not just read from props) so a favorite toggle
   // updates the filters/sort immediately without a full page reload —
@@ -34,6 +43,8 @@ export function SquadListClient({
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [favoritesFirst, setFavoritesFirst] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [tagSearch, setTagSearch] = useState("");
 
   function handleToggleFavorite(id: string, isFavorite: boolean) {
     setSquads((prev) => prev.map((s) => (s.id === id ? { ...s, isFavorite } : s)));
@@ -57,12 +68,24 @@ export function SquadListClient({
     return [...list].sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite));
   }
 
+  function toggleTag(id: string) {
+    setSelectedTagIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
+  }
+
+  const visibleTagOptions = tagSearch.trim()
+    ? tags.filter((t) => t.name.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+    : tags;
+
   const filtered = useMemo(() => {
     let list = onlyFavorites ? squads.filter((s) => s.isFavorite) : squads;
     if (categoryFilter === NO_CATEGORY) list = list.filter((s) => s.categoryId === null);
     else if (categoryFilter !== ALL_CATEGORIES) list = list.filter((s) => s.categoryId === categoryFilter);
+    // OR semantics: a squad with any of the selected tags matches.
+    if (selectedTagIds.length > 0) {
+      list = list.filter((s) => s.tags.some((t) => selectedTagIds.includes(t.id)));
+    }
     return list;
-  }, [squads, onlyFavorites, categoryFilter]);
+  }, [squads, onlyFavorites, categoryFilter, selectedTagIds]);
 
   // Grouped by category only in the "all categories" view — picking one
   // specific category (or "Outros") already narrows it down, so a flat
@@ -126,6 +149,32 @@ export function SquadListClient({
 
         <ManageCategoriesDialog />
       </div>
+
+      {tags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Input
+            placeholder="Buscar tag…"
+            value={tagSearch}
+            onChange={(e) => setTagSearch(e.target.value)}
+            className="h-7 w-36 text-xs"
+          />
+          {visibleTagOptions.map((tag) => (
+            <Badge
+              key={tag.id}
+              variant={selectedTagIds.includes(tag.id) ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => toggleTag(tag.id)}
+            >
+              {tag.name}
+            </Badge>
+          ))}
+          {selectedTagIds.length > 0 && (
+            <Button variant="ghost" size="xs" onClick={() => setSelectedTagIds([])}>
+              Limpar tags
+            </Button>
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
