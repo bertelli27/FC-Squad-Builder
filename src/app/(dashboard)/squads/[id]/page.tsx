@@ -51,6 +51,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
         formation={squad.formation}
         players={squad.players.map((sp) => ({
           id: sp.id,
+          source: sp.cachedPlayer.source,
           name: sp.cachedPlayer.name,
           photoUrl: sp.cachedPlayer.photoUrl,
           position: sp.cachedPlayer.position,

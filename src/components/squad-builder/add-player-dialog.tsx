@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OverallBadge } from "@/components/player-card/overall-badge";
+import { POSITIONS } from "@/lib/positions";
 import { PlayerRowContent } from "./roster-table";
 import type { SquadPlayerVM } from "./squad-editor";
 
@@ -34,24 +35,6 @@ interface SearchResult {
   photoUrl?: string;
 }
 
-const POSITIONS = [
-  { value: "GK", label: "Goleiro" },
-  { value: "CB", label: "Zagueiro" },
-  { value: "LB", label: "Lateral esquerdo" },
-  { value: "RB", label: "Lateral direito" },
-  { value: "LWB", label: "Ala esquerdo" },
-  { value: "RWB", label: "Ala direito" },
-  { value: "CDM", label: "Volante" },
-  { value: "CM", label: "Meio-campo" },
-  { value: "CAM", label: "Meia atacante" },
-  { value: "LM", label: "Meia esquerdo" },
-  { value: "RM", label: "Meia direito" },
-  { value: "LW", label: "Ponta esquerda" },
-  { value: "RW", label: "Ponta direita" },
-  { value: "CF", label: "Segundo atacante" },
-  { value: "ST", label: "Atacante" },
-];
-
 function squadPlayerVMFromResponse(sp: {
   id: string;
   shirtNumber: number | null;
@@ -59,6 +42,7 @@ function squadPlayerVMFromResponse(sp: {
   isStarter: boolean;
   positionSlot: string | null;
   cachedPlayer: {
+    source: string;
     name: string;
     photoUrl: string | null;
     position: string | null;
@@ -69,6 +53,7 @@ function squadPlayerVMFromResponse(sp: {
 }): SquadPlayerVM {
   return {
     id: sp.id,
+    source: sp.cachedPlayer.source,
     name: sp.cachedPlayer.name,
     photoUrl: sp.cachedPlayer.photoUrl,
     position: sp.cachedPlayer.position,

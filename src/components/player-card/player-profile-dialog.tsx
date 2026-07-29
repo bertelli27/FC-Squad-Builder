@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
+import { PencilIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,15 +10,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PlayerAvatar } from "./player-avatar";
 import { OverallBadge } from "./overall-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MAIN_ATTRIBUTES, ATTRIBUTE_GROUPS, ATTRIBUTE_LABELS } from "@/lib/attribute-labels";
 import { ratingStyle } from "@/lib/rating-tier";
+import { POSITIONS } from "@/lib/positions";
 import { cn } from "@/lib/utils";
 import type { Player } from "@/types/domain";
 
 export interface KnownPlayerInfo {
+  source?: string | null;
   name: string;
   club?: string | null;
   position?: string | null;
@@ -25,25 +39,48 @@ export interface KnownPlayerInfo {
   externalLink?: string | null;
 }
 
+const CUSTOM_SOURCE = "custom";
+
 export function PlayerProfileDialog({
   player: known,
+  squadId,
+  squadPlayerId,
+  onUpdated,
   className,
   "aria-label": ariaLabel,
   children,
 }: {
   player: KnownPlayerInfo;
+  /** Only needed to enable editing — a custom player viewed without these just can't show the pencil button. */
+  squadId?: string;
+  squadPlayerId?: string;
+  onUpdated?: (patch: Partial<KnownPlayerInfo>) => void;
   className?: string;
   "aria-label"?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const [enriched, setEnriched] = useState<Player | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
+  const isCustom = known.source === CUSTOM_SOURCE;
+  const canEdit = isCustom && !!squadId && !!squadPlayerId;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (!next || fetched || loading) return;
+    if (!next) return;
+    setMode("view");
+    // Custom players aren't real provider records — searching for one by
+    // name against Kaggle/API-Football/TheSportsDB has no club to filter
+    // by (custom players never have one), so it was matching whatever
+    // same-named real player came back first and letting that overwrite
+    // the actual custom data (see the merge below, which used to spread
+    // this unconditionally). Skipping the fetch entirely is both correct
+    // (there's nothing to enrich — custom players have no attributes to
+    // fill in) and avoids wastefully upserting an unrelated player's cache
+    // row every time this dialog opens.
+    if (fetched || loading || isCustom) return;
 
     setLoading(true);
     const params = new URLSearchParams({ name: known.name });
@@ -62,20 +99,27 @@ export function PlayerProfileDialog({
       });
   }
 
-  // Known (trusted, came straight from the club/national-team roster) is
-  // the baseline; enrichment only fills in what's still missing (chiefly
-  // attributes, plus nationality/age which rosters don't carry).
+  // Known (trusted — came straight from the squad's own data, whether
+  // that's a real roster or a custom player's manually-entered fields) is
+  // the baseline and always wins; enrichment only fills in fields known
+  // doesn't have at all (attributes/nationality/age never come from known,
+  // and club/position/photoUrl/overall/externalLink only fall back to
+  // enriched if known's own value is missing).
   const displayed: Player = {
     id: enriched?.id ?? "",
-    source: enriched?.source ?? "",
+    source: known.source ?? enriched?.source ?? "",
     externalId: enriched?.externalId ?? "",
     name: known.name,
-    club: known.club ?? undefined,
-    position: known.position ?? undefined,
-    photoUrl: known.photoUrl ?? undefined,
-    overall: known.overall ?? undefined,
-    externalLink: known.externalLink ?? undefined,
-    ...enriched,
+    club: known.club ?? enriched?.club,
+    position: known.position ?? enriched?.position,
+    photoUrl: known.photoUrl ?? enriched?.photoUrl,
+    overall: known.overall ?? enriched?.overall,
+    externalLink: known.externalLink ?? enriched?.externalLink,
+    nationality: enriched?.nationality,
+    age: enriched?.age,
+    league: enriched?.league,
+    potential: enriched?.potential,
+    attributes: enriched?.attributes,
   };
 
   return (
@@ -85,12 +129,141 @@ export function PlayerProfileDialog({
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">{displayed.name}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+            {displayed.name}
+            {canEdit && mode === "view" && (
+              <button
+                type="button"
+                onClick={() => setMode("edit")}
+                aria-label="Editar jogador"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <PencilIcon className="size-4" />
+              </button>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
-        <ProfileContent player={displayed} attributesLoading={loading} />
+        {mode === "edit" && squadId && squadPlayerId ? (
+          <EditCustomPlayerForm
+            known={known}
+            squadId={squadId}
+            squadPlayerId={squadPlayerId}
+            onCancel={() => setMode("view")}
+            onSaved={(patch) => {
+              onUpdated?.(patch);
+              setMode("view");
+            }}
+          />
+        ) : (
+          <ProfileContent player={displayed} attributesLoading={loading} />
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function EditCustomPlayerForm({
+  known,
+  squadId,
+  squadPlayerId,
+  onSaved,
+  onCancel,
+}: {
+  known: KnownPlayerInfo;
+  squadId: string;
+  squadPlayerId: string;
+  onSaved: (patch: Partial<KnownPlayerInfo>) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(known.name);
+  const [position, setPosition] = useState(known.position ?? "");
+  const [photoUrl, setPhotoUrl] = useState(known.photoUrl ?? "");
+  const [externalLink, setExternalLink] = useState(known.externalLink ?? "");
+  const [saving, setSaving] = useState(false);
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) {
+      toast.error("O jogador precisa de um nome.");
+      return;
+    }
+
+    setSaving(true);
+    const patch = {
+      name,
+      position: position || null,
+      photoUrl: photoUrl || null,
+      externalLink: externalLink || null,
+    };
+    fetch(`/api/squads/${squadId}/players/${squadPlayerId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then(() => {
+        toast.success("Jogador atualizado.");
+        onSaved(patch);
+      })
+      .catch(() => toast.error("Não foi possível salvar."))
+      .finally(() => setSaving(false));
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="edit-player-name">Nome</Label>
+        <Input id="edit-player-name" value={name} onChange={(e) => setName(e.target.value)} required />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="edit-player-position">Posição</Label>
+        <Select value={position} onValueChange={(v) => setPosition(v ?? "")}>
+          <SelectTrigger id="edit-player-position">
+            <SelectValue placeholder="Selecione" />
+          </SelectTrigger>
+          <SelectContent>
+            {POSITIONS.map((p) => (
+              <SelectItem key={p.value} value={p.value}>
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="edit-player-photo">URL da foto</Label>
+        <Input
+          id="edit-player-photo"
+          type="url"
+          placeholder="https://..."
+          value={photoUrl}
+          onChange={(e) => setPhotoUrl(e.target.value)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="edit-player-link">Link externo (ogol, transfermarket...)</Label>
+        <Input
+          id="edit-player-link"
+          type="url"
+          placeholder="https://..."
+          value={externalLink}
+          onChange={(e) => setExternalLink(e.target.value)}
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="submit" disabled={saving}>
+          {saving ? "Salvando…" : "Salvar"}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+          Cancelar
+        </Button>
+      </div>
+    </form>
   );
 }
 

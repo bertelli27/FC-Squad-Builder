@@ -27,6 +27,7 @@ import { AddPlayerDialog } from "./add-player-dialog";
 
 export interface SquadPlayerVM {
   id: string;
+  source?: string | null;
   name: string;
   photoUrl?: string | null;
   position?: string | null;
@@ -240,6 +241,7 @@ export function SquadEditor({
     onNumberChange: handleNumberChange,
     onCaptainToggle: handleCaptainToggle,
     onRemove: handleRemove,
+    onUpdated: updatePlayerLocal,
   };
 
   return (
@@ -280,6 +282,7 @@ export function SquadEditor({
                   x={s.x}
                   y={s.y}
                   player={state.slots[s.slot]}
+                  squadId={squadId}
                   {...chipHandlers}
                 />
               ))}
@@ -296,7 +299,7 @@ export function SquadEditor({
             <AddPlayerDialog squadId={squadId} onAdded={handlePlayerAdded} />
           </CardHeader>
           <CardContent className="p-3">
-            <RosterTable bench={state.bench} {...chipHandlers} />
+            <RosterTable bench={state.bench} squadId={squadId} {...chipHandlers} />
           </CardContent>
         </Card>
       </div>
@@ -332,18 +335,22 @@ function DroppableSlot({
   x,
   y,
   player,
+  squadId,
   onNumberChange,
   onCaptainToggle,
   onRemove,
+  onUpdated,
 }: {
   slotKey: string;
   label: string;
   x: number;
   y: number;
   player: SquadPlayerVM | null;
+  squadId: string;
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
+  onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot:${slotKey}` });
 
@@ -356,9 +363,11 @@ function DroppableSlot({
       {player ? (
         <PlayerChip
           player={player}
+          squadId={squadId}
           onNumberChange={onNumberChange}
           onCaptainToggle={onCaptainToggle}
           onRemove={onRemove}
+          onUpdated={onUpdated}
         />
       ) : (
         <div
@@ -393,14 +402,18 @@ function DragOverlayChip({ player }: { player: SquadPlayerVM }) {
 
 function PlayerChip({
   player,
+  squadId,
   onNumberChange,
   onCaptainToggle,
   onRemove,
+  onUpdated,
 }: {
   player: SquadPlayerVM;
+  squadId: string;
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
+  onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: player.id,
@@ -448,6 +461,7 @@ function PlayerChip({
   );
 
   const profileInfo = {
+    source: player.source,
     name: player.name,
     club: player.club,
     position: player.position,
@@ -474,6 +488,9 @@ function PlayerChip({
       <div className="relative">
         <PlayerProfileDialog
           player={profileInfo}
+          squadId={squadId}
+          squadPlayerId={player.id}
+          onUpdated={(patch) => onUpdated(player.id, patch)}
           aria-label={`Ver perfil de ${player.name}`}
           className="block rounded-full"
         >

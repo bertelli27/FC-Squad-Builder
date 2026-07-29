@@ -47,6 +47,7 @@ interface RosterHandlers {
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
+  onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }
 
 /**
@@ -56,7 +57,11 @@ interface RosterHandlers {
  * target — no activationConstraint/stopPropagation choreography needed for
  * those, unlike the pitch chips which still drag by their whole body.
  */
-export function RosterTable({ bench, ...handlers }: { bench: SquadPlayerVM[] } & RosterHandlers) {
+export function RosterTable({
+  bench,
+  squadId,
+  ...handlers
+}: { bench: SquadPlayerVM[]; squadId: string } & RosterHandlers) {
   const { setNodeRef, isOver } = useDroppable({ id: "bench" });
   const groups = groupPlayersByPosition(bench);
 
@@ -84,7 +89,7 @@ export function RosterTable({ bench, ...handlers }: { bench: SquadPlayerVM[] } &
           </thead>
           <tbody>
             {groups.map(({ group, players }) => (
-              <RosterGroup key={group} group={group} players={players} {...handlers} />
+              <RosterGroup key={group} group={group} players={players} squadId={squadId} {...handlers} />
             ))}
           </tbody>
         </table>
@@ -96,8 +101,9 @@ export function RosterTable({ bench, ...handlers }: { bench: SquadPlayerVM[] } &
 function RosterGroup({
   group,
   players,
+  squadId,
   ...handlers
-}: { group: string; players: SquadPlayerVM[] } & RosterHandlers) {
+}: { group: string; players: SquadPlayerVM[]; squadId: string } & RosterHandlers) {
   return (
     <>
       <tr className="bg-muted/30">
@@ -109,13 +115,20 @@ function RosterGroup({
         </td>
       </tr>
       {players.map((player) => (
-        <RosterRow key={player.id} player={player} {...handlers} />
+        <RosterRow key={player.id} player={player} squadId={squadId} {...handlers} />
       ))}
     </>
   );
 }
 
-function RosterRow({ player, onNumberChange, onCaptainToggle, onRemove }: { player: SquadPlayerVM } & RosterHandlers) {
+function RosterRow({
+  player,
+  squadId,
+  onNumberChange,
+  onCaptainToggle,
+  onRemove,
+  onUpdated,
+}: { player: SquadPlayerVM; squadId: string } & RosterHandlers) {
   // No transform/translate here on purpose: CSS transforms on <tr> render
   // inconsistently across engines (table-row boxes aren't a normal
   // transformable element the way a <div> is), which is what made
@@ -127,6 +140,7 @@ function RosterRow({ player, onNumberChange, onCaptainToggle, onRemove }: { play
   });
 
   const profileInfo = {
+    source: player.source,
     name: player.name,
     club: player.club,
     position: player.position,
@@ -157,6 +171,9 @@ function RosterRow({ player, onNumberChange, onCaptainToggle, onRemove }: { play
       <td className="px-2 py-1.5">
         <PlayerProfileDialog
           player={profileInfo}
+          squadId={squadId}
+          squadPlayerId={player.id}
+          onUpdated={(patch) => onUpdated(player.id, patch)}
           aria-label={`Ver perfil de ${player.name}`}
           className="block w-full"
         >

@@ -239,6 +239,51 @@ export const squadService = {
     await prisma.squadPlayer.delete({ where: { id: playerId, squadId } });
   },
 
+  async getSquadPlayer(squadId: string, playerId: string) {
+    return prisma.squadPlayer.findUnique({
+      where: { id: playerId, squadId },
+      include: { cachedPlayer: true },
+    });
+  },
+
+  /**
+   * Edits a custom player's own details (name/position/photo/link) — the
+   * fields the user typed in by hand when there was no matching provider
+   * result. Deliberately refuses to touch anything whose CachedPlayer
+   * source isn't "custom": that would violate §7's "cache is only ever a
+   * mirror, never edited by the user" guarantee for real provider data.
+   * Returns null both when the SquadPlayer doesn't exist and when it does
+   * but isn't custom, so the route can 404/403 without leaking which case.
+   */
+  async updateCustomPlayerDetails(
+    squadId: string,
+    squadPlayerId: string,
+    patch: {
+      name?: string;
+      position?: string | null;
+      photoUrl?: string | null;
+      externalLink?: string | null;
+    },
+  ) {
+    const squadPlayer = await prisma.squadPlayer.findUnique({
+      where: { id: squadPlayerId, squadId },
+      include: { cachedPlayer: true },
+    });
+    if (!squadPlayer || squadPlayer.cachedPlayer.source !== CUSTOM_PLAYER_SOURCE) return null;
+
+    await prisma.cachedPlayer.update({
+      where: { id: squadPlayer.cachedPlayerId },
+      data: {
+        ...(patch.name !== undefined && { name: patch.name }),
+        ...(patch.position !== undefined && { position: patch.position }),
+        ...(patch.photoUrl !== undefined && { photoUrl: patch.photoUrl }),
+        ...(patch.externalLink !== undefined && { externalLink: patch.externalLink }),
+      },
+    });
+
+    return squadService.getSquadPlayer(squadId, squadPlayerId);
+  },
+
   /**
    * Creates a player that exists only in this app (not backed by any
    * provider) — for when a search across Kaggle/API-Football/TheSportsDB
