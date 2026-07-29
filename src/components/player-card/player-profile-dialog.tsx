@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ImageUrlInput } from "@/components/ui/image-url-input";
 import {
   Select,
   SelectContent,
@@ -235,13 +236,7 @@ function EditCustomPlayerForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="edit-player-photo">URL da foto</Label>
-        <Input
-          id="edit-player-photo"
-          type="url"
-          placeholder="https://..."
-          value={photoUrl}
-          onChange={(e) => setPhotoUrl(e.target.value)}
-        />
+        <ImageUrlInput id="edit-player-photo" value={photoUrl} onChange={setPhotoUrl} />
       </div>
 
       <div className="flex flex-col gap-1.5">

@@ -7,6 +7,7 @@ import { PencilIcon, Shield, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ImageUrlInput } from "@/components/ui/image-url-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export interface EditableSquadData {
@@ -81,13 +82,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="squad-logo">URL do escudo</Label>
-              <Input
-                id="squad-logo"
-                type="url"
-                placeholder="https://..."
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-              />
+              <ImageUrlInput id="squad-logo" value={logoUrl} onChange={setLogoUrl} />
             </div>
           </div>
 
@@ -108,13 +103,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="coach-photo">URL da foto</Label>
-              <Input
-                id="coach-photo"
-                type="url"
-                placeholder="https://..."
-                value={coachPhotoUrl}
-                onChange={(e) => setCoachPhotoUrl(e.target.value)}
-              />
+              <ImageUrlInput id="coach-photo" value={coachPhotoUrl} onChange={setCoachPhotoUrl} />
             </div>
 
             <div className="flex flex-col gap-1.5">

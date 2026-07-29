@@ -6,6 +6,7 @@ import { SearchIcon, UserPlus, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ImageUrlInput } from "@/components/ui/image-url-input";
 import {
   Dialog,
   DialogContent,
@@ -305,13 +306,7 @@ export function AddPlayerDialog({
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="custom-photo">URL da foto (opcional)</Label>
-                <Input
-                  id="custom-photo"
-                  type="url"
-                  placeholder="https://..."
-                  value={photoUrl}
-                  onChange={(e) => setPhotoUrl(e.target.value)}
-                />
+                <ImageUrlInput id="custom-photo" value={photoUrl} onChange={setPhotoUrl} />
               </div>
 
               <div className="flex flex-col gap-1.5">
