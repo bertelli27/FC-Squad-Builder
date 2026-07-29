@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Star } from "lucide-react";
+import { Star, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,7 @@ export function SquadListClient({
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [tagSearch, setTagSearch] = useState("");
+  const [query, setQuery] = useState("");
 
   function handleToggleFavorite(id: string, isFavorite: boolean) {
     setSquads((prev) => prev.map((s) => (s.id === id ? { ...s, isFavorite } : s)));
@@ -84,8 +85,17 @@ export function SquadListClient({
     if (selectedTagIds.length > 0) {
       list = list.filter((s) => s.tags.some((t) => selectedTagIds.includes(t.id)));
     }
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.categoryName?.toLowerCase().includes(q) ||
+          s.tags.some((t) => t.name.toLowerCase().includes(q)),
+      );
+    }
     return list;
-  }, [squads, onlyFavorites, categoryFilter, selectedTagIds]);
+  }, [squads, onlyFavorites, categoryFilter, selectedTagIds, query]);
 
   // Grouped by category only in the "all categories" view — picking one
   // specific category (or "Outros") already narrows it down, so a flat
@@ -115,6 +125,16 @@ export function SquadListClient({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="relative w-full sm:max-w-xs">
+        <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+        <Input
+          placeholder="Buscar elencos por nome, categoria ou tag…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant={onlyFavorites ? "default" : "outline"}
@@ -179,7 +199,11 @@ export function SquadListClient({
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
           <p className="text-muted-foreground">
-            {onlyFavorites ? "Nenhum elenco favoritado ainda." : "Nenhum elenco encontrado."}
+            {query.trim()
+              ? `Nenhum elenco encontrado para "${query.trim()}".`
+              : onlyFavorites
+                ? "Nenhum elenco favoritado ainda."
+                : "Nenhum elenco encontrado."}
           </p>
         </div>
       ) : groups ? (

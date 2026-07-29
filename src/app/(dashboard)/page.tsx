@@ -57,6 +57,7 @@ export default async function HomePage() {
             logoUrl: squad.logoUrl,
             isFavorite: squad.isFavorite,
             categoryId: squad.categoryId,
+            categoryName: squad.category?.name ?? null,
             tags: squad.tags,
           }))}
           categories={categories}
