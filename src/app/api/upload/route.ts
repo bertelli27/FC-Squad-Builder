@@ -17,13 +17,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Image too large (max 4.5MB)" }, { status: 400 });
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: "Blob storage isn't configured (missing BLOB_READ_WRITE_TOKEN)" },
-      { status: 500 },
-    );
-  }
-
+  // No explicit token/credential check here: a project connected to a Blob
+  // store (recommended over a standalone BLOB_READ_WRITE_TOKEN) authenticates
+  // via OIDC — Vercel injects VERCEL_OIDC_TOKEN + BLOB_STORE_ID automatically,
+  // and put() reads both on its own. It throws (caught below) if neither
+  // that pair nor a BLOB_READ_WRITE_TOKEN is available.
   try {
     const blob = await put(file.name, file, {
       access: "public",
