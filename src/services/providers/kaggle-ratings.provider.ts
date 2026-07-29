@@ -16,11 +16,22 @@ let cachedRows: KaggleRatingsRow[] | null = null;
 function loadRows(): KaggleRatingsRow[] {
   if (cachedRows) return cachedRows;
 
-  const csv = readFileSync(resolve(process.cwd(), CSV_PATH), "utf-8");
-  cachedRows = parse(csv, {
-    columns: true,
-    skip_empty_lines: true,
-  }) as KaggleRatingsRow[];
+  try {
+    // turbopackIgnore: the CSV path is intentionally dynamic (env-overridable)
+    // and lives outside the bundle — without this hint, Next's file tracer
+    // tries to pull the whole project into scope chasing it.
+    const csv = readFileSync(resolve(/* turbopackIgnore: true */ process.cwd(), CSV_PATH), "utf-8");
+    cachedRows = parse(csv, {
+      columns: true,
+      skip_empty_lines: true,
+    }) as KaggleRatingsRow[];
+  } catch {
+    // The CSV is a personal, non-redistributable dataset (§3.1 of
+    // CLAUDE.md) — gitignored, never deployed. Missing here just means
+    // this source has nothing to offer, not that the request should fail;
+    // callers fall through to the other providers (see provider-registry.ts).
+    cachedRows = [];
+  }
 
   return cachedRows;
 }
