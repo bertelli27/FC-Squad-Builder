@@ -19,6 +19,7 @@ export interface SquadCardData {
   playerCount: number;
   logoUrl?: string | null;
   isFavorite: boolean;
+  categoryId: string | null;
 }
 
 export function SquadCard({

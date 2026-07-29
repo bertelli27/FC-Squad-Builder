@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUrlInput } from "@/components/ui/image-url-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CategorySelect } from "./category-select";
 
 export interface EditableSquadData {
   id: string;
@@ -17,6 +18,7 @@ export interface EditableSquadData {
   coachName?: string | null;
   coachPhotoUrl?: string | null;
   coachExternalLink?: string | null;
+  categoryId?: string | null;
 }
 
 export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
@@ -27,6 +29,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
   const [coachName, setCoachName] = useState(squad.coachName ?? "");
   const [coachPhotoUrl, setCoachPhotoUrl] = useState(squad.coachPhotoUrl ?? "");
   const [coachExternalLink, setCoachExternalLink] = useState(squad.coachExternalLink ?? "");
+  const [categoryId, setCategoryId] = useState<string | null>(squad.categoryId ?? null);
   const [saving, setSaving] = useState(false);
 
   function handleSubmit(event: React.FormEvent) {
@@ -40,7 +43,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
     fetch(`/api/squads/${squad.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, logoUrl, coachName, coachPhotoUrl, coachExternalLink }),
+      body: JSON.stringify({ name, logoUrl, coachName, coachPhotoUrl, coachExternalLink, categoryId }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then(() => {
@@ -83,6 +86,11 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="squad-logo">URL do escudo</Label>
               <ImageUrlInput id="squad-logo" value={logoUrl} onChange={setLogoUrl} />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Categoria</Label>
+              <CategorySelect value={categoryId} onChange={setCategoryId} />
             </div>
           </div>
 

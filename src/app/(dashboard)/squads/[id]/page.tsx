@@ -31,6 +31,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
                 coachName: squad.coachName,
                 coachPhotoUrl: squad.coachPhotoUrl,
                 coachExternalLink: squad.coachExternalLink,
+                categoryId: squad.categoryId,
               }}
             />
           </div>

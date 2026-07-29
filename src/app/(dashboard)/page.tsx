@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PlusIcon } from "lucide-react";
 import { squadService } from "@/services/squad.service";
+import { categoryService } from "@/services/category.service";
 import { Button } from "@/components/ui/button";
 import { SquadListClient } from "@/components/squad-builder/squad-list-client";
 
@@ -14,7 +15,10 @@ import { SquadListClient } from "@/components/squad-builder/squad-list-client";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const squads = await squadService.listSquads();
+  const [squads, categories] = await Promise.all([
+    squadService.listSquads(),
+    categoryService.listCategories(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,7 +54,9 @@ export default async function HomePage() {
             playerCount: squad._count.players,
             logoUrl: squad.logoUrl,
             isFavorite: squad.isFavorite,
+            categoryId: squad.categoryId,
           }))}
+          categories={categories}
         />
       )}
     </div>
