@@ -53,13 +53,9 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Editar elenco"
-        onClick={() => setOpen(true)}
-      >
+      <Button variant="outline" size="sm" aria-label="Editar elenco" onClick={() => setOpen(true)}>
         <PencilIcon className="size-4" />
+        Editar
       </Button>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
