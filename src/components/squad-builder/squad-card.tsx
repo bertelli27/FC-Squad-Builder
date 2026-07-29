@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2, Users } from "lucide-react";
+import { Trash2, Users, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { cn } from "@/lib/utils";
 import { ClubBadge } from "./club-badge";
 
 export interface SquadCardData {
@@ -17,9 +18,17 @@ export interface SquadCardData {
   formation: string;
   playerCount: number;
   logoUrl?: string | null;
+  isFavorite: boolean;
 }
 
-export function SquadCard({ squad }: { squad: SquadCardData }) {
+export function SquadCard({
+  squad,
+  onToggleFavorite,
+}: {
+  squad: SquadCardData;
+  /** Lifted up to SquadListClient so the favorites filter/sort stay in sync without a full reload — see that component for the optimistic update + revert-on-failure. */
+  onToggleFavorite: (id: string, isFavorite: boolean) => void;
+}) {
   const router = useRouter();
   const [isDeleting, startDeleting] = useTransition();
   const { confirm, dialog } = useConfirmDialog();
@@ -64,13 +73,29 @@ export function SquadCard({ squad }: { squad: SquadCardData }) {
               {squad.name}
             </Link>
           </CardTitle>
-          <CardAction className="relative z-10 opacity-0 transition-opacity group-hover:opacity-100">
+          <CardAction className="relative z-10 flex items-center">
+            {/* Always visible (unlike delete below) — at-a-glance "which of
+                these are favorited" is the whole point of the star. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={squad.isFavorite ? "Remover dos favoritos" : "Favoritar elenco"}
+              onClick={() => onToggleFavorite(squad.id, !squad.isFavorite)}
+            >
+              <Star
+                className={cn(
+                  "size-4",
+                  squad.isFavorite && "fill-amber-400 text-amber-400",
+                )}
+              />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
               aria-label="Excluir elenco"
               disabled={isDeleting}
               onClick={handleDelete}
+              className="opacity-0 transition-opacity group-hover:opacity-100"
             >
               <Trash2 className="size-4" />
             </Button>

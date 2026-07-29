@@ -30,6 +30,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const coachPhotoUrl = optionalStringField(body?.coachPhotoUrl);
   const coachExternalLink = optionalStringField(body?.coachExternalLink);
   const notes = optionalStringField(body?.notes);
+  const isFavorite = typeof body?.isFavorite === "boolean" ? body.isFavorite : undefined;
+  const categoryId = optionalStringField(body?.categoryId);
+  const tagNames = Array.isArray(body?.tagNames)
+    ? body.tagNames.filter((t: unknown): t is string => typeof t === "string")
+    : undefined;
 
   if (
     name !== undefined ||
@@ -37,7 +42,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     coachName !== undefined ||
     coachPhotoUrl !== undefined ||
     coachExternalLink !== undefined ||
-    notes !== undefined
+    notes !== undefined ||
+    isFavorite !== undefined ||
+    categoryId !== undefined ||
+    tagNames !== undefined
   ) {
     await squadService.updateSquad(id, {
       name,
@@ -46,6 +54,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       coachPhotoUrl,
       coachExternalLink,
       notes,
+      isFavorite,
+      categoryId,
+      tagNames,
     });
   }
 

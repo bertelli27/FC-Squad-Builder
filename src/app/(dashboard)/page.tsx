@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PlusIcon } from "lucide-react";
 import { squadService } from "@/services/squad.service";
 import { Button } from "@/components/ui/button";
-import { SquadCard } from "@/components/squad-builder/squad-card";
+import { SquadListClient } from "@/components/squad-builder/squad-list-client";
 
 // Without this, Next prerenders this page as static HTML at build time
 // (it has no params/cookies/etc. to force dynamic rendering on its own) —
@@ -42,20 +42,16 @@ export default async function HomePage() {
           <Button render={<Link href="/squads/new">Criar meu primeiro elenco</Link>} nativeButton={false} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {squads.map((squad) => (
-            <SquadCard
-              key={squad.id}
-              squad={{
-                id: squad.id,
-                name: squad.name,
-                formation: squad.formation,
-                playerCount: squad._count.players,
-                logoUrl: squad.logoUrl,
-              }}
-            />
-          ))}
-        </div>
+        <SquadListClient
+          squads={squads.map((squad) => ({
+            id: squad.id,
+            name: squad.name,
+            formation: squad.formation,
+            playerCount: squad._count.players,
+            logoUrl: squad.logoUrl,
+            isFavorite: squad.isFavorite,
+          }))}
+        />
       )}
     </div>
   );

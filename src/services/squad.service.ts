@@ -5,6 +5,7 @@ import { normalizePositionCategory } from "@/lib/position-category";
 import { clubDataService } from "./club-data.service";
 import { nationalTeamDataService } from "./national-team-data.service";
 import { playerDataService } from "./player-data.service";
+import { tagService } from "./tag.service";
 import type { Player } from "@/types/domain";
 
 export interface CreateSquadInput {
@@ -12,6 +13,9 @@ export interface CreateSquadInput {
   formation?: string;
   /** Auto-loads the base roster from a club or national team, by name (re-resolved live so this doesn't depend on prior cache state). */
   base?: { kind: "club" | "nationalTeam"; name: string };
+  categoryId?: string | null;
+  /** Tag names — resolved/created via tagService.findOrCreateTags and connected. */
+  tagNames?: string[];
 }
 
 async function resolveBase(
@@ -89,17 +93,26 @@ function assignStartingXI(
 }
 
 export const squadService = {
+  /**
+   * All squads with just enough to power the home page's cards and its
+   * client-side favorite/category/tag/search filtering (§V2) — no need for
+   * full player rosters here, that's what getSquad is for.
+   */
   async listSquads() {
     return prisma.squad.findMany({
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { players: true } } },
+      include: { _count: { select: { players: true } }, category: true, tags: true },
     });
   },
 
   async getSquad(id: string) {
     return prisma.squad.findUnique({
       where: { id },
-      include: { players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } } },
+      include: {
+        players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
+        category: true,
+        tags: true,
+      },
     });
   },
 
@@ -117,6 +130,7 @@ export const squadService = {
   async createSquad(input: CreateSquadInput) {
     const resolved = input.base ? await resolveBase(input.base) : null;
     const formation = input.formation ?? "4-3-3";
+    const tags = input.tagNames?.length ? await tagService.findOrCreateTags(input.tagNames) : [];
 
     const squad = await prisma.squad.create({
       data: {
@@ -124,6 +138,8 @@ export const squadService = {
         formation,
         baseClubRef: resolved?.externalId,
         logoUrl: resolved?.logoUrl,
+        categoryId: input.categoryId,
+        tags: tags.length ? { connect: tags.map((t) => ({ id: t.id })) } : undefined,
       },
     });
 
@@ -162,9 +178,22 @@ export const squadService = {
       coachPhotoUrl?: string | null;
       coachExternalLink?: string | null;
       notes?: string | null;
+      isFavorite?: boolean;
+      categoryId?: string | null;
+      /** Full replace: the squad's tags become exactly this set (undefined leaves tags untouched). */
+      tagNames?: string[];
     },
   ) {
-    return prisma.squad.update({ where: { id }, data });
+    const { tagNames, ...rest } = data;
+    const tags = tagNames !== undefined ? await tagService.findOrCreateTags(tagNames) : undefined;
+
+    return prisma.squad.update({
+      where: { id },
+      data: {
+        ...rest,
+        tags: tags !== undefined ? { set: tags.map((t) => ({ id: t.id })) } : undefined,
+      },
+    });
   },
 
   async deleteSquad(id: string) {
