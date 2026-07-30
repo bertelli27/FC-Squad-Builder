@@ -12,6 +12,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const shirtNumber = typeof body.shirtNumber === "number" ? body.shirtNumber : undefined;
+  const destination = body.destination === "watchlist" ? "watchlist" : "bench";
 
   const player = await squadService.createCustomPlayer(id, {
     name: body.name,
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     photoUrl: typeof body.photoUrl === "string" ? body.photoUrl : undefined,
     externalLink: typeof body.externalLink === "string" ? body.externalLink : undefined,
     shirtNumber,
+    destination,
   });
 
   return NextResponse.json({ player }, { status: 201 });

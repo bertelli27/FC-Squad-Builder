@@ -52,6 +52,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
         key={squad.formation}
         squadId={squad.id}
         formation={squad.formation}
+        baseKind={squad.baseKind}
         players={squad.players.map((sp) => ({
           id: sp.id,
           source: sp.cachedPlayer.source,
@@ -63,6 +64,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
           shirtNumber: sp.shirtNumber,
           isCaptain: sp.isCaptain,
           isStarter: sp.isStarter,
+          isWatchlist: sp.isWatchlist,
           positionSlot: sp.positionSlot,
           externalLink: sp.cachedPlayer.externalLink,
         }))}

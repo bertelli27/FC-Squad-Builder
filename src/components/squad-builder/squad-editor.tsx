@@ -14,7 +14,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { toast } from "sonner";
-import { XIcon, Volleyball, Users } from "lucide-react";
+import { XIcon, Volleyball, Users, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFormationSlots } from "@/lib/formations";
 import { ratingStyle } from "@/lib/rating-tier";
@@ -24,6 +24,11 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { RosterTable } from "./roster-table";
 import { AddPlayerDialog } from "./add-player-dialog";
+import { WatchlistPanel } from "./watchlist-panel";
+
+// Only informative (no hard cap enforced) — a seleção squad's starters +
+// bench are its 26 convocados; observados sit outside that count entirely.
+const NATIONAL_TEAM_SQUAD_SIZE = 26;
 
 export interface SquadPlayerVM {
   id: string;
@@ -36,6 +41,7 @@ export interface SquadPlayerVM {
   shirtNumber?: number | null;
   isCaptain: boolean;
   isStarter: boolean;
+  isWatchlist: boolean;
   positionSlot?: string | null;
   externalLink?: string | null;
 }
@@ -43,6 +49,7 @@ export interface SquadPlayerVM {
 interface EditorState {
   slots: Record<string, SquadPlayerVM | null>;
   bench: SquadPlayerVM[];
+  watchlist: SquadPlayerVM[];
 }
 
 function buildInitialState(players: SquadPlayerVM[], formation: string): EditorState {
@@ -52,9 +59,12 @@ function buildInitialState(players: SquadPlayerVM[], formation: string): EditorS
     formationSlots.map((s) => [s.slot, null]),
   );
   const bench: SquadPlayerVM[] = [];
+  const watchlist: SquadPlayerVM[] = [];
 
   for (const player of players) {
-    if (
+    if (player.isWatchlist) {
+      watchlist.push(player);
+    } else if (
       player.isStarter &&
       player.positionSlot &&
       slotKeys.has(player.positionSlot) &&
@@ -66,20 +76,23 @@ function buildInitialState(players: SquadPlayerVM[], formation: string): EditorS
     }
   }
 
-  return { slots, bench };
+  return { slots, bench, watchlist };
 }
 
 export function SquadEditor({
   squadId,
   formation,
   players,
+  baseKind,
 }: {
   squadId: string;
   formation: string;
   players: SquadPlayerVM[];
+  baseKind?: string | null;
 }) {
   const formationSlots = getFormationSlots(formation);
   const [state, setState] = useState<EditorState>(() => buildInitialState(players, formation));
+  const isNationalTeam = baseKind === "nationalTeam";
   // Without a distance threshold, PointerSensor starts tracking a
   // potential drag on the very first pixel of pointer movement from ANY
   // pointerdown on a draggable chip — including pointerdown on a nested
@@ -97,7 +110,7 @@ export function SquadEditor({
     for (const key of Object.keys(state.slots)) {
       if (state.slots[key]?.id === id) return state.slots[key];
     }
-    return state.bench.find((p) => p.id === id) ?? null;
+    return state.bench.find((p) => p.id === id) ?? state.watchlist.find((p) => p.id === id) ?? null;
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -108,13 +121,21 @@ export function SquadEditor({
     const payload = [
       ...formationSlots.flatMap((s, i) => {
         const p = next.slots[s.slot];
-        return p ? [{ id: p.id, positionSlot: s.slot, isStarter: true, order: i }] : [];
+        return p ? [{ id: p.id, positionSlot: s.slot, isStarter: true, isWatchlist: false, order: i }] : [];
       }),
       ...next.bench.map((p, i) => ({
         id: p.id,
         positionSlot: null,
         isStarter: false,
+        isWatchlist: false,
         order: formationSlots.length + i,
+      })),
+      ...next.watchlist.map((p, i) => ({
+        id: p.id,
+        positionSlot: null,
+        isStarter: false,
+        isWatchlist: true,
+        order: formationSlots.length + next.bench.length + i,
       })),
     ];
 
@@ -135,18 +156,28 @@ export function SquadEditor({
     if (activeId === overId) return;
 
     const fromSlotKey = Object.keys(state.slots).find((k) => state.slots[k]?.id === activeId);
+    const fromWatchlist = state.watchlist.some((p) => p.id === activeId);
     const draggedPlayer = fromSlotKey
       ? state.slots[fromSlotKey]
-      : state.bench.find((p) => p.id === activeId);
+      : (fromWatchlist
+          ? state.watchlist.find((p) => p.id === activeId)
+          : state.bench.find((p) => p.id === activeId));
     if (!draggedPlayer) return;
 
     const slots = { ...state.slots };
     let bench = [...state.bench];
+    let watchlist = [...state.watchlist];
 
     if (overId === "bench") {
-      if (!fromSlotKey) return; // already on bench
-      slots[fromSlotKey] = null;
+      if (!fromSlotKey && !fromWatchlist) return; // already on bench
+      if (fromSlotKey) slots[fromSlotKey] = null;
+      if (fromWatchlist) watchlist = watchlist.filter((p) => p.id !== activeId);
       bench = [...bench, draggedPlayer];
+    } else if (overId === "watchlist") {
+      if (fromWatchlist) return; // already there
+      if (fromSlotKey) slots[fromSlotKey] = null;
+      else bench = bench.filter((p) => p.id !== activeId);
+      watchlist = [...watchlist, draggedPlayer];
     } else if (overId.startsWith("slot:")) {
       const targetSlotKey = overId.slice("slot:".length);
       if (targetSlotKey === fromSlotKey) return;
@@ -154,7 +185,14 @@ export function SquadEditor({
 
       slots[targetSlotKey] = draggedPlayer;
       if (fromSlotKey) {
+        // Swap within the pitch: the displaced starter takes the dragged
+        // player's old slot.
         slots[fromSlotKey] = displaced ?? null;
+      } else if (fromWatchlist) {
+        // The "call up a scouted player" swap: whoever was starting there
+        // becomes the observado, not a bench reserve.
+        watchlist = watchlist.filter((p) => p.id !== activeId);
+        if (displaced) watchlist = [...watchlist, displaced];
       } else {
         bench = bench.filter((p) => p.id !== activeId);
         if (displaced) bench = [...bench, displaced];
@@ -163,7 +201,7 @@ export function SquadEditor({
       return;
     }
 
-    const next = { slots, bench };
+    const next = { slots, bench, watchlist };
     setState(next);
     persistArrangement(next);
   }
@@ -184,7 +222,10 @@ export function SquadEditor({
       const bench = prev.bench.map((p) =>
         p.id === playerId ? { ...p, ...patch } : patch.isCaptain ? { ...p, isCaptain: false } : p,
       );
-      return { slots, bench };
+      const watchlist = prev.watchlist.map((p) =>
+        p.id === playerId ? { ...p, ...patch } : patch.isCaptain ? { ...p, isCaptain: false } : p,
+      );
+      return { slots, bench, watchlist };
     });
   }
 
@@ -225,7 +266,11 @@ export function SquadEditor({
       for (const key of Object.keys(slots)) {
         if (slots[key]?.id === playerId) slots[key] = null;
       }
-      return { slots, bench: prev.bench.filter((p) => p.id !== playerId) };
+      return {
+        slots,
+        bench: prev.bench.filter((p) => p.id !== playerId),
+        watchlist: prev.watchlist.filter((p) => p.id !== playerId),
+      };
     });
 
     const res = await fetch(`/api/squads/${squadId}/players/${playerId}`, { method: "DELETE" });
@@ -235,6 +280,11 @@ export function SquadEditor({
   function handlePlayerAdded(player: SquadPlayerVM) {
     setState((prev) => ({ ...prev, bench: [...prev.bench, player] }));
     toast.success(`${player.name} adicionado ao elenco.`);
+  }
+
+  function handleWatchlistPlayerAdded(player: SquadPlayerVM) {
+    setState((prev) => ({ ...prev, watchlist: [...prev.watchlist, player] }));
+    toast.success(`${player.name} adicionado aos observados.`);
   }
 
   const chipHandlers = {
@@ -295,6 +345,12 @@ export function SquadEditor({
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="text-primary size-4" />
               Elenco ({state.bench.length})
+              {isNationalTeam && (
+                <span className="text-muted-foreground text-xs font-normal">
+                  · {Object.values(state.slots).filter(Boolean).length + state.bench.length}/
+                  {NATIONAL_TEAM_SQUAD_SIZE} convocados
+                </span>
+              )}
             </CardTitle>
             <AddPlayerDialog squadId={squadId} onAdded={handlePlayerAdded} />
           </CardHeader>
@@ -324,6 +380,32 @@ export function SquadEditor({
           </CardContent>
         </Card>
       </div>
+
+      {isNationalTeam && (
+        <Card className="mt-6 gap-0 py-0">
+          <CardHeader className="flex-row items-center justify-between border-b py-3 [.border-b]:pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Eye className="text-primary size-4" />
+              Observados ({state.watchlist.length})
+            </CardTitle>
+            <AddPlayerDialog
+              squadId={squadId}
+              onAdded={handleWatchlistPlayerAdded}
+              destination="watchlist"
+              triggerLabel="+ Observar"
+            />
+          </CardHeader>
+          <CardContent className="p-3">
+            <WatchlistPanel
+              players={state.watchlist}
+              squadId={squadId}
+              onRemove={handleRemove}
+              onUpdated={updatePlayerLocal}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* The floating clone that actually follows the cursor during a
           drag. Both drag sources (pitch chip, roster table row) just show
           reduced opacity in place via `isDragging` — neither one moves

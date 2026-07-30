@@ -8,6 +8,7 @@ export interface SquadExportPlayer {
   shirtNumber: number | null;
   isCaptain: boolean;
   isStarter: boolean;
+  isWatchlist: boolean;
   positionSlot: string | null;
   order: number;
   player: {
@@ -29,6 +30,7 @@ export interface SquadExportPlayer {
 export interface SquadExportEntry {
   name: string;
   formation: string;
+  baseKind: string | null;
   logoUrl: string | null;
   coachName: string | null;
   coachPhotoUrl: string | null;
@@ -50,6 +52,7 @@ function toExportEntry(squad: FullSquad): SquadExportEntry {
   return {
     name: squad.name,
     formation: squad.formation,
+    baseKind: squad.baseKind,
     logoUrl: squad.logoUrl,
     coachName: squad.coachName,
     coachPhotoUrl: squad.coachPhotoUrl,
@@ -61,6 +64,7 @@ function toExportEntry(squad: FullSquad): SquadExportEntry {
       shirtNumber: p.shirtNumber,
       isCaptain: p.isCaptain,
       isStarter: p.isStarter,
+      isWatchlist: p.isWatchlist,
       positionSlot: p.positionSlot,
       order: p.order,
       player: {
@@ -124,6 +128,7 @@ function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | 
       shirtNumber: num(p.shirtNumber),
       isCaptain: p.isCaptain === true,
       isStarter: p.isStarter !== false,
+      isWatchlist: p.isWatchlist === true,
       positionSlot: str(p.positionSlot),
       order: num(p.order) ?? 0,
       player: {
@@ -147,6 +152,7 @@ function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | 
     entry: {
       name: obj.name,
       formation: obj.formation,
+      baseKind: str(obj.baseKind),
       logoUrl: str(obj.logoUrl),
       coachName: str(obj.coachName),
       coachPhotoUrl: str(obj.coachPhotoUrl),
@@ -230,6 +236,7 @@ export const squadTransferService = {
         data: {
           name,
           formation: entry.formation,
+          baseKind: entry.baseKind,
           logoUrl: entry.logoUrl,
           coachName: entry.coachName,
           coachPhotoUrl: entry.coachPhotoUrl,
@@ -263,6 +270,7 @@ export const squadTransferService = {
             shirtNumber: p.shirtNumber,
             isCaptain: p.isCaptain,
             isStarter: p.isStarter,
+            isWatchlist: p.isWatchlist,
             positionSlot: p.positionSlot,
             order: p.order,
           },

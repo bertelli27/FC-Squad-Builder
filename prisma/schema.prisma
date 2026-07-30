@@ -72,6 +72,11 @@ model Squad {
   id          String   @id @default(cuid())
   name        String // "Coritiba", "Barcelona 2011", "Time dos Sonhos"
   baseClubRef String? // externalId do CachedClub/CachedNationalTeam de origem, se carregado de um clube/seleção real
+  // "club" | "nationalTeam" | null (do zero/desconhecido) — setado uma
+  // única vez na criação a partir da aba escolhida (Clube/Seleção/Do
+  // zero); não editável depois. Só "nationalTeam" ganha a área de
+  // observados no editor (ver SquadPlayer.isWatchlist).
+  baseKind    String?
   logoUrl     String? // escudo do elenco — copiado do clube de origem na criação (se houver) e editável livremente depois; nunca buscado ao vivo
   formation   String   @default("4-3-3")
 
@@ -122,6 +127,10 @@ model SquadPlayer {
   shirtNumber    Int?
   isCaptain      Boolean      @default(false)
   isStarter      Boolean      @default(true) // false = banco de reservas
+  // jogador observado (fora dos titulares/reserva "oficiais") — só usado
+  // quando Squad.baseKind === "nationalTeam"; nunca true por qualquer
+  // fluxo de elenco de clube.
+  isWatchlist    Boolean      @default(false)
   positionSlot   String? // posição na formação, ex: "LW", "CB1"
   order          Int          @default(0)
 

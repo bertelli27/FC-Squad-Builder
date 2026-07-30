@@ -7,6 +7,7 @@ interface PlayerUpdate {
   id: string;
   positionSlot: string | null;
   isStarter: boolean;
+  isWatchlist: boolean;
   order: number;
 }
 
@@ -17,6 +18,7 @@ function isValidUpdate(value: unknown): value is PlayerUpdate {
     typeof v.id === "string" &&
     (v.positionSlot === null || typeof v.positionSlot === "string") &&
     typeof v.isStarter === "boolean" &&
+    typeof v.isWatchlist === "boolean" &&
     typeof v.order === "number"
   );
 }
@@ -45,10 +47,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     );
   }
 
-  const player = await squadService.addPlayerToSquad(id, {
-    source: body.source,
-    externalId: body.externalId,
-  });
+  const destination = body.destination === "watchlist" ? "watchlist" : "bench";
+  const player = await squadService.addPlayerToSquad(
+    id,
+    { source: body.source, externalId: body.externalId },
+    destination,
+  );
   if (!player) return NextResponse.json({ error: "Player not found" }, { status: 404 });
 
   return NextResponse.json({ player }, { status: 201 });

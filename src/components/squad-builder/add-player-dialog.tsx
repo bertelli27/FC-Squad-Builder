@@ -41,6 +41,7 @@ function squadPlayerVMFromResponse(sp: {
   shirtNumber: number | null;
   isCaptain: boolean;
   isStarter: boolean;
+  isWatchlist: boolean;
   positionSlot: string | null;
   cachedPlayer: {
     source: string;
@@ -63,6 +64,7 @@ function squadPlayerVMFromResponse(sp: {
     shirtNumber: sp.shirtNumber,
     isCaptain: sp.isCaptain,
     isStarter: sp.isStarter,
+    isWatchlist: sp.isWatchlist,
     positionSlot: sp.positionSlot,
     externalLink: sp.cachedPlayer.externalLink,
   };
@@ -71,9 +73,14 @@ function squadPlayerVMFromResponse(sp: {
 export function AddPlayerDialog({
   squadId,
   onAdded,
+  destination = "bench",
+  triggerLabel = "+ Adicionar",
 }: {
   squadId: string;
   onAdded: (player: SquadPlayerVM) => void;
+  /** Which bucket the added player lands in — plain bench (default) or a national-team squad's watchlist. */
+  destination?: "bench" | "watchlist";
+  triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"search" | "create">("search");
@@ -134,7 +141,7 @@ export function AddPlayerDialog({
     fetch(`/api/squads/${squadId}/players`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: result.source, externalId: result.externalId }),
+      body: JSON.stringify({ source: result.source, externalId: result.externalId, destination }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => onAdded(squadPlayerVMFromResponse(data.player)))
@@ -159,6 +166,7 @@ export function AddPlayerDialog({
         shirtNumber: shirtNumber ? Number(shirtNumber) : undefined,
         photoUrl: photoUrl || undefined,
         externalLink: externalLink || undefined,
+        destination,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -181,7 +189,7 @@ export function AddPlayerDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        + Adicionar
+        {triggerLabel}
       </Button>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>

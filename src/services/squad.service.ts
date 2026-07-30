@@ -137,6 +137,7 @@ export const squadService = {
         name: input.name,
         formation,
         baseClubRef: resolved?.externalId,
+        baseKind: input.base?.kind ?? null,
         logoUrl: resolved?.logoUrl,
         categoryId: input.categoryId,
         tags: tags.length ? { connect: tags.map((t) => ({ id: t.id })) } : undefined,
@@ -219,6 +220,7 @@ export const squadService = {
         name: `${original.name} (Cópia)`,
         formation: original.formation,
         baseClubRef: original.baseClubRef,
+        baseKind: original.baseKind,
         logoUrl: original.logoUrl,
         coachName: original.coachName,
         coachPhotoUrl: original.coachPhotoUrl,
@@ -237,6 +239,7 @@ export const squadService = {
           shirtNumber: p.shirtNumber,
           isCaptain: p.isCaptain,
           isStarter: p.isStarter,
+          isWatchlist: p.isWatchlist,
           positionSlot: p.positionSlot,
           order: p.order,
         })),
@@ -246,16 +249,27 @@ export const squadService = {
     return squadService.getSquad(copy.id);
   },
 
-  /** Bulk-persists a new field/bench arrangement after a drag-and-drop change. */
+  /** Bulk-persists a new field/bench/watchlist arrangement after a drag-and-drop change. */
   async updateSquadPlayers(
     squadId: string,
-    updates: { id: string; positionSlot: string | null; isStarter: boolean; order: number }[],
+    updates: {
+      id: string;
+      positionSlot: string | null;
+      isStarter: boolean;
+      isWatchlist: boolean;
+      order: number;
+    }[],
   ) {
     await prisma.$transaction(
       updates.map((u) =>
         prisma.squadPlayer.update({
           where: { id: u.id, squadId },
-          data: { positionSlot: u.positionSlot, isStarter: u.isStarter, order: u.order },
+          data: {
+            positionSlot: u.positionSlot,
+            isStarter: u.isStarter,
+            isWatchlist: u.isWatchlist,
+            order: u.order,
+          },
         }),
       ),
     );
@@ -279,10 +293,15 @@ export const squadService = {
   /**
    * Adds any player (identified by source+externalId, from a player
    * search — Kaggle catalog or a live API-Football/TheSportsDB lookup) to
-   * the squad's bench. Idempotent: adding a player already in the squad
-   * just returns their existing row instead of erroring.
+   * the squad's bench (or, for national-team squads, its watchlist).
+   * Idempotent: adding a player already in the squad just returns their
+   * existing row instead of erroring.
    */
-  async addPlayerToSquad(squadId: string, ref: { source: string; externalId: string }) {
+  async addPlayerToSquad(
+    squadId: string,
+    ref: { source: string; externalId: string },
+    destination: "bench" | "watchlist" = "bench",
+  ) {
     const player = await playerDataService.getPlayer(ref.source, ref.externalId);
     if (!player) return null;
 
@@ -305,6 +324,7 @@ export const squadService = {
         squadId,
         cachedPlayerId: cached.id,
         isStarter: false,
+        isWatchlist: destination === "watchlist",
         order: (_max.order ?? -1) + 1,
       },
       include: { cachedPlayer: true },
@@ -363,9 +383,9 @@ export const squadService = {
   /**
    * Creates a player that exists only in this app (not backed by any
    * provider) — for when a search across Kaggle/API-Football/TheSportsDB
-   * still doesn't find who the user wants. Added straight to the bench;
-   * `expiresAt` is set far in the future since there's no source to ever
-   * refresh it from.
+   * still doesn't find who the user wants. Added straight to the bench
+   * (or, for national-team squads, the watchlist); `expiresAt` is set far
+   * in the future since there's no source to ever refresh it from.
    */
   async createCustomPlayer(
     squadId: string,
@@ -375,6 +395,7 @@ export const squadService = {
       photoUrl?: string;
       externalLink?: string;
       shirtNumber?: number;
+      destination?: "bench" | "watchlist";
     },
   ) {
     const externalId = crypto.randomUUID();
@@ -397,6 +418,7 @@ export const squadService = {
         squadId,
         cachedPlayerId: cached.id,
         isStarter: false,
+        isWatchlist: input.destination === "watchlist",
         shirtNumber: input.shirtNumber,
         order: (_max.order ?? -1) + 1,
       },
