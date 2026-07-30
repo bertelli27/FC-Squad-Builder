@@ -69,7 +69,14 @@ export function CategorySelect({
         onValueChange={(v) => onChange(v === NONE_VALUE ? null : (v ?? null))}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Sem categoria (Outros)" />
+          {/* Select.Value shows the raw `value` unless told how to render it —
+              fine when value and label are the same string, but here value
+              is a category id, so it needs an explicit lookup. */}
+          <SelectValue placeholder="Sem categoria (Outros)">
+            {(v: string) =>
+              v === NONE_VALUE ? "Sem categoria (Outros)" : (categories.find((c) => c.id === v)?.name ?? v)
+            }
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={NONE_VALUE}>Sem categoria (Outros)</SelectItem>

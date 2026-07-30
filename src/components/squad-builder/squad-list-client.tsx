@@ -154,7 +154,16 @@ export function SquadListClient({
 
         <Select value={categoryFilter} onValueChange={(v) => v && setCategoryFilter(v)}>
           <SelectTrigger className="w-48">
-            <SelectValue />
+            {/* Select.Value shows the raw `value` unless told how to render
+                it — fine for value===label selects, but here value is a
+                category id, so it needs an explicit lookup. */}
+            <SelectValue>
+              {(v: string) => {
+                if (v === ALL_CATEGORIES) return "Todas as categorias";
+                if (v === NO_CATEGORY) return UNCATEGORIZED_LABEL;
+                return categories.find((c) => c.id === v)?.name ?? v;
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_CATEGORIES}>Todas as categorias</SelectItem>

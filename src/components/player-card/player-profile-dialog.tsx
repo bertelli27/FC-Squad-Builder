@@ -222,7 +222,9 @@ function EditCustomPlayerForm({
         <Label htmlFor="edit-player-position">Posição</Label>
         <Select value={position} onValueChange={(v) => setPosition(v ?? "")}>
           <SelectTrigger id="edit-player-position">
-            <SelectValue placeholder="Selecione" />
+            <SelectValue placeholder="Selecione">
+              {(v: string) => POSITIONS.find((p) => p.value === v)?.label ?? v}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {POSITIONS.map((p) => (

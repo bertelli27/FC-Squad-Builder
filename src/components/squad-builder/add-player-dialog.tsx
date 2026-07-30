@@ -273,7 +273,9 @@ export function AddPlayerDialog({
                 <Label htmlFor="custom-position">Posição</Label>
                 <Select value={position} onValueChange={(v) => setPosition(v ?? "")}>
                   <SelectTrigger id="custom-position">
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue placeholder="Selecione">
+                      {(v: string) => POSITIONS.find((p) => p.value === v)?.label ?? v}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {POSITIONS.map((p) => (
