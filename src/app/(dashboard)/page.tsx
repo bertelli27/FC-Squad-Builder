@@ -5,6 +5,7 @@ import { categoryService } from "@/services/category.service";
 import { tagService } from "@/services/tag.service";
 import { Button } from "@/components/ui/button";
 import { SquadListClient } from "@/components/squad-builder/squad-list-client";
+import { ImportExportBar } from "@/components/squad-builder/import-export-bar";
 
 // Without this, Next prerenders this page as static HTML at build time
 // (it has no params/cookies/etc. to force dynamic rendering on its own) —
@@ -31,15 +32,18 @@ export default async function HomePage() {
             <span className="text-muted-foreground text-sm">({squads.length})</span>
           )}
         </div>
-        <Button
-          render={
-            <Link href="/squads/new">
-              <PlusIcon className="size-4" />
-              Criar elenco
-            </Link>
-          }
-          nativeButton={false}
-        />
+        <div className="flex items-center gap-2">
+          <ImportExportBar />
+          <Button
+            render={
+              <Link href="/squads/new">
+                <PlusIcon className="size-4" />
+                Criar elenco
+              </Link>
+            }
+            nativeButton={false}
+          />
+        </div>
       </div>
 
       {squads.length === 0 ? (

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2, Users, Star, MoreVertical, Copy } from "lucide-react";
+import { Trash2, Users, Star, MoreVertical, Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +129,12 @@ export function SquadCard({
                 <DropdownMenuItem disabled={isDuplicating} onClick={handleDuplicate}>
                   <Copy className="size-4" />
                   Duplicar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  render={<a href={`/api/squads/${squad.id}/export`} download />}
+                >
+                  <Download className="size-4" />
+                  Exportar
                 </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" disabled={isDeleting} onClick={handleDelete}>
                   <Trash2 className="size-4" />
