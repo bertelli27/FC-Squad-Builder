@@ -2,15 +2,22 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { careerService } from "@/services/career.service";
-import { PlayerAvatar } from "@/components/player-card/player-avatar";
+import { CareerHeader } from "@/components/careers/career-header";
 import { CareerWorkspace } from "@/components/careers/career-workspace";
 import { CareerSummary } from "@/components/careers/career-summary";
-import { Card, CardContent } from "@/components/ui/card";
 
 export default async function CareerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const career = await careerService.getCareer(id);
   if (!career) notFound();
+
+  // Etapa 6 (§24/§32): cachedPlayerId is now always set for careers
+  // created going forward, and the etapa's migration backfilled it for any
+  // that predate this — cachedPlayer should always exist. Falling back to
+  // "" (rather than career.id) if it's ever somehow still missing just
+  // hides the edit action (see CareerHeader) instead of pointing "Editar
+  // jogador" at a nonexistent CachedPlayer id.
+  const cachedPlayerId = career.cachedPlayerId ?? "";
 
   return (
     <div className="flex flex-col gap-6">
@@ -22,15 +29,24 @@ export default async function CareerPage({ params }: { params: Promise<{ id: str
         Carreiras
       </Link>
 
-      <Card className="gap-0 py-0">
-        <CardContent className="flex items-center gap-3 py-4">
-          <PlayerAvatar src={career.photoUrl} name={career.name} size="lg" />
-          <h1 className="font-heading text-2xl font-bold tracking-tight">{career.name}</h1>
-        </CardContent>
-      </Card>
+      <CareerHeader
+        player={{
+          cachedPlayerId,
+          name: career.cachedPlayer?.name ?? career.name,
+          photoUrl: career.cachedPlayer?.photoUrl ?? career.photoUrl,
+          dateOfBirth: career.cachedPlayer?.dateOfBirth?.toISOString() ?? null,
+          nationality: career.cachedPlayer?.nationality ?? null,
+          position: career.cachedPlayer?.position ?? null,
+          secondaryPositions: career.cachedPlayer?.secondaryPositions ?? [],
+          overall: career.cachedPlayer?.overall ?? null,
+          potential: career.cachedPlayer?.potential ?? null,
+          externalLink: career.cachedPlayer?.externalLink ?? null,
+        }}
+      />
 
       <CareerWorkspace
         careerId={career.id}
+        dateOfBirth={career.cachedPlayer?.dateOfBirth?.toISOString() ?? null}
         initialStints={career.stints.map((s) => ({
           id: s.id,
           kind: s.kind,

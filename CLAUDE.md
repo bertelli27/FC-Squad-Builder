@@ -325,7 +325,9 @@ fc-squad-builder/
 5. Resultado mesclado é persistido em `CachedPlayer`/`CachedClub`/`CachedNationalTeam` com `rawData` (payload bruto de cada fonte, para reprocessar sem nova chamada) e um `expiresAt` (sugestão: 30 dias — ratings de FC mudam pouco).
 6. Retorna o DTO normalizado ao chamador.
 
-Garantia central do projeto: **o cache é só um espelho local, nunca é editado pelo usuário.** Toda customização (numeração, capitão, banco, formação, escolha de jogadores) vive exclusivamente em `Squad`/`SquadPlayer`, que referenciam o cache por `cachedPlayerId` sem alterá-lo.
+Garantia central do projeto: **o cache de clube/seleção é só um espelho local, nunca é editado pelo usuário.** Toda customização de escalação (numeração, capitão, banco, formação, escolha de jogadores) vive exclusivamente em `Squad`/`SquadPlayer`, que referenciam o cache por `cachedPlayerId` sem alterá-lo.
+
+**Exceção deliberada (etapa 6): o cadastro do jogador em si (`CachedPlayer`) é editável**, independentemente da origem (kaggle/api-football/thesportsdb/custom) — nome, foto, data de nascimento, nacionalidade, posição principal/secundárias, overall, potencial. A edição é feita via `PATCH /api/players/[id]` (`playerDataService.updatePlayer`), que marca a linha com `manuallyEdited: true`. Como um `CachedPlayer` é compartilhado por toda referência ao mesmo jogador (squads, carreira), editar reflete em todo lugar — essa é a ideia: é a mesma pessoa (ver seção "Regra fundamental" do jogador como entidade central). `manuallyEdited` existe para proteger essas edições de serem sobrescritas silenciosamente por um refresh futuro do cache (re-fetch de provider, ou `npm run import:ratings` reimportando uma nova versão do CSV do Kaggle) — tanto `cachePlayer()` (player-data.service.ts) quanto `scripts/import-ratings.ts` pulam os campos cadastrais de uma linha já marcada como editada manualmente.
 
 ## 8. Funcionalidades — checklist
 

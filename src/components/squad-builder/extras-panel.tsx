@@ -27,11 +27,13 @@ import type { SquadPlayerVM } from "./squad-editor";
 export function ExtrasPanel({
   players,
   seasonId,
+  ageReference,
   onRemove,
   onUpdated,
 }: {
   players: SquadPlayerVM[];
   seasonId: string;
+  ageReference?: { startYear: number; calendar: string };
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }) {
@@ -62,6 +64,7 @@ export function ExtrasPanel({
                     key={player.id}
                     player={player}
                     seasonId={seasonId}
+                    ageReference={ageReference}
                     onRemove={onRemove}
                     onUpdated={onUpdated}
                   />
@@ -78,23 +81,30 @@ export function ExtrasPanel({
 function ExtraRow({
   player,
   seasonId,
+  ageReference,
   onRemove,
   onUpdated,
 }: {
   player: SquadPlayerVM;
   seasonId: string;
+  ageReference?: { startYear: number; calendar: string };
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: player.id });
 
   const profileInfo = {
+    cachedPlayerId: player.cachedPlayerId,
     source: player.source,
     name: player.name,
     club: player.club,
     position: player.position,
+    secondaryPositions: player.secondaryPositions,
+    nationality: player.nationality,
+    dateOfBirth: player.dateOfBirth,
     photoUrl: player.photoUrl,
     overall: player.overall,
+    potential: player.potential,
     externalLink: player.externalLink,
   };
 
@@ -119,6 +129,7 @@ function ExtraRow({
         player={profileInfo}
         seasonId={seasonId}
         squadPlayerId={player.id}
+        ageReference={ageReference}
         onUpdated={(patch) => onUpdated(player.id, patch)}
         aria-label={`Ver perfil de ${player.name}`}
         className="block min-w-0 flex-1"

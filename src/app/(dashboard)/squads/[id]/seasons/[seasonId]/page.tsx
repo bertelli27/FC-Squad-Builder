@@ -96,14 +96,20 @@ export default async function SeasonPage({
         seasonId={season.id}
         formation={season.formation}
         baseKind={squad.baseKind}
+        ageReference={{ startYear: season.startYear, calendar: squad.seasonCalendar }}
         players={season.players.map((sp) => ({
           id: sp.id,
+          cachedPlayerId: sp.cachedPlayer.id,
           source: sp.cachedPlayer.source,
           name: sp.cachedPlayer.name,
           photoUrl: sp.cachedPlayer.photoUrl,
           position: sp.cachedPlayer.position,
+          secondaryPositions: sp.cachedPlayer.secondaryPositions,
+          nationality: sp.cachedPlayer.nationality,
+          dateOfBirth: sp.cachedPlayer.dateOfBirth?.toISOString() ?? null,
           club: sp.cachedPlayer.club,
           overall: sp.cachedPlayer.overall,
+          potential: sp.cachedPlayer.potential,
           shirtNumber: sp.shirtNumber,
           isCaptain: sp.isCaptain,
           isStarter: sp.isStarter,

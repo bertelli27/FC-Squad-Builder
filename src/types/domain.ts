@@ -11,6 +11,8 @@ export interface Player {
   overall?: number;
   potential?: number;
   age?: number;
+  dateOfBirth?: string; // ISO date — quando presente, prefira lib/player-age.ts a `age` (§4/5, etapa 6)
+  secondaryPositions?: string[]; // até 3, além de `position` (§2, etapa 6)
   attributes?: Record<string, number>; // crossing, dribbling, etc.
   externalLink?: string; // link externo (ex: ogol, transfermarket), informado manualmente para jogadores "custom"
 }

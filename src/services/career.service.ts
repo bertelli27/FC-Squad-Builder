@@ -11,6 +11,7 @@ function getCareerById(id: string) {
   return prisma.playerCareer.findUnique({
     where: { id },
     include: {
+      cachedPlayer: true,
       stints: {
         include: {
           titles: { include: { competition: true } },
@@ -36,7 +37,7 @@ export const careerService = {
   async listCareers() {
     return prisma.playerCareer.findMany({
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { stints: true } } },
+      include: { cachedPlayer: true, _count: { select: { stints: true } } },
     });
   },
 
@@ -46,9 +47,17 @@ export const careerService = {
    * §14: `playerRef` (source+externalId, from the same player search used
    * everywhere else — see add-player-dialog.tsx) resolves to an existing
    * CachedPlayer instead of creating a disconnected identity when the
-   * player is already known. Name/photo are copied once into the career's
-   * own fields (never synced afterward) — a career doesn't share
-   * CachedPlayer's lifecycle, it can be renamed/re-photographed on its own.
+   * player is already known.
+   *
+   * Etapa 6 (§16/§24/§32): `cachedPlayerId` is now always set, even without
+   * a `playerRef` — a fresh "custom" CachedPlayer is minted for freeform
+   * careers, the same way createCustomPlayer already does for squads. This
+   * guarantees every career has one central, editable player record ("Editar
+   * jogador" always has something concrete to point at), instead of the
+   * name/photo living nowhere but this row. `name`/`photoUrl` below stay as
+   * the values passed at creation, but callers should prefer
+   * `cachedPlayer.name`/`cachedPlayer.photoUrl` once "Editar jogador" can
+   * change them — see getCareerById's include.
    */
   async createCareer(input: {
     name: string;
@@ -63,6 +72,18 @@ export const careerService = {
         cachedPlayerId = cached.id;
         if (!photoUrl) photoUrl = cached.photoUrl ?? undefined;
       }
+    }
+    if (!cachedPlayerId) {
+      // Same "custom" source/shape createCustomPlayer uses for squads
+      // (season.service.ts) — a career-only player is just as much a
+      // user-authored identity as a squad-only one.
+      const cached = await cacheRepository.upsertPlayer("custom", crypto.randomUUID(), {
+        name: input.name,
+        photoUrl,
+        rawData: { custom: true },
+        expiresAt: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000),
+      });
+      cachedPlayerId = cached.id;
     }
     return prisma.playerCareer.create({ data: { name: input.name, photoUrl, cachedPlayerId } });
   },

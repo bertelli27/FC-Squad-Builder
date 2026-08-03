@@ -13,11 +13,23 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   const shirtNumber = typeof body.shirtNumber === "number" ? body.shirtNumber : undefined;
   const destination = body.destination === "watchlist" ? "watchlist" : "bench";
+  const secondaryPositions =
+    Array.isArray(body.secondaryPositions) && body.secondaryPositions.every((p: unknown) => typeof p === "string")
+      ? body.secondaryPositions.slice(0, 3)
+      : undefined;
+  const dateOfBirth = typeof body.dateOfBirth === "string" && body.dateOfBirth ? new Date(body.dateOfBirth) : undefined;
+  const overall = typeof body.overall === "number" ? body.overall : undefined;
+  const potential = typeof body.potential === "number" ? body.potential : undefined;
 
   const player = await seasonService.createCustomPlayer(id, {
     name: body.name,
     position: typeof body.position === "string" ? body.position : undefined,
+    secondaryPositions,
     photoUrl: typeof body.photoUrl === "string" ? body.photoUrl : undefined,
+    dateOfBirth,
+    nationality: typeof body.nationality === "string" ? body.nationality : undefined,
+    overall,
+    potential,
     externalLink: typeof body.externalLink === "string" ? body.externalLink : undefined,
     shirtNumber,
     destination,

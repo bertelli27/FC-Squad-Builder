@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { SearchIcon, UserPlus, ImageIcon } from "lucide-react";
+import { SearchIcon, UserPlus, ImageIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUrlInput } from "@/components/ui/image-url-input";
+import { CountrySelect } from "@/components/ui/country-select";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OverallBadge } from "@/components/player-card/overall-badge";
-import { POSITIONS } from "@/lib/positions";
+import { POSITIONS, MAX_SECONDARY_POSITIONS } from "@/lib/positions";
 import { PlayerRowContent } from "./roster-table";
 import type { SquadPlayerVM } from "./squad-editor";
 
@@ -45,23 +46,33 @@ function squadPlayerVMFromResponse(sp: {
   isExtra: boolean;
   positionSlot: string | null;
   cachedPlayer: {
+    id: string;
     source: string;
     name: string;
     photoUrl: string | null;
     position: string | null;
+    secondaryPositions?: string[];
+    nationality?: string | null;
+    dateOfBirth?: string | null;
     club: string | null;
     overall: number | null;
+    potential?: number | null;
     externalLink?: string | null;
   };
 }): SquadPlayerVM {
   return {
     id: sp.id,
+    cachedPlayerId: sp.cachedPlayer.id,
     source: sp.cachedPlayer.source,
     name: sp.cachedPlayer.name,
     photoUrl: sp.cachedPlayer.photoUrl,
     position: sp.cachedPlayer.position,
+    secondaryPositions: sp.cachedPlayer.secondaryPositions,
+    nationality: sp.cachedPlayer.nationality,
+    dateOfBirth: sp.cachedPlayer.dateOfBirth,
     club: sp.cachedPlayer.club,
     overall: sp.cachedPlayer.overall,
+    potential: sp.cachedPlayer.potential,
     shirtNumber: sp.shirtNumber,
     isCaptain: sp.isCaptain,
     isStarter: sp.isStarter,
@@ -98,10 +109,17 @@ export function AddPlayerDialog({
   // Base UI's Select warns if a component switches between uncontrolled
   // (value=undefined) and controlled (value=string) over its lifetime.
   const [position, setPosition] = useState("");
+  const [secondaryPositions, setSecondaryPositions] = useState<string[]>([]);
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [nationality, setNationality] = useState("");
+  const [overall, setOverall] = useState("");
+  const [potential, setPotential] = useState("");
   const [shirtNumber, setShirtNumber] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [externalLink, setExternalLink] = useState("");
   const [creating, setCreating] = useState(false);
+
+  const usedPositions = new Set([position, ...secondaryPositions].filter(Boolean));
 
   useEffect(() => {
     if (query.trim().length < 2) return;
@@ -169,6 +187,11 @@ export function AddPlayerDialog({
       body: JSON.stringify({
         name,
         position,
+        secondaryPositions: secondaryPositions.filter(Boolean),
+        dateOfBirth: dateOfBirth || undefined,
+        nationality: nationality || undefined,
+        overall: overall ? Number(overall) : undefined,
+        potential: potential ? Number(potential) : undefined,
         shirtNumber: shirtNumber ? Number(shirtNumber) : undefined,
         photoUrl: photoUrl || undefined,
         externalLink: externalLink || undefined,
@@ -181,6 +204,11 @@ export function AddPlayerDialog({
         toast.success(`${name} criado e adicionado ao elenco.`);
         setName("");
         setPosition("");
+        setSecondaryPositions([]);
+        setDateOfBirth("");
+        setNationality("");
+        setOverall("");
+        setPotential("");
         setShirtNumber("");
         setPhotoUrl("");
         setExternalLink("");
@@ -299,6 +327,93 @@ export function AddPlayerDialog({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <Label>Posições secundárias</Label>
+                  {secondaryPositions.length < MAX_SECONDARY_POSITIONS && (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={() => setSecondaryPositions((prev) => [...prev, ""])}
+                    >
+                      + Adicionar
+                    </Button>
+                  )}
+                </div>
+                {secondaryPositions.map((secondary, index) => (
+                  <div key={index} className="flex items-center gap-1.5">
+                    <Select
+                      value={secondary}
+                      onValueChange={(v) =>
+                        setSecondaryPositions((prev) => prev.map((p, i) => (i === index ? (v ?? "") : p)))
+                      }
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Selecione">
+                          {(v: string) => POSITIONS.find((p) => p.value === v)?.label ?? v}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {POSITIONS.filter((p) => p.value === secondary || !usedPositions.has(p.value)).map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            {p.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <button
+                      type="button"
+                      onClick={() => setSecondaryPositions((prev) => prev.filter((_, i) => i !== index))}
+                      aria-label="Remover posição secundária"
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <XIcon className="size-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-dob">Data de nascimento</Label>
+                <Input
+                  id="custom-dob"
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="custom-nationality">Nacionalidade</Label>
+                <CountrySelect id="custom-nationality" value={nationality} onChange={setNationality} />
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label htmlFor="custom-overall">Overall</Label>
+                  <Input
+                    id="custom-overall"
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={overall}
+                    onChange={(e) => setOverall(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label htmlFor="custom-potential">Potencial</Label>
+                  <Input
+                    id="custom-potential"
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={potential}
+                    onChange={(e) => setPotential(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="flex flex-col gap-1.5">

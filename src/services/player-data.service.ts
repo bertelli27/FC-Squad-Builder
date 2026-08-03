@@ -29,19 +29,39 @@ const RATE_LIMITED_PLAYER_PROVIDERS: Record<string, PlayerProvider> = {
 // Exported so ClubDataService/NationalTeamDataService can cache the
 // players they pull in via resolveClubSquad/resolveNationalTeamSquad.
 export async function cachePlayer(player: Player): Promise<void> {
-  await cacheRepository.upsertPlayer(player.source, player.externalId, {
+  // Etapa 6: a player the user has manually edited (§14/§29's "don't
+  // silently overwrite personalized data" applies beyond the SoFIFA import
+  // this etapa dropped — the same risk exists whenever a provider re-fetch
+  // re-caches a player, e.g. re-adding them to another squad or reopening
+  // their profile). Non-cadastral bookkeeping (club/league/rawData/
+  // expiresAt) still refreshes normally either way. Calls prisma directly
+  // (rather than cacheRepository.upsertPlayer) because create and update
+  // need genuinely different payloads here — a brand new row always needs
+  // its full cadastral data, an existing manually-edited one must skip it.
+  const existing = await cacheRepository.getPlayer(player.source, player.externalId);
+  const cadastral = {
     name: player.name,
     photoUrl: player.photoUrl,
     nationality: player.nationality,
     position: player.position,
-    club: player.club,
-    league: player.league,
+    secondaryPositions: player.secondaryPositions ?? [],
     overall: player.overall,
     potential: player.potential,
     age: player.age,
+    dateOfBirth: player.dateOfBirth ? new Date(player.dateOfBirth) : undefined,
     externalLink: player.externalLink,
+  };
+  const bookkeeping = {
+    club: player.club,
+    league: player.league,
     rawData: toJson(player),
     expiresAt: defaultExpiresAt(),
+  };
+
+  await prisma.cachedPlayer.upsert({
+    where: { source_externalId: { source: player.source, externalId: player.externalId } },
+    create: { source: player.source, externalId: player.externalId, ...cadastral, ...bookkeeping },
+    update: existing?.manuallyEdited ? bookkeeping : { ...cadastral, ...bookkeeping },
   });
 }
 
@@ -99,5 +119,54 @@ export const playerDataService = {
     const player = await providerRegistry.resolvePlayer(name, context);
     if (player) await cachePlayer(player);
     return player;
+  },
+
+  /**
+   * Etapa 6 (§16/§24): edits a player's cadastral data directly, regardless
+   * of source — the old restriction to only "custom" players (§7's original
+   * "cache is never edited by the user" guarantee) is deliberately lifted
+   * here. Every SquadPlayer/PlayerCareer referencing this CachedPlayer row
+   * shares the same identity, so the edit is meant to show up everywhere at
+   * once — that's the point of a central player record (§32). Sets
+   * `manuallyEdited` so future cache refreshes (import-ratings.ts,
+   * cachePlayer above) don't silently revert it.
+   */
+  async updatePlayer(
+    cachedPlayerId: string,
+    patch: {
+      name?: string;
+      photoUrl?: string | null;
+      dateOfBirth?: Date | null;
+      nationality?: string | null;
+      position?: string | null;
+      secondaryPositions?: string[];
+      overall?: number | null;
+      potential?: number | null;
+      externalLink?: string | null;
+    },
+  ): Promise<Player | null> {
+    const secondaryPositions = patch.secondaryPositions
+      ?.filter((p, i, arr) => p && p !== patch.position && arr.indexOf(p) === i)
+      .slice(0, 3);
+
+    const row = await prisma.cachedPlayer
+      .update({
+        where: { id: cachedPlayerId },
+        data: {
+          ...(patch.name !== undefined && { name: patch.name }),
+          ...(patch.photoUrl !== undefined && { photoUrl: patch.photoUrl }),
+          ...(patch.dateOfBirth !== undefined && { dateOfBirth: patch.dateOfBirth }),
+          ...(patch.nationality !== undefined && { nationality: patch.nationality }),
+          ...(patch.position !== undefined && { position: patch.position }),
+          ...(secondaryPositions !== undefined && { secondaryPositions }),
+          ...(patch.overall !== undefined && { overall: patch.overall }),
+          ...(patch.potential !== undefined && { potential: patch.potential }),
+          ...(patch.externalLink !== undefined && { externalLink: patch.externalLink }),
+          manuallyEdited: true,
+        },
+      })
+      .catch(() => null);
+
+    return row ? cachedPlayerToDomain(row) : null;
   },
 };

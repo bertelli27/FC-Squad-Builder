@@ -43,8 +43,8 @@ export default async function CareersPage() {
               key={career.id}
               career={{
                 id: career.id,
-                name: career.name,
-                photoUrl: career.photoUrl,
+                name: career.cachedPlayer?.name ?? career.name,
+                photoUrl: career.cachedPlayer?.photoUrl ?? career.photoUrl,
                 stintCount: career._count.stints,
               }}
             />

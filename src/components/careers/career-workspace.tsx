@@ -29,10 +29,13 @@ type TrophyView = "combined" | "separated";
 
 export function CareerWorkspace({
   careerId,
+  dateOfBirth,
   initialStints,
   initialTransfers,
 }: {
   careerId: string;
+  /** §19 — recomputes each stint's age (below) when the player's date of birth is edited, instead of a stored per-stint age. */
+  dateOfBirth?: string | null;
   initialStints: CareerStintVM[];
   initialTransfers: CareerTransferVM[];
 }) {
@@ -289,6 +292,7 @@ export function CareerWorkspace({
                   key={stint.id}
                   careerId={careerId}
                   stint={stint}
+                  dateOfBirth={dateOfBirth}
                   onTitleAdded={(title) => updateStintLocal(stint.id, { titles: [...stint.titles, title] })}
                   onTitleRemoved={(titleId) =>
                     updateStintLocal(stint.id, { titles: stint.titles.filter((t) => t.id !== titleId) })
@@ -313,6 +317,7 @@ export function CareerWorkspace({
                   key={stint.id}
                   careerId={careerId}
                   stint={stint}
+                  dateOfBirth={dateOfBirth}
                   onTitleAdded={(title) => updateStintLocal(stint.id, { titles: [...stint.titles, title] })}
                   onTitleRemoved={(titleId) =>
                     updateStintLocal(stint.id, { titles: stint.titles.filter((t) => t.id !== titleId) })
@@ -344,6 +349,7 @@ export function CareerWorkspace({
           nationalStints={filteredNationalStints}
           transfers={filter === ALL_TEAMS ? transfers : []}
           careerId={careerId}
+          dateOfBirth={dateOfBirth}
           updateStintLocal={updateStintLocal}
           handleRemoveStint={handleRemoveStint}
           handleRemoveTransfer={handleRemoveTransfer}
@@ -384,6 +390,7 @@ function TimelineTab({
   nationalStints,
   transfers,
   careerId,
+  dateOfBirth,
   updateStintLocal,
   handleRemoveStint,
   handleRemoveTransfer,
@@ -393,6 +400,7 @@ function TimelineTab({
   nationalStints: CareerStintVM[];
   transfers: CareerTransferVM[];
   careerId: string;
+  dateOfBirth?: string | null;
   updateStintLocal: (stintId: string, patch: Partial<CareerStintVM>) => void;
   handleRemoveStint: (stint: CareerStintVM, confirm: ReturnType<typeof useConfirmDialog>["confirm"]) => void;
   handleRemoveTransfer: (transfer: CareerTransferVM, confirm: ReturnType<typeof useConfirmDialog>["confirm"]) => void;
@@ -420,6 +428,7 @@ function TimelineTab({
                 key={item.stint.id}
                 careerId={careerId}
                 stint={item.stint}
+                dateOfBirth={dateOfBirth}
                 onTitleAdded={(title) => updateStintLocal(item.stint.id, { titles: [...item.stint.titles, title] })}
                 onTitleRemoved={(titleId) =>
                   updateStintLocal(item.stint.id, { titles: item.stint.titles.filter((t) => t.id !== titleId) })
@@ -449,6 +458,7 @@ function TimelineTab({
                   key={stint.id}
                   careerId={careerId}
                   stint={stint}
+                  dateOfBirth={dateOfBirth}
                   onTitleAdded={(title) => updateStintLocal(stint.id, { titles: [...stint.titles, title] })}
                   onTitleRemoved={(titleId) =>
                     updateStintLocal(stint.id, { titles: stint.titles.filter((t) => t.id !== titleId) })

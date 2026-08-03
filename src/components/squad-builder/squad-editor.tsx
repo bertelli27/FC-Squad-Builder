@@ -32,12 +32,17 @@ import { ExtrasPanel } from "./extras-panel";
 
 export interface SquadPlayerVM {
   id: string;
+  cachedPlayerId: string;
   source?: string | null;
   name: string;
   photoUrl?: string | null;
   position?: string | null;
+  secondaryPositions?: string[] | null;
+  nationality?: string | null;
+  dateOfBirth?: string | null;
   club?: string | null;
   overall?: number | null;
+  potential?: number | null;
   shirtNumber?: number | null;
   isCaptain: boolean;
   isStarter: boolean;
@@ -106,11 +111,14 @@ export function SquadEditor({
   formation,
   players,
   baseKind,
+  ageReference,
 }: {
   seasonId: string;
   formation: string;
   players: SquadPlayerVM[];
   baseKind?: string | null;
+  /** Season the player's age (§5/§19) should be computed as of. */
+  ageReference?: { startYear: number; calendar: string };
 }) {
   const formationSlots = getFormationSlots(formation);
   const [state, setState] = useState<EditorState>(() => buildInitialState(players, formation));
@@ -462,6 +470,7 @@ export function SquadEditor({
                   player={state.slots[s.slot]}
                   seasonId={seasonId}
                   duplicateNumbers={duplicateNumbers}
+                  ageReference={ageReference}
                   {...chipHandlers}
                 />
               ))}
@@ -509,6 +518,7 @@ export function SquadEditor({
               bench={state.bench}
               seasonId={seasonId}
               duplicateNumbers={duplicateNumbers}
+              ageReference={ageReference}
               {...chipHandlers}
             />
           </CardContent>
@@ -527,6 +537,7 @@ export function SquadEditor({
             <ExtrasPanel
               players={state.extras}
               seasonId={seasonId}
+              ageReference={ageReference}
               onRemove={handleRemove}
               onUpdated={updatePlayerLocal}
             />
@@ -552,6 +563,7 @@ export function SquadEditor({
             <WatchlistPanel
               players={state.watchlist}
               seasonId={seasonId}
+              ageReference={ageReference}
               onRemove={handleRemove}
               onUpdated={updatePlayerLocal}
             />
@@ -593,6 +605,7 @@ function DroppableSlot({
   player,
   seasonId,
   duplicateNumbers,
+  ageReference,
   onNumberChange,
   onCaptainToggle,
   onRemove,
@@ -605,6 +618,7 @@ function DroppableSlot({
   player: SquadPlayerVM | null;
   seasonId: string;
   duplicateNumbers: Set<number>;
+  ageReference?: { startYear: number; calendar: string };
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
@@ -623,6 +637,7 @@ function DroppableSlot({
           player={player}
           seasonId={seasonId}
           isDuplicateNumber={player.shirtNumber != null && duplicateNumbers.has(player.shirtNumber)}
+          ageReference={ageReference}
           onNumberChange={onNumberChange}
           onCaptainToggle={onCaptainToggle}
           onRemove={onRemove}
@@ -663,6 +678,7 @@ function PlayerChip({
   player,
   seasonId,
   isDuplicateNumber,
+  ageReference,
   onNumberChange,
   onCaptainToggle,
   onRemove,
@@ -671,6 +687,7 @@ function PlayerChip({
   player: SquadPlayerVM;
   seasonId: string;
   isDuplicateNumber: boolean;
+  ageReference?: { startYear: number; calendar: string };
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
@@ -725,12 +742,17 @@ function PlayerChip({
   );
 
   const profileInfo = {
+    cachedPlayerId: player.cachedPlayerId,
     source: player.source,
     name: player.name,
     club: player.club,
     position: player.position,
+    secondaryPositions: player.secondaryPositions,
+    nationality: player.nationality,
+    dateOfBirth: player.dateOfBirth,
     photoUrl: player.photoUrl,
     overall: player.overall,
+    potential: player.potential,
     externalLink: player.externalLink,
   };
   // No onPointerDown/stopPropagation here on purpose: dnd-kit only starts a
@@ -754,6 +776,7 @@ function PlayerChip({
           player={profileInfo}
           seasonId={seasonId}
           squadPlayerId={player.id}
+          ageReference={ageReference}
           onUpdated={(patch) => onUpdated(player.id, patch)}
           aria-label={`Ver perfil de ${player.name}`}
           className="block rounded-full"

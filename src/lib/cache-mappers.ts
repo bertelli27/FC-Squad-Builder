@@ -31,6 +31,8 @@ export function cachedPlayerToDomain(row: CachedPlayer): Player {
     overall: row.overall ?? undefined,
     potential: row.potential ?? undefined,
     age: row.age ?? undefined,
+    dateOfBirth: row.dateOfBirth ? row.dateOfBirth.toISOString() : undefined,
+    secondaryPositions: row.secondaryPositions.length > 0 ? row.secondaryPositions : undefined,
     externalLink: row.externalLink ?? undefined,
   };
 }

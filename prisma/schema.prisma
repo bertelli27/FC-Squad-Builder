@@ -24,8 +24,22 @@ model CachedPlayer {
   league       String?
   overall      Int?
   potential    Int?
-  age          Int?
+  age          Int? // idade estática legada — preferir dateOfBirth + lib/player-age.ts quando disponível (§4/5, etapa 6)
   externalLink String? // link externo informado manualmente (ex: ogol, transfermarket) para jogadores "custom"
+
+  // ── Etapa 6: cadastro do jogador vira editável independente da origem ──
+  // (revisa a garantia antiga do §7 — "cache nunca é editado pelo
+  // usuário" — que valia só pra dados de clube/seleção agora). Editar
+  // aqui é seguro mesmo pra jogadores reais (kaggle/api-football/
+  // thesportsdb): o mesmo CachedPlayer é compartilhado por toda referência
+  // a esse jogador (squads, carreira), então a edição reflete em todo
+  // lugar de propósito — é a mesma pessoa. `manuallyEdited` avisa o
+  // importador do Kaggle (scripts/import-ratings.ts) pra não sobrescrever
+  // silenciosamente um cadastro que o usuário já customizou.
+  dateOfBirth        DateTime?
+  secondaryPositions String[]  @default([])
+  manuallyEdited     Boolean   @default(false)
+
   rawData      Json // payload bruto, para reprocessar sem rechamar a API
   fetchedAt    DateTime @default(now())
   expiresAt    DateTime
@@ -298,13 +312,20 @@ model PlayerCompetitionStats {
 // oposto do que uma carreira precisa modelar) nem duplica elenco algum —
 // ver comentário em CareerStint.
 
-// A pessoa cuja carreira está sendo registrada. `cachedPlayerId` é uma
-// referência opcional pro mesmo CachedPlayer já usado nos elencos (§14:
-// "se já existe um jogador no banco, use-o em vez de criar outro
-// registro idêntico") — resolvida uma vez na criação via busca (mesmo
-// endpoint /api/players/search já usado em add-player-dialog.tsx), nunca
-// sincronizada depois: nome/foto vivem aqui mesmo, editáveis
-// independentemente do CachedPlayer de origem.
+// A pessoa cuja carreira está sendo registrada. `cachedPlayerId` referencia
+// o mesmo CachedPlayer já usado nos elencos (§14/§24: "se já existe um
+// jogador no banco, use-o em vez de criar outro registro idêntico").
+//
+// Etapa 6 (§16/§24): `cachedPlayerId` agora é sempre preenchido por
+// createCareer — quando não há playerRef (busca), um CachedPlayer
+// "custom" é criado pra carreira, igual createCustomPlayer já faz pros
+// elencos. Isso garante um cadastro central único por jogador: "Editar
+// jogador" na carreira edita esse CachedPlayer diretamente (via
+// PATCH /api/players/[id]), e getCareerById/listCareers passam a priorizar
+// os campos ao vivo do CachedPlayer sobre `name`/`photoUrl` abaixo, que
+// ficam como cópia congelada do valor na criação (mantidos só por
+// compatibilidade com o dado antigo de carreiras pré-etapa-6 e como
+// fallback defensivo caso cachedPlayerId nunca tenha sido setado).
 model PlayerCareer {
   id             String        @id @default(cuid())
   name           String

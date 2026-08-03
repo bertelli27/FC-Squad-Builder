@@ -1,3 +1,6 @@
+/** 1 posição principal + até este tanto de secundárias (§2, etapa 6). */
+export const MAX_SECONDARY_POSITIONS = 3;
+
 /** FIFA-style abbreviations used for custom players (create + edit forms) — see also lib/position-groups.ts and lib/position-category.ts, which read these same abbreviations back out. */
 export const POSITIONS = [
   { value: "GK", label: "Goleiro" },

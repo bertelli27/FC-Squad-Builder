@@ -62,12 +62,14 @@ export function RosterTable({
   bench,
   seasonId,
   duplicateNumbers,
+  ageReference,
   ...handlers
 }: {
   bench: SquadPlayerVM[];
   seasonId: string;
   /** Shirt numbers that appear more than once across starters+bench — flagged with a red ring wherever they're shown. */
   duplicateNumbers: Set<number>;
+  ageReference?: { startYear: number; calendar: string };
 } & RosterHandlers) {
   const { setNodeRef, isOver } = useDroppable({ id: "bench" });
   const groups = groupPlayersByPosition(bench);
@@ -112,6 +114,7 @@ export function RosterTable({
                 players={players}
                 seasonId={seasonId}
                 duplicateNumbers={duplicateNumbers}
+                ageReference={ageReference}
                 {...handlers}
               />
             ))}
@@ -127,12 +130,14 @@ function RosterGroup({
   players,
   seasonId,
   duplicateNumbers,
+  ageReference,
   ...handlers
 }: {
   group: string;
   players: SquadPlayerVM[];
   seasonId: string;
   duplicateNumbers: Set<number>;
+  ageReference?: { startYear: number; calendar: string };
 } & RosterHandlers) {
   return (
     <>
@@ -150,6 +155,7 @@ function RosterGroup({
           player={player}
           seasonId={seasonId}
           isDuplicateNumber={player.shirtNumber != null && duplicateNumbers.has(player.shirtNumber)}
+          ageReference={ageReference}
           {...handlers}
         />
       ))}
@@ -161,11 +167,17 @@ function RosterRow({
   player,
   seasonId,
   isDuplicateNumber,
+  ageReference,
   onNumberChange,
   onCaptainToggle,
   onRemove,
   onUpdated,
-}: { player: SquadPlayerVM; seasonId: string; isDuplicateNumber: boolean } & RosterHandlers) {
+}: {
+  player: SquadPlayerVM;
+  seasonId: string;
+  isDuplicateNumber: boolean;
+  ageReference?: { startYear: number; calendar: string };
+} & RosterHandlers) {
   // No transform/translate here on purpose: CSS transforms on <tr> render
   // inconsistently across engines (table-row boxes aren't a normal
   // transformable element the way a <div> is), which is what made
@@ -196,12 +208,17 @@ function RosterRow({
   );
 
   const profileInfo = {
+    cachedPlayerId: player.cachedPlayerId,
     source: player.source,
     name: player.name,
     club: player.club,
     position: player.position,
+    secondaryPositions: player.secondaryPositions,
+    nationality: player.nationality,
+    dateOfBirth: player.dateOfBirth,
     photoUrl: player.photoUrl,
     overall: player.overall,
+    potential: player.potential,
     externalLink: player.externalLink,
   };
 
@@ -230,6 +247,7 @@ function RosterRow({
           player={profileInfo}
           seasonId={seasonId}
           squadPlayerId={player.id}
+          ageReference={ageReference}
           onUpdated={(patch) => onUpdated(player.id, patch)}
           aria-label={`Ver perfil de ${player.name}`}
           className="block w-full"

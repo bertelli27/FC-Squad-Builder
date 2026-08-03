@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
 import {
   Dialog,
@@ -10,34 +9,31 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ImageUrlInput } from "@/components/ui/image-url-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { PlayerAvatar } from "./player-avatar";
 import { OverallBadge } from "./overall-badge";
 import { PlayerStatsSection } from "./player-stats-section";
+import { EditPlayerForm } from "./edit-player-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MAIN_ATTRIBUTES, ATTRIBUTE_GROUPS, ATTRIBUTE_LABELS } from "@/lib/attribute-labels";
 import { ratingStyle } from "@/lib/rating-tier";
 import { POSITIONS } from "@/lib/positions";
+import { countryFlag } from "@/lib/countries";
+import { ageAtSeason, ageToday } from "@/lib/player-age";
 import { cn } from "@/lib/utils";
 import type { Player } from "@/types/domain";
 
 export interface KnownPlayerInfo {
+  cachedPlayerId?: string | null;
   source?: string | null;
   name: string;
   club?: string | null;
   position?: string | null;
+  secondaryPositions?: string[] | null;
+  nationality?: string | null;
+  dateOfBirth?: string | null;
   photoUrl?: string | null;
   overall?: number | null;
+  potential?: number | null;
   externalLink?: string | null;
 }
 
@@ -47,16 +43,19 @@ export function PlayerProfileDialog({
   player: known,
   seasonId,
   squadPlayerId,
+  /** Reference temporada for the age display (§5/§19) — defaults to today's date when omitted (e.g. search dialogs). */
+  ageReference,
   onUpdated,
   className,
   "aria-label": ariaLabel,
   children,
 }: {
   player: KnownPlayerInfo;
-  /** Only needed to enable editing — a custom player viewed without these just can't show the pencil button. */
+  /** Only needed for stats — the profile-stats section is squad/season-scoped. */
   seasonId?: string;
   squadPlayerId?: string;
-  onUpdated?: (patch: Partial<KnownPlayerInfo>) => void;
+  ageReference?: { startYear: number; calendar: string };
+  onUpdated?: (patch: Partial<Omit<KnownPlayerInfo, "cachedPlayerId">>) => void;
   className?: string;
   "aria-label"?: string;
   children: React.ReactNode;
@@ -67,7 +66,10 @@ export function PlayerProfileDialog({
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
   const isCustom = known.source === CUSTOM_SOURCE;
-  const canEdit = isCustom && !!seasonId && !!squadPlayerId;
+  // Etapa 6 (§16/§24): editing is no longer limited to "custom" players —
+  // any CachedPlayer's cadastral data can be edited, since it's the same
+  // central record wherever it's referenced.
+  const canEdit = !!known.cachedPlayerId;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -101,12 +103,14 @@ export function PlayerProfileDialog({
       });
   }
 
-  // Known (trusted — came straight from the squad's own data, whether
-  // that's a real roster or a custom player's manually-entered fields) is
-  // the baseline and always wins; enrichment only fills in fields known
-  // doesn't have at all (attributes/nationality/age never come from known,
-  // and club/position/photoUrl/overall/externalLink only fall back to
-  // enriched if known's own value is missing).
+  // Known (trusted — came straight from the squad/career's own data,
+  // reflecting whatever's actually stored on the CachedPlayer row) is the
+  // baseline and always wins; enrichment only fills in fields known
+  // doesn't have at all (attributes/league never come from known — no
+  // cadastral edit form has ever exposed those). Etapa 6 widened `known`
+  // to carry nationality/dateOfBirth/secondaryPositions/potential too
+  // (previously only enrichment ever supplied these), since those are now
+  // real, editable CachedPlayer fields rather than provider-only data.
   const displayed: Player = {
     id: enriched?.id ?? "",
     source: known.source ?? enriched?.source ?? "",
@@ -114,13 +118,15 @@ export function PlayerProfileDialog({
     name: known.name,
     club: known.club ?? enriched?.club,
     position: known.position ?? enriched?.position,
+    secondaryPositions: known.secondaryPositions ?? enriched?.secondaryPositions ?? undefined,
     photoUrl: known.photoUrl ?? enriched?.photoUrl,
     overall: known.overall ?? enriched?.overall,
     externalLink: known.externalLink ?? enriched?.externalLink,
-    nationality: enriched?.nationality,
+    nationality: known.nationality ?? enriched?.nationality,
+    dateOfBirth: known.dateOfBirth ?? enriched?.dateOfBirth ?? undefined,
     age: enriched?.age,
     league: enriched?.league,
-    potential: enriched?.potential,
+    potential: known.potential ?? enriched?.potential,
     attributes: enriched?.attributes,
   };
 
@@ -146,11 +152,20 @@ export function PlayerProfileDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {mode === "edit" && seasonId && squadPlayerId ? (
-          <EditCustomPlayerForm
-            known={known}
-            seasonId={seasonId}
-            squadPlayerId={squadPlayerId}
+        {mode === "edit" && known.cachedPlayerId ? (
+          <EditPlayerForm
+            player={{
+              cachedPlayerId: known.cachedPlayerId,
+              name: known.name,
+              photoUrl: displayed.photoUrl,
+              dateOfBirth: displayed.dateOfBirth,
+              nationality: displayed.nationality,
+              position: displayed.position,
+              secondaryPositions: displayed.secondaryPositions,
+              overall: displayed.overall,
+              potential: displayed.potential,
+              externalLink: displayed.externalLink,
+            }}
             onCancel={() => setMode("view")}
             onSaved={(patch) => {
               onUpdated?.(patch);
@@ -159,7 +174,7 @@ export function PlayerProfileDialog({
           />
         ) : (
           <>
-            <ProfileContent player={displayed} attributesLoading={loading} />
+            <ProfileContent player={displayed} attributesLoading={loading} ageReference={ageReference} />
             {seasonId && squadPlayerId && (
               <PlayerStatsSection seasonId={seasonId} squadPlayerId={squadPlayerId} />
             )}
@@ -167,110 +182,6 @@ export function PlayerProfileDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function EditCustomPlayerForm({
-  known,
-  seasonId,
-  squadPlayerId,
-  onSaved,
-  onCancel,
-}: {
-  known: KnownPlayerInfo;
-  seasonId: string;
-  squadPlayerId: string;
-  onSaved: (patch: Partial<KnownPlayerInfo>) => void;
-  onCancel: () => void;
-}) {
-  const [name, setName] = useState(known.name);
-  const [position, setPosition] = useState(known.position ?? "");
-  const [photoUrl, setPhotoUrl] = useState(known.photoUrl ?? "");
-  const [externalLink, setExternalLink] = useState(known.externalLink ?? "");
-  const [saving, setSaving] = useState(false);
-
-  function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!name.trim()) {
-      toast.error("O jogador precisa de um nome.");
-      return;
-    }
-    if (!position) {
-      toast.error("Escolha uma posição.");
-      return;
-    }
-
-    setSaving(true);
-    const patch = {
-      name,
-      position,
-      photoUrl: photoUrl || null,
-      externalLink: externalLink || null,
-    };
-    fetch(`/api/seasons/${seasonId}/players/${squadPlayerId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    })
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then(() => {
-        toast.success("Jogador atualizado.");
-        onSaved(patch);
-      })
-      .catch(() => toast.error("Não foi possível salvar."))
-      .finally(() => setSaving(false));
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="edit-player-name">Nome</Label>
-        <Input id="edit-player-name" value={name} onChange={(e) => setName(e.target.value)} required />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="edit-player-position">Posição</Label>
-        <Select value={position} onValueChange={(v) => setPosition(v ?? "")}>
-          <SelectTrigger id="edit-player-position">
-            <SelectValue placeholder="Selecione">
-              {(v: string) => POSITIONS.find((p) => p.value === v)?.label ?? v}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {POSITIONS.map((p) => (
-              <SelectItem key={p.value} value={p.value}>
-                {p.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="edit-player-photo">URL da foto</Label>
-        <ImageUrlInput id="edit-player-photo" value={photoUrl} onChange={setPhotoUrl} />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="edit-player-link">Link externo (ogol, transfermarket...)</Label>
-        <Input
-          id="edit-player-link"
-          type="url"
-          placeholder="https://..."
-          value={externalLink}
-          onChange={(e) => setExternalLink(e.target.value)}
-        />
-      </div>
-
-      <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
-          {saving ? "Salvando…" : "Salvar"}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
-          Cancelar
-        </Button>
-      </div>
-    </form>
   );
 }
 
@@ -286,12 +197,27 @@ function AttributesSkeleton() {
 function ProfileContent({
   player,
   attributesLoading,
+  ageReference,
 }: {
   player: Player;
   attributesLoading: boolean;
+  ageReference?: { startYear: number; calendar: string };
 }) {
   const attributes = player.attributes;
   const tier = ratingStyle(player.overall);
+  const flag = countryFlag(player.nationality);
+  // §5/§19: prefer the season-aware calculation from a stored date of
+  // birth; `player.age` (the legacy static field, only ever populated for
+  // Kaggle-sourced rows) is a last-resort fallback for players who don't
+  // have a date of birth on file yet.
+  const age = player.dateOfBirth
+    ? ageReference
+      ? ageAtSeason(player.dateOfBirth, ageReference.startYear, ageReference.calendar)
+      : ageToday(player.dateOfBirth)
+    : player.age;
+  const secondaryLabels = (player.secondaryPositions ?? [])
+    .map((p) => POSITIONS.find((pos) => pos.value === p)?.label ?? p)
+    .join(", ");
 
   return (
     <div className="flex flex-col gap-4">
@@ -307,13 +233,21 @@ function ProfileContent({
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-muted-foreground truncate text-sm">
-            {[player.position, player.club, player.nationality].filter(Boolean).join(" · ")}
+            {[player.position, player.club, flag ? `${flag} ${player.nationality}` : player.nationality]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
-          {player.age != null && (
-            <span className="text-muted-foreground text-xs">{player.age} anos</span>
+          {secondaryLabels && (
+            <span className="text-muted-foreground truncate text-xs">Também joga: {secondaryLabels}</span>
+          )}
+          {age != null && <span className="text-muted-foreground text-xs">{age} anos</span>}
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <OverallBadge overall={player.overall} className="h-7 px-2.5 text-base" />
+          {player.potential != null && (
+            <span className="text-muted-foreground text-xs">Pot. {player.potential}</span>
           )}
         </div>
-        <OverallBadge overall={player.overall} className="h-7 px-2.5 text-base" />
       </div>
 
       {player.externalLink && (

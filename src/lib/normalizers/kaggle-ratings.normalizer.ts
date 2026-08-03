@@ -73,13 +73,16 @@ const ATTRIBUTE_COLUMNS = [
   "weakFootAbility",
 ] as const;
 
-function parseAge(birthdate: string): number | undefined {
-  // Format: "6/15/1992 12:00:00 AM"
+// Format: "6/15/1992 12:00:00 AM"
+function parseBirthdate(birthdate: string): Date | undefined {
   const datePart = birthdate.split(" ")[0];
   const [month, day, year] = datePart.split("/").map(Number);
   if (!month || !day || !year) return undefined;
+  return new Date(year, month - 1, day);
+}
 
-  const birth = new Date(year, month - 1, day);
+function parseAge(birth: Date | undefined): number | undefined {
+  if (!birth) return undefined;
   const now = new Date();
   let age = now.getFullYear() - birth.getFullYear();
   const hasHadBirthdayThisYear =
@@ -87,6 +90,18 @@ function parseAge(birthdate: string): number | undefined {
     (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
   if (!hasHadBirthdayThisYear) age -= 1;
   return age;
+}
+
+const MAX_SECONDARY_POSITIONS = 3;
+
+// "RW,CAM" / "LW,LM" / "" — comma-separated FIFA-style abbreviations,
+// already the same vocabulary as lib/positions.ts's POSITIONS list.
+function parseAlternatePositions(alternatePositions: string): string[] {
+  return alternatePositions
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, MAX_SECONDARY_POSITIONS);
 }
 
 function toNumber(value: string | undefined): number | undefined {
@@ -102,6 +117,8 @@ export function normalizeKaggleRatingsRow(row: KaggleRatingsRow): Player {
     if (value !== undefined) attributes[column] = value;
   }
 
+  const birth = parseBirthdate(row.birthdate);
+
   return {
     id: `${KAGGLE_RATINGS_SOURCE}:${row.id}`,
     source: KAGGLE_RATINGS_SOURCE,
@@ -109,13 +126,15 @@ export function normalizeKaggleRatingsRow(row: KaggleRatingsRow): Player {
     name: row.commonName || `${row.firstName} ${row.lastName}`.trim(),
     nationality: row.nationality || undefined,
     position: row.position || undefined,
+    secondaryPositions: parseAlternatePositions(row.alternatePositions ?? ""),
     club: row.team || undefined,
     league: row.leagueName || undefined,
     overall: toNumber(row.overallRating),
     // Not present in this dataset (base FC26 live-service ratings have no
     // career-mode "potential"); left undefined until a source provides it.
     potential: undefined,
-    age: parseAge(row.birthdate),
+    age: parseAge(birth),
+    dateOfBirth: birth?.toISOString(),
     attributes,
   };
 }

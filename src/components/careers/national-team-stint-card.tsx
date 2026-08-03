@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatSeasonLabel } from "@/lib/season";
+import { ageAtSeason } from "@/lib/player-age";
 import { stintTotals } from "@/lib/career";
 import { AddCareerTitleDialog } from "./add-career-title-dialog";
 import type { CareerCompetitionStatsVM, CareerStintVM, CareerTitleVM } from "./types";
@@ -38,6 +39,7 @@ const NEW_COMPETITION = "__new__";
 export function NationalTeamStintCard({
   careerId,
   stint,
+  dateOfBirth,
   onUpdated,
   onTitleAdded,
   onTitleRemoved,
@@ -48,6 +50,8 @@ export function NationalTeamStintCard({
 }: {
   careerId: string;
   stint: CareerStintVM;
+  /** §19 — age shown next to the season label, recomputed from the player's date of birth. */
+  dateOfBirth?: string | null;
   onUpdated: (patch: Partial<CareerStintVM>) => void;
   onTitleAdded: (title: CareerTitleVM) => void;
   onTitleRemoved: (titleId: string) => void;
@@ -57,6 +61,7 @@ export function NationalTeamStintCard({
   onRemove: (stint: CareerStintVM, confirm: ReturnType<typeof useConfirmDialog>["confirm"]) => void;
 }) {
   const { confirm, dialog } = useConfirmDialog();
+  const age = dateOfBirth ? ageAtSeason(dateOfBirth, stint.startYear, stint.calendar) : null;
   const [addTitleOpen, setAddTitleOpen] = useState(false);
   const [addingStats, setAddingStats] = useState(false);
   const [summary, setSummary] = useState(stint.summary ?? "");
@@ -153,6 +158,7 @@ export function NationalTeamStintCard({
           {stint.clubName}
           <span className="text-muted-foreground text-sm font-normal">
             {formatSeasonLabel(stint.startYear, stint.calendar)}
+            {age != null && ` · ${age} anos`}
           </span>
         </CardTitle>
         <button
