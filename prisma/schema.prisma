@@ -31,6 +31,7 @@ model CachedPlayer {
   expiresAt    DateTime
 
   squadPlayers SquadPlayer[]
+  careers      PlayerCareer[]
 
   @@unique([source, externalId])
   @@index([name])
@@ -151,6 +152,11 @@ model Season {
   players   SquadPlayer[]
   titles    SeasonTitle[]
   transfers Transfer[]
+  // Passagens de carreira (§5 etapa 4) que referenciam esta temporada como
+  // "reaproveitar elenco existente" — ver comentário em CareerStint. Uma
+  // temporada não sabe nem precisa saber quais carreiras a referenciam
+  // além disso (a relação existe só pra permitir onDelete: SetNull).
+  careerStints CareerStint[]
 
   @@unique([squadId, startYear])
   @@index([squadId])
@@ -166,8 +172,9 @@ model Competition {
   trophyImageUrl String?
   createdAt      DateTime @default(now())
 
-  titles      SeasonTitle[]
-  playerStats PlayerCompetitionStats[]
+  titles       SeasonTitle[]
+  playerStats  PlayerCompetitionStats[]
+  careerTitles CareerTitle[]
 }
 
 // Um título conquistado NUMA temporada específica — nunca "vaza" pra outra
@@ -279,4 +286,127 @@ model PlayerCompetitionStats {
   @@unique([squadPlayerId, competitionId])
   @@index([squadPlayerId])
   @@index([competitionId])
+}
+
+// ── CARREIRAS DE JOGADOR (§ etapa 4) ───────────────────────
+//
+// Segundo grande contexto do app, ao lado de Clubes — a trajetória
+// completa de UMA pessoa através de vários clubes, independente de
+// qualquer Squad específico. Deliberadamente NÃO reaproveita SquadPlayer
+// (que representa "um jogador NUM elenco NUMA temporada de UM clube", o
+// oposto do que uma carreira precisa modelar) nem duplica elenco algum —
+// ver comentário em CareerStint.
+
+// A pessoa cuja carreira está sendo registrada. `cachedPlayerId` é uma
+// referência opcional pro mesmo CachedPlayer já usado nos elencos (§14:
+// "se já existe um jogador no banco, use-o em vez de criar outro
+// registro idêntico") — resolvida uma vez na criação via busca (mesmo
+// endpoint /api/players/search já usado em add-player-dialog.tsx), nunca
+// sincronizada depois: nome/foto vivem aqui mesmo, editáveis
+// independentemente do CachedPlayer de origem.
+model PlayerCareer {
+  id             String        @id @default(cuid())
+  name           String
+  photoUrl       String?
+  cachedPlayerId String?
+  cachedPlayer   CachedPlayer? @relation(fields: [cachedPlayerId], references: [id])
+
+  // "Resumo da carreira" (§9) — geral, diferente do resumo de cada
+  // temporada (§8, ver CareerStint.summary).
+  summary String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stints    CareerStint[]
+  transfers CareerTransfer[]
+}
+
+// Uma passagem por um clube numa temporada específica (§4) — o
+// equivalente, na carreira, ao que Season é pro módulo de clubes.
+//
+// `seasonId` é uma referência OPCIONAL e segura a uma Season já cadastrada
+// no módulo de clubes (§5/§6: "reaproveitar elencos existentes... não
+// crie uma cópia inteira do elenco"). Ela existe só pra: (a) evitar
+// re-digitar nome/escudo/calendário de um clube que já está cadastrado, e
+// (b) um link de volta pra ver aquele elenco completo. NÃO sincroniza
+// estatísticas com PlayerCompetitionStats daquela Season — os campos
+// abaixo (appearances/goals/assists/titles/summary) são sempre inteiramente
+// próprios da carreira, preenchidos manualmente. Essa é a "referência
+// segura, não sincronização bidirecional" pedida, em vez de algo mais
+// arriscado.
+// clubName/clubLogoUrl/startYear/calendar são copiados da Season no
+// momento da criação (quando vinculado) e continuam existindo mesmo que a
+// Season vinculada seja apagada depois (onDelete: SetNull) — o stint nunca
+// fica "quebrado" por causa de uma mudança no módulo de clubes.
+model CareerStint {
+  id       String       @id @default(cuid())
+  careerId String
+  career   PlayerCareer @relation(fields: [careerId], references: [id], onDelete: Cascade)
+
+  seasonId String?
+  season   Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+
+  clubName    String
+  clubLogoUrl String?
+  startYear   Int
+  // "brasileiro" | "europeu" — por stint (não por carreira inteira, ao
+  // contrário de Squad.seasonCalendar): a mesma carreira passa por clubes
+  // com convenções de calendário diferentes (ex: Coritiba "2019" vs.
+  // Dortmund "22/23"), então cada passagem guarda a sua própria.
+  calendar String @default("brasileiro")
+
+  appearances Int     @default(0)
+  goals       Int     @default(0)
+  assists     Int     @default(0)
+  summary     String? // resumo desta temporada da carreira (§8) — independente de outras
+
+  // Posição compartilhada na mesma sequência numérica de
+  // PlayerCareer.transfers, pra intercalar stints e transferências na
+  // linha do tempo em ordem cronológica real sem ambiguidade de "mesmo
+  // ano" (ver career.service.ts).
+  order Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  titles CareerTitle[]
+
+  @@index([careerId])
+  @@index([seasonId])
+}
+
+// Título conquistado NUMA passagem específica da carreira (§10) —
+// reaproveita o mesmo Competition (com troféu) já usado pelos títulos de
+// clube (SeasonTitle), pra não recadastrar a mesma competição duas vezes.
+model CareerTitle {
+  id            String      @id @default(cuid())
+  stintId       String
+  stint         CareerStint @relation(fields: [stintId], references: [id], onDelete: Cascade)
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@unique([stintId, competitionId])
+  @@index([stintId])
+}
+
+// Um evento de transferência NA LINHA DO TEMPO da carreira (§2/§3) — "Clube
+// A → Clube B, €valor" entre duas passagens. Dado textual (mesmo padrão do
+// Transfer de clube já existente), sem vínculo obrigatório com um
+// CareerStint específico: fromClubName/toClubName só precisam bater
+// visualmente com os stints adjacentes, não são uma FK pra eles.
+model CareerTransfer {
+  id           String       @id @default(cuid())
+  careerId     String
+  career       PlayerCareer @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  fromClubName String?
+  toClubName   String
+  value        Float?
+  year         Int
+  // Mesma sequência numérica de CareerStint.order — ver comentário lá.
+  order        Int          @default(0)
+  createdAt    DateTime     @default(now())
+
+  @@index([careerId])
 }
