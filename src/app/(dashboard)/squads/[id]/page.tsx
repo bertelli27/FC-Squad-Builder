@@ -5,11 +5,17 @@ import { EditSquadDialog } from "@/components/squad-builder/edit-squad-dialog";
 import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
 import { SeasonsSection } from "@/components/squad-builder/seasons-section";
 import { PalmaresCard } from "@/components/squad-builder/palmares-card";
+import { HistoryCard } from "@/components/squad-builder/history-card";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [squad, palmares] = await Promise.all([squadService.getSquad(id), squadService.getPalmares(id)]);
+  const [squad, palmares, historicalStats, topTransfers] = await Promise.all([
+    squadService.getSquad(id),
+    squadService.getPalmares(id),
+    squadService.getHistoricalStats(id),
+    squadService.getTopTransfers(id),
+  ]);
   if (!squad) notFound();
 
   return (
@@ -36,6 +42,15 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
       </Card>
 
       <PalmaresCard entries={palmares} />
+
+      <HistoryCard
+        topScorers={historicalStats.topScorers}
+        topAssists={historicalStats.topAssists}
+        mostAppearances={historicalStats.mostAppearances}
+        topBuys={topTransfers.topBuys}
+        topSales={topTransfers.topSales}
+        seasonCalendar={squad.seasonCalendar}
+      />
 
       <SeasonsSection
         squadId={squad.id}

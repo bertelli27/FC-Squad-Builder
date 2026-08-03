@@ -166,7 +166,8 @@ model Competition {
   trophyImageUrl String?
   createdAt      DateTime @default(now())
 
-  titles SeasonTitle[]
+  titles      SeasonTitle[]
+  playerStats PlayerCompetitionStats[]
 }
 
 // Um título conquistado NUMA temporada específica — nunca "vaza" pra outra
@@ -247,5 +248,35 @@ model SquadPlayer {
   positionSlot   String? // posição na formação, ex: "LW", "CB1"
   order          Int          @default(0)
 
+  competitionStats PlayerCompetitionStats[]
+
   @@unique([seasonId, cachedPlayerId])
+}
+
+// Estatísticas de UM jogador em UMA competição, dentro de UMA temporada
+// (§1 etapa 3) — pendurada em SquadPlayer (que já escopa jogador+temporada
+// sozinho) em vez de precisar repetir seasonId/cachedPlayerId aqui. O
+// "total" (§2) nunca é uma coluna própria: é sempre a soma dessas linhas
+// pelo mesmo squadPlayerId, calculada sob demanda (mesmo padrão de
+// Season.wins/draws/losses → partidas). Duplicar uma temporada cria NOVAS
+// linhas de SquadPlayer (mesmo cachedPlayerId, id novo) e nunca copia
+// PlayerCompetitionStats — é assim que "as estatísticas de 2026 não podem
+// virar estatísticas de 2027" (§4) acontece de graça, sem lógica extra.
+model PlayerCompetitionStats {
+  id            String      @id @default(cuid())
+  squadPlayerId String
+  squadPlayer   SquadPlayer @relation(fields: [squadPlayerId], references: [id], onDelete: Cascade)
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id])
+
+  appearances Int @default(0)
+  goals       Int @default(0)
+  assists     Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([squadPlayerId, competitionId])
+  @@index([squadPlayerId])
+  @@index([competitionId])
 }

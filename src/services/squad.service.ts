@@ -261,4 +261,73 @@ export const squadService = {
       (a, b) => b.count - a.count || a.competition.name.localeCompare(b.competition.name),
     );
   },
+
+  /**
+   * §7/§8: artilheiros/assistências/jogos históricos do clube, somando
+   * PlayerCompetitionStats de TODAS as temporadas — sempre calculado, nunca
+   * digitado. Agrupado por `cachedPlayerId` (não por SquadPlayer.id, que é
+   * um registro novo a cada temporada/duplicação): um jogador real
+   * pesquisado/carregado de novo, ou carregado via "duplicar temporada",
+   * reaproveita o mesmo CachedPlayer — é isso que reconhece "é o mesmo
+   * jogador" entre temporadas sem precisar de nenhuma estrutura nova (§10).
+   * Um jogador customizado cadastrado à mão de novo em cada temporada,
+   * sem nunca ter vindo de uma duplicação, é tratado como pessoas
+   * diferentes — consistente com como o resto do app já funciona.
+   */
+  async getHistoricalStats(squadId: string, limit = 5) {
+    const rows = await prisma.playerCompetitionStats.findMany({
+      where: { squadPlayer: { season: { squadId } } },
+      include: { squadPlayer: { include: { cachedPlayer: true } } },
+    });
+
+    const byPlayer = new Map<
+      string,
+      { cachedPlayer: (typeof rows)[number]["squadPlayer"]["cachedPlayer"]; appearances: number; goals: number; assists: number }
+    >();
+    for (const row of rows) {
+      const key = row.squadPlayer.cachedPlayerId;
+      const entry = byPlayer.get(key) ?? {
+        cachedPlayer: row.squadPlayer.cachedPlayer,
+        appearances: 0,
+        goals: 0,
+        assists: 0,
+      };
+      entry.appearances += row.appearances;
+      entry.goals += row.goals;
+      entry.assists += row.assists;
+      byPlayer.set(key, entry);
+    }
+
+    const all = [...byPlayer.values()];
+    const topN = (key: "appearances" | "goals" | "assists") =>
+      all
+        .filter((p) => p[key] > 0)
+        .sort((a, b) => b[key] - a[key])
+        .slice(0, limit);
+
+    return {
+      topScorers: topN("goals"),
+      topAssists: topN("assists"),
+      mostAppearances: topN("appearances"),
+    };
+  },
+
+  /** §7/§8: maiores compras e vendas do clube, considerando transferências de todas as temporadas. */
+  async getTopTransfers(squadId: string, limit = 5) {
+    const [topBuys, topSales] = await Promise.all([
+      prisma.transfer.findMany({
+        where: { season: { squadId }, type: "in", value: { not: null } },
+        orderBy: { value: "desc" },
+        take: limit,
+        include: { season: { select: { startYear: true } } },
+      }),
+      prisma.transfer.findMany({
+        where: { season: { squadId }, type: "out", value: { not: null } },
+        orderBy: { value: "desc" },
+        take: limit,
+        include: { season: { select: { startYear: true } } },
+      }),
+    ]);
+    return { topBuys, topSales };
+  },
 };

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { PlayerAvatar } from "./player-avatar";
 import { OverallBadge } from "./overall-badge";
+import { PlayerStatsSection } from "./player-stats-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MAIN_ATTRIBUTES, ATTRIBUTE_GROUPS, ATTRIBUTE_LABELS } from "@/lib/attribute-labels";
 import { ratingStyle } from "@/lib/rating-tier";
@@ -157,7 +158,12 @@ export function PlayerProfileDialog({
             }}
           />
         ) : (
-          <ProfileContent player={displayed} attributesLoading={loading} />
+          <>
+            <ProfileContent player={displayed} attributesLoading={loading} />
+            {seasonId && squadPlayerId && (
+              <PlayerStatsSection seasonId={seasonId} squadPlayerId={squadPlayerId} />
+            )}
+          </>
         )}
       </DialogContent>
     </Dialog>
