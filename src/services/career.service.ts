@@ -14,6 +14,7 @@ function getCareerById(id: string) {
       stints: {
         include: {
           titles: { include: { competition: true } },
+          competitionStats: { include: { competition: true }, orderBy: { competition: { name: "asc" } } },
           season: { select: { id: true, squadId: true } },
         },
         orderBy: { order: "asc" },
@@ -84,6 +85,7 @@ export const careerService = {
   async addStint(
     careerId: string,
     input: {
+      kind?: "club" | "nationalTeam";
       seasonId?: string;
       clubName?: string;
       clubLogoUrl?: string;
@@ -96,6 +98,7 @@ export const careerService = {
     let startYear = input.startYear;
     let calendar = input.calendar ?? "brasileiro";
     let seasonId: string | undefined;
+    const kind = input.kind ?? "club";
 
     if (input.seasonId) {
       const season = await prisma.season.findUnique({
@@ -114,8 +117,11 @@ export const careerService = {
 
     const order = await nextOrder(careerId);
     return prisma.careerStint.create({
-      data: { careerId, seasonId, clubName, clubLogoUrl, startYear, calendar, order },
-      include: { titles: { include: { competition: true } } },
+      data: { careerId, seasonId, kind, clubName, clubLogoUrl, startYear, calendar, order },
+      include: {
+        titles: { include: { competition: true } },
+        competitionStats: { include: { competition: true } },
+      },
     });
   },
 
@@ -168,6 +174,45 @@ export const careerService = {
 
   async removeStintTitle(stintId: string, titleId: string) {
     await prisma.careerTitle.delete({ where: { id: titleId, stintId } });
+  },
+
+  /**
+   * §3/§4: starts tracking a competition for a national-team stint (zeroed
+   * row) — same resolve-or-create-competition + idempotent-per-competition
+   * pattern as addStintTitle/seasonService.addTitle/playerStatsService.
+   */
+  async addStintCompetitionStats(
+    stintId: string,
+    input: { competitionId?: string; competitionName?: string },
+  ) {
+    let competitionId = input.competitionId;
+    if (!competitionId) {
+      if (!input.competitionName?.trim()) return null;
+      const competition = await competitionService.findOrCreateCompetition(input.competitionName);
+      competitionId = competition.id;
+    }
+
+    const existing = await prisma.careerStintCompetitionStats.findUnique({
+      where: { stintId_competitionId: { stintId, competitionId } },
+      include: { competition: true },
+    });
+    if (existing) return existing;
+
+    return prisma.careerStintCompetitionStats.create({
+      data: { stintId, competitionId },
+      include: { competition: true },
+    });
+  },
+
+  async updateStintCompetitionStats(
+    statsId: string,
+    data: { appearances?: number; goals?: number; assists?: number },
+  ) {
+    return prisma.careerStintCompetitionStats.update({ where: { id: statsId }, data });
+  },
+
+  async removeStintCompetitionStats(stintId: string, statsId: string) {
+    await prisma.careerStintCompetitionStats.delete({ where: { id: statsId, stintId } });
   },
 
   /** §2/§3: a "Clube A → Clube B, €valor" event sitting in the timeline between two stints. */

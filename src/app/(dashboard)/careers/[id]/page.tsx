@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { careerService } from "@/services/career.service";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
-import { CareerTimeline } from "@/components/careers/career-timeline";
+import { CareerWorkspace } from "@/components/careers/career-workspace";
 import { CareerSummary } from "@/components/careers/career-summary";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -29,10 +29,11 @@ export default async function CareerPage({ params }: { params: Promise<{ id: str
         </CardContent>
       </Card>
 
-      <CareerTimeline
+      <CareerWorkspace
         careerId={career.id}
         initialStints={career.stints.map((s) => ({
           id: s.id,
+          kind: s.kind,
           seasonId: s.seasonId,
           clubName: s.clubName,
           clubLogoUrl: s.clubLogoUrl,
@@ -50,6 +51,17 @@ export default async function CareerPage({ params }: { params: Promise<{ id: str
               name: t.competition.name,
               trophyImageUrl: t.competition.trophyImageUrl,
             },
+          })),
+          competitionStats: s.competitionStats.map((cs) => ({
+            id: cs.id,
+            competition: {
+              id: cs.competition.id,
+              name: cs.competition.name,
+              trophyImageUrl: cs.competition.trophyImageUrl,
+            },
+            appearances: cs.appearances,
+            goals: cs.goals,
+            assists: cs.assists,
           })),
         }))}
         initialTransfers={career.transfers.map((t) => ({

@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CareerTitleVM } from "./career-timeline";
+import type { CareerTitleVM } from "./types";
 
 interface CompetitionOption {
   id: string;

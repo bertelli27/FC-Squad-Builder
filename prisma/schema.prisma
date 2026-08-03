@@ -174,7 +174,8 @@ model Competition {
 
   titles       SeasonTitle[]
   playerStats  PlayerCompetitionStats[]
-  careerTitles CareerTitle[]
+  careerTitles     CareerTitle[]
+  careerStintStats CareerStintCompetitionStats[]
 }
 
 // Um título conquistado NUMA temporada específica — nunca "vaza" pra outra
@@ -347,7 +348,16 @@ model CareerStint {
   seasonId String?
   season   Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull)
 
-  clubName    String
+  // "club" | "nationalTeam" (§1/§11 etapa 5) — separa a aba SELEÇÃO da aba
+  // CLUBES sem precisar de um model paralelo: um CareerStint já modela
+  // "uma passagem", seja por clube ou por seleção; só o que se pode
+  // registrar dentro dela difere (ver appearances/goals/assists abaixo).
+  // Nunca misturado com kind na filtragem por equipe (§9-§12): "Brasil"
+  // aparece no mesmo dropdown que "Coritiba"/"Dortmund", mas nunca conta
+  // como clube nos agregados de CLUBES nem vice-versa.
+  kind String @default("club")
+
+  clubName    String // nome do clube OU da seleção (kind decide qual)
   clubLogoUrl String?
   startYear   Int
   // "brasileiro" | "europeu" — por stint (não por carreira inteira, ao
@@ -356,10 +366,16 @@ model CareerStint {
   // Dortmund "22/23"), então cada passagem guarda a sua própria.
   calendar String @default("brasileiro")
 
+  // Usados por stints kind="club" — preenchidos à mão, exatamente como na
+  // etapa 4. Stints kind="nationalTeam" deixam esses três zerados/sem uso:
+  // o total anual da seleção (§3/§4) é sempre a soma de
+  // CareerStintCompetitionStats (mesmo princípio de "nunca digitar um
+  // total" já usado em Season.wins/PlayerCompetitionStats), calculada sob
+  // demanda em lib/career.ts, nunca escrita aqui.
   appearances Int     @default(0)
   goals       Int     @default(0)
   assists     Int     @default(0)
-  summary     String? // resumo desta temporada da carreira (§8) — independente de outras
+  summary     String? // resumo desta temporada da carreira (§7/§8) — independente de outras
 
   // Posição compartilhada na mesma sequência numérica de
   // PlayerCareer.transfers, pra intercalar stints e transferências na
@@ -370,10 +386,36 @@ model CareerStint {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  titles CareerTitle[]
+  titles           CareerTitle[]
+  competitionStats CareerStintCompetitionStats[]
 
   @@index([careerId])
   @@index([seasonId])
+}
+
+// Estatísticas de UM ano de seleção (CareerStint kind="nationalTeam") NUMA
+// competição específica (§3: Copa do Mundo, Eliminatórias, Amistosos...) —
+// mesmo desenho de PlayerCompetitionStats (§ etapa 3), só que pendurado em
+// CareerStint em vez de SquadPlayer. Nunca usado por stints kind="club",
+// que continuam com os campos flat em CareerStint (§4 só pede total
+// automático pra seleção, não muda o que já existe pra clube).
+model CareerStintCompetitionStats {
+  id            String      @id @default(cuid())
+  stintId       String
+  stint         CareerStint @relation(fields: [stintId], references: [id], onDelete: Cascade)
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id])
+
+  appearances Int @default(0)
+  goals       Int @default(0)
+  assists     Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([stintId, competitionId])
+  @@index([stintId])
+  @@index([competitionId])
 }
 
 // Título conquistado NUMA passagem específica da carreira (§10) —

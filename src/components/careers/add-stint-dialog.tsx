@@ -17,12 +17,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SEASON_CALENDARS, formatSeasonLabel } from "@/lib/season";
-import type { CareerStintVM } from "./career-timeline";
+import type { CareerStintKind } from "@/lib/career";
+import type { CareerStintVM } from "./types";
 
 interface SquadOption {
   id: string;
   name: string;
   seasonCalendar: string;
+  baseKind: string | null;
 }
 
 interface SeasonOption {
@@ -38,15 +40,19 @@ interface SeasonOption {
  */
 export function AddStintDialog({
   careerId,
+  kind,
   open,
   onOpenChange,
   onAdded,
 }: {
   careerId: string;
+  /** Which tab this dialog is opened from — filters the "existing" picker to matching Squads and tags the created stint accordingly (§1/§11 etapa 5). */
+  kind: CareerStintKind;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAdded: (stint: CareerStintVM) => void;
 }) {
+  const isNationalTeam = kind === "nationalTeam";
   const [mode, setMode] = useState<"existing" | "manual">("existing");
   const [squads, setSquads] = useState<SquadOption[]>([]);
   const [squadId, setSquadId] = useState("");
@@ -64,9 +70,15 @@ export function AddStintDialog({
     if (!open) return;
     fetch("/api/squads")
       .then((res) => (res.ok ? res.json() : { squads: [] }))
-      .then((data) => setSquads(data.squads ?? []))
+      .then((data) => {
+        const all: SquadOption[] = data.squads ?? [];
+        // Only offer clubs when adding a club stint, and only national
+        // teams when adding a seleção one — a seleção stint linking a
+        // club's Season (or vice-versa) would be semantically confusing.
+        setSquads(all.filter((s) => (isNationalTeam ? s.baseKind === "nationalTeam" : s.baseKind !== "nationalTeam")));
+      })
       .catch(() => {});
-  }, [open]);
+  }, [open, isNationalTeam]);
 
   useEffect(() => {
     if (!squadId) return;
@@ -100,14 +112,18 @@ export function AddStintDialog({
     const body =
       mode === "existing"
         ? seasonId
-          ? { seasonId }
+          ? { kind, seasonId }
           : null
         : clubName.trim() && Number.isInteger(startYear)
-          ? { clubName, clubLogoUrl: clubLogoUrl || undefined, startYear, calendar }
+          ? { kind, clubName, clubLogoUrl: clubLogoUrl || undefined, startYear, calendar }
           : null;
 
     if (!body) {
-      toast.error(mode === "existing" ? "Escolha um clube e uma temporada." : "Preencha o clube e o ano.");
+      if (mode === "existing") {
+        toast.error(isNationalTeam ? "Escolha uma seleção e uma temporada." : "Escolha um clube e uma temporada.");
+      } else {
+        toast.error(isNationalTeam ? "Preencha a seleção e o ano." : "Preencha o clube e o ano.");
+      }
       return;
     }
 
@@ -134,13 +150,13 @@ export function AddStintDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-1.5">
             <CalendarPlus className="size-4" />
-            Nova passagem
+            {isNationalTeam ? "Novo ano na seleção" : "Nova passagem"}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs value={mode} onValueChange={(v) => v && setMode(v as "existing" | "manual")}>
           <TabsList>
-            <TabsTrigger value="existing">Clube existente</TabsTrigger>
+            <TabsTrigger value="existing">{isNationalTeam ? "Seleção existente" : "Clube existente"}</TabsTrigger>
             <TabsTrigger value="manual">Manual</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -149,7 +165,7 @@ export function AddStintDialog({
           {mode === "existing" ? (
             <>
               <div className="flex flex-col gap-1.5">
-                <Label>Clube</Label>
+                <Label>{isNationalTeam ? "Seleção" : "Clube"}</Label>
                 <Select value={squadId} onValueChange={(v) => v && handleSquadChange(v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione">
@@ -189,7 +205,9 @@ export function AddStintDialog({
                     </SelectContent>
                   </Select>
                   {seasons.length === 0 && (
-                    <p className="text-muted-foreground text-xs">Esse clube ainda não tem temporadas.</p>
+                    <p className="text-muted-foreground text-xs">
+                      {isNationalTeam ? "Essa seleção ainda não tem temporadas." : "Esse clube ainda não tem temporadas."}
+                    </p>
                   )}
                 </div>
               )}
@@ -197,7 +215,7 @@ export function AddStintDialog({
           ) : (
             <>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="stint-club">Clube</Label>
+                <Label htmlFor="stint-club">{isNationalTeam ? "Seleção" : "Clube"}</Label>
                 <Input id="stint-club" value={clubName} onChange={(e) => setClubName(e.target.value)} required />
               </div>
               <div className="flex flex-col gap-1.5">

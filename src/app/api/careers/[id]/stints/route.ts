@@ -7,6 +7,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   const body = await request.json().catch(() => null);
 
+  const kind = body?.kind === "nationalTeam" ? "nationalTeam" : "club";
   const seasonId = typeof body?.seasonId === "string" ? body.seasonId : undefined;
   const clubName = typeof body?.clubName === "string" ? body.clubName : undefined;
   const clubLogoUrl = typeof body?.clubLogoUrl === "string" ? body.clubLogoUrl : undefined;
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     );
   }
 
-  const stint = await careerService.addStint(id, { seasonId, clubName, clubLogoUrl, startYear, calendar });
+  const stint = await careerService.addStint(id, { kind, seasonId, clubName, clubLogoUrl, startYear, calendar });
   if (!stint) return NextResponse.json({ error: "Could not create stint" }, { status: 400 });
 
   return NextResponse.json({ stint }, { status: 201 });

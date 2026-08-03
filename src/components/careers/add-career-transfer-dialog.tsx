@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { CareerTransferVM } from "./career-timeline";
+import type { CareerTransferVM } from "./types";
 
 /** §2/§3: a transfer event on the timeline — "Clube A → Clube B, €valor". */
 export function AddCareerTransferDialog({
