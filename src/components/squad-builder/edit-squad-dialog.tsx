@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUrlInput } from "@/components/ui/image-url-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CategorySelect } from "./category-select";
 import { TagsInput } from "./tags-input";
 
@@ -21,6 +28,15 @@ export interface EditableSquadData {
   coachExternalLink?: string | null;
   categoryId?: string | null;
   tags?: { id: string; name: string }[];
+  baseKind?: string | null;
+}
+
+const BASE_KIND_NONE = "__none__";
+
+function baseKindLabel(value: string): string {
+  if (value === "club") return "Clube";
+  if (value === "nationalTeam") return "Seleção";
+  return "Não definido";
 }
 
 export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
@@ -33,6 +49,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
   const [coachExternalLink, setCoachExternalLink] = useState(squad.coachExternalLink ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(squad.categoryId ?? null);
   const [tagNames, setTagNames] = useState<string[]>(squad.tags?.map((t) => t.name) ?? []);
+  const [baseKind, setBaseKind] = useState<string | null>(squad.baseKind ?? null);
   const [saving, setSaving] = useState(false);
 
   function handleSubmit(event: React.FormEvent) {
@@ -54,6 +71,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
         coachExternalLink,
         categoryId,
         tagNames,
+        baseKind,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -97,6 +115,28 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="squad-logo">URL do escudo</Label>
               <ImageUrlInput id="squad-logo" value={logoUrl} onChange={setLogoUrl} />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Tipo de elenco</Label>
+              <Select
+                value={baseKind ?? BASE_KIND_NONE}
+                onValueChange={(v) => v && setBaseKind(v === BASE_KIND_NONE ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue>{(v: string) => baseKindLabel(v)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="club">Clube</SelectItem>
+                  <SelectItem value="nationalTeam">Seleção</SelectItem>
+                  <SelectItem value={BASE_KIND_NONE}>Não definido</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                Marcar como &quot;Seleção&quot; libera a área de observados e o elenco
+                ampliado (26 convocados) — útil pra elencos criados antes dessa
+                funcionalidade existir.
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">

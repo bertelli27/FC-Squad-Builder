@@ -33,6 +33,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
                 coachExternalLink: squad.coachExternalLink,
                 categoryId: squad.categoryId,
                 tags: squad.tags,
+                baseKind: squad.baseKind,
               }}
             />
           </div>

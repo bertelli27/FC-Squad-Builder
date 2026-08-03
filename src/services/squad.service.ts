@@ -220,6 +220,13 @@ export const squadService = {
       categoryId?: string | null;
       /** Full replace: the squad's tags become exactly this set (undefined leaves tags untouched). */
       tagNames?: string[];
+      /**
+       * "club" | "nationalTeam" | null — normally set once at creation and
+       * left alone, but exposed as editable so a squad created before this
+       * concept existed can retroactively unlock the observados/elenco
+       * ampliado areas without losing anything already customized on it.
+       */
+      baseKind?: string | null;
     },
   ) {
     const { tagNames, ...rest } = data;

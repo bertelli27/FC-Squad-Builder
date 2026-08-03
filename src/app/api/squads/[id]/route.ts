@@ -10,6 +10,14 @@ function optionalStringField(value: unknown): string | null | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+// Same undefined/null convention as optionalStringField, but restricted to
+// the only two real values baseKind can hold.
+function baseKindField(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return value === "club" || value === "nationalTeam" ? value : undefined;
+}
+
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   const squad = await squadService.getSquad(id);
@@ -35,6 +43,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const tagNames = Array.isArray(body?.tagNames)
     ? body.tagNames.filter((t: unknown): t is string => typeof t === "string")
     : undefined;
+  const baseKind = baseKindField(body?.baseKind);
 
   if (
     name !== undefined ||
@@ -45,7 +54,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     notes !== undefined ||
     isFavorite !== undefined ||
     categoryId !== undefined ||
-    tagNames !== undefined
+    tagNames !== undefined ||
+    baseKind !== undefined
   ) {
     await squadService.updateSquad(id, {
       name,
@@ -57,6 +67,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       isFavorite,
       categoryId,
       tagNames,
+      baseKind,
     });
   }
 
