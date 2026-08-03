@@ -128,6 +128,7 @@ export default async function SeasonPage({
           playerName: t.playerName,
           counterpartClub: t.counterpartClub,
           value: t.value,
+          dealType: t.dealType,
         }))}
       />
 

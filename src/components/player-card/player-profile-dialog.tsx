@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PencilIcon } from "lucide-react";
+import { PencilIcon, ArrowRightLeftIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import { PlayerAvatar } from "./player-avatar";
 import { OverallBadge } from "./overall-badge";
 import { PlayerStatsSection } from "./player-stats-section";
 import { EditPlayerForm } from "./edit-player-form";
+import { TransferPlayerForm } from "./transfer-player-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MAIN_ATTRIBUTES, ATTRIBUTE_GROUPS, ATTRIBUTE_LABELS } from "@/lib/attribute-labels";
 import { ratingStyle } from "@/lib/rating-tier";
@@ -46,6 +47,7 @@ export function PlayerProfileDialog({
   /** Reference temporada for the age display (§5/§19) — defaults to today's date when omitted (e.g. search dialogs). */
   ageReference,
   onUpdated,
+  onTransferredOut,
   className,
   "aria-label": ariaLabel,
   children,
@@ -56,12 +58,14 @@ export function PlayerProfileDialog({
   squadPlayerId?: string;
   ageReference?: { startYear: number; calendar: string };
   onUpdated?: (patch: Partial<Omit<KnownPlayerInfo, "cachedPlayerId">>) => void;
+  /** Etapa 7 (§2-§7) — only needed to show "Transferir jogador"; called (with the destination club) after a successful transfer, once the player has already left this season's roster server-side. */
+  onTransferredOut?: (counterpartClub: string) => void;
   className?: string;
   "aria-label"?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"view" | "edit">("view");
+  const [mode, setMode] = useState<"view" | "edit" | "transfer">("view");
   const [enriched, setEnriched] = useState<Player | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
@@ -70,6 +74,9 @@ export function PlayerProfileDialog({
   // any CachedPlayer's cadastral data can be edited, since it's the same
   // central record wherever it's referenced.
   const canEdit = !!known.cachedPlayerId;
+  // §2: transferring is only meaningful for a player actually on this
+  // season's roster right now, not e.g. a search result before adding.
+  const canTransfer = !!onTransferredOut && !!seasonId && !!squadPlayerId;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -139,15 +146,29 @@ export function PlayerProfileDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             {displayed.name}
-            {canEdit && mode === "view" && (
-              <button
-                type="button"
-                onClick={() => setMode("edit")}
-                aria-label="Editar jogador"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <PencilIcon className="size-4" />
-              </button>
+            {mode === "view" && (
+              <span className="flex items-center gap-2">
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("edit")}
+                    aria-label="Editar jogador"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <PencilIcon className="size-4" />
+                  </button>
+                )}
+                {canTransfer && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("transfer")}
+                    aria-label="Transferir jogador"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowRightLeftIcon className="size-4" />
+                  </button>
+                )}
+              </span>
             )}
           </DialogTitle>
         </DialogHeader>
@@ -170,6 +191,16 @@ export function PlayerProfileDialog({
             onSaved={(patch) => {
               onUpdated?.(patch);
               setMode("view");
+            }}
+          />
+        ) : mode === "transfer" && seasonId && squadPlayerId ? (
+          <TransferPlayerForm
+            seasonId={seasonId}
+            squadPlayerId={squadPlayerId}
+            onCancel={() => setMode("view")}
+            onTransferred={(counterpartClub) => {
+              onTransferredOut?.(counterpartClub);
+              setOpen(false);
             }}
           />
         ) : (

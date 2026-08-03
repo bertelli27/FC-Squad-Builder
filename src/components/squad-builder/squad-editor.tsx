@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -122,6 +123,22 @@ export function SquadEditor({
 }) {
   const formationSlots = getFormationSlots(formation);
   const [state, setState] = useState<EditorState>(() => buildInitialState(players, formation));
+  const router = useRouter();
+  // Etapa 7: `players` only ever changes reference after a router.refresh()
+  // (this component's own DND/edit handlers all mutate `state` locally,
+  // never re-render page.tsx) — so this only fires when something OUTSIDE
+  // this editor changed the roster server-side, e.g. TransfersCard signing
+  // a player in (§8-§13). Safe to fully re-derive from it: every local
+  // edit already persists via its own fetch immediately, so the fresh
+  // server data reflects those same edits plus whatever changed elsewhere.
+  // Adjusting state during render (not in an effect) per React's own
+  // guidance for "resetting state when a prop changes" — avoids an extra
+  // commit/flash of stale data that a useEffect-based reset would cause.
+  const [prevPlayers, setPrevPlayers] = useState(players);
+  if (players !== prevPlayers) {
+    setPrevPlayers(players);
+    setState(buildInitialState(players, formation));
+  }
   const isNationalTeam = baseKind === "nationalTeam";
   // Without a distance threshold, PointerSensor starts tracking a
   // potential drag on the very first pixel of pointer movement from ANY
@@ -362,14 +379,7 @@ export function SquadEditor({
     if (!res.ok) toast.error("Não foi possível definir o capitão.");
   }
 
-  async function handleRemove(playerId: string) {
-    const ok = await confirm({
-      title: "Remover este jogador do elenco?",
-      confirmLabel: "Remover",
-      destructive: true,
-    });
-    if (!ok) return;
-
+  function removePlayerLocal(playerId: string) {
     setState((prev) => {
       const slots = { ...prev.slots };
       for (const key of Object.keys(slots)) {
@@ -382,9 +392,35 @@ export function SquadEditor({
         extras: prev.extras.filter((p) => p.id !== playerId),
       };
     });
+  }
+
+  async function handleRemove(playerId: string) {
+    const ok = await confirm({
+      title: "Remover este jogador do elenco?",
+      confirmLabel: "Remover",
+      destructive: true,
+    });
+    if (!ok) return;
+
+    removePlayerLocal(playerId);
 
     const res = await fetch(`/api/seasons/${seasonId}/players/${playerId}`, { method: "DELETE" });
     if (!res.ok) toast.error("Não foi possível remover o jogador.");
+  }
+
+  // Etapa 7 (§2-§7): the transfer-out endpoint already deletes the
+  // SquadPlayer server-side as part of recording the Transfer — this only
+  // needs to mirror that locally, no confirm/fetch of its own (unlike
+  // handleRemove, which is a standalone destructive action).
+  function handleTransferredOut(playerId: string, playerName: string, counterpartClub: string) {
+    removePlayerLocal(playerId);
+    toast.success(`${playerName} transferido para ${counterpartClub}.`);
+    // TransfersCard (a sibling, not a child, of this editor) needs to pick
+    // up the new "out" Transfer this created — same cross-sibling refresh
+    // used for the reverse direction (signing a player in TransfersCard
+    // updating this editor's roster). This editor's own local state is
+    // already updated above, so the refresh only affects the sibling.
+    router.refresh();
   }
 
   function handlePlayerAdded(player: SquadPlayerVM) {
@@ -428,6 +464,7 @@ export function SquadEditor({
     onCaptainToggle: handleCaptainToggle,
     onRemove: handleRemove,
     onUpdated: updatePlayerLocal,
+    onTransferredOut: handleTransferredOut,
   };
 
   return (
@@ -540,6 +577,7 @@ export function SquadEditor({
               ageReference={ageReference}
               onRemove={handleRemove}
               onUpdated={updatePlayerLocal}
+              onTransferredOut={handleTransferredOut}
             />
           </CardContent>
         </Card>
@@ -566,6 +604,7 @@ export function SquadEditor({
               ageReference={ageReference}
               onRemove={handleRemove}
               onUpdated={updatePlayerLocal}
+              onTransferredOut={handleTransferredOut}
             />
           </CardContent>
         </Card>
@@ -610,6 +649,7 @@ function DroppableSlot({
   onCaptainToggle,
   onRemove,
   onUpdated,
+  onTransferredOut,
 }: {
   slotKey: string;
   label: string;
@@ -623,6 +663,7 @@ function DroppableSlot({
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
+  onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot:${slotKey}` });
 
@@ -642,6 +683,7 @@ function DroppableSlot({
           onCaptainToggle={onCaptainToggle}
           onRemove={onRemove}
           onUpdated={onUpdated}
+          onTransferredOut={onTransferredOut}
         />
       ) : (
         <div
@@ -683,6 +725,7 @@ function PlayerChip({
   onCaptainToggle,
   onRemove,
   onUpdated,
+  onTransferredOut,
 }: {
   player: SquadPlayerVM;
   seasonId: string;
@@ -692,6 +735,7 @@ function PlayerChip({
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
+  onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: player.id,
@@ -778,6 +822,7 @@ function PlayerChip({
           squadPlayerId={player.id}
           ageReference={ageReference}
           onUpdated={(patch) => onUpdated(player.id, patch)}
+          onTransferredOut={(counterpartClub) => onTransferredOut(player.id, player.name, counterpartClub)}
           aria-label={`Ver perfil de ${player.name}`}
           className="block rounded-full"
         >

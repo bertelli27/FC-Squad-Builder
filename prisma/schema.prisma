@@ -46,6 +46,7 @@ model CachedPlayer {
 
   squadPlayers SquadPlayer[]
   careers      PlayerCareer[]
+  transfers    Transfer[]
 
   @@unique([source, externalId])
   @@index([name])
@@ -215,6 +216,16 @@ model SeasonTitle {
 // transferência registra HISTÓRICO de mercado, não necessariamente alguém
 // que chegou a entrar no elenco da temporada (ex: uma venda de alguém que
 // já tinha saído do elenco antes dessa funcionalidade existir).
+// Etapa 7: uma transferência passa a ser uma movimentação real do jogador
+// entre CachedPlayer (§24, entidade central) e o elenco da temporada — não
+// mais só um registro de texto livre. `cachedPlayerId` é opcional pra
+// preservar as linhas antigas (criadas antes desta etapa, só com
+// playerName/counterpartClub em texto livre) sem precisar de backfill;
+// todo fluxo NOVO (transferir/contratar) sempre preenche esse campo.
+// `playerName` continua sendo salvo mesmo quando cachedPlayerId existe —
+// é um retrato do nome no momento da transferência (o mesmo princípio já
+// usado em CareerStint pra clube/foto: cópia, não sincronização ao vivo),
+// então a lista de transferências nunca precisa fazer join pra exibir.
 model Transfer {
   id              String   @id @default(cuid())
   seasonId        String
@@ -226,7 +237,17 @@ model Transfer {
   order           Int      @default(0)
   createdAt       DateTime @default(now())
 
+  cachedPlayerId String?
+  cachedPlayer   CachedPlayer? @relation(fields: [cachedPlayerId], references: [id])
+  dealType       String        @default("permanent") // "permanent" | "loan" — livre/gratuita é só um "permanent" com value = null (§18)
+
+  // Espelho opcional em CareerTransfer (ver comentário lá) — 1:1, criado
+  // automaticamente quando o jogador tem carreira vinculada ao mesmo
+  // CachedPlayer.
+  careerMirror CareerTransfer?
+
   @@index([seasonId])
+  @@index([cachedPlayerId])
 }
 
 model Category {
@@ -459,6 +480,19 @@ model CareerTitle {
 // Transfer de clube já existente), sem vínculo obrigatório com um
 // CareerStint específico: fromClubName/toClubName só precisam bater
 // visualmente com os stints adjacentes, não são uma FK pra eles.
+// Etapa 7 (§22/§23): quando uma transferência de clube (Transfer, acima) é
+// feita para um jogador que já tem PlayerCareer vinculada ao mesmo
+// CachedPlayer, uma CareerTransfer é criada automaticamente aqui —
+// "utilizar a mesma entidade... evitar cadastrar a mesma transferência
+// duas vezes" na prática, sem fundir os dois modelos (que têm escopos
+// diferentes: Transfer pertence a UMA Season de UM clube, CareerTransfer
+// pertence à carreira inteira). `sourceTransferId` é só uma referência —
+// cópia feita uma vez na criação, nunca sincronizada depois (mesmo
+// princípio de CareerStint.seasonId): editar/remover o Transfer do lado
+// do clube não toca nessa linha, e apagar o Transfer de origem só
+// desvincula (onDelete padrão do Prisma pra relação opcional), nunca
+// apaga histórico de carreira. CareerTransfer continua podendo ser
+// criada manualmente também (sourceTransferId null), como já era.
 model CareerTransfer {
   id           String       @id @default(cuid())
   careerId     String
@@ -470,6 +504,9 @@ model CareerTransfer {
   // Mesma sequência numérica de CareerStint.order — ver comentário lá.
   order        Int          @default(0)
   createdAt    DateTime     @default(now())
+
+  sourceTransferId String?   @unique
+  sourceTransfer   Transfer? @relation(fields: [sourceTransferId], references: [id])
 
   @@index([careerId])
 }

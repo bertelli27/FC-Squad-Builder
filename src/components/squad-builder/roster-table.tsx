@@ -49,6 +49,7 @@ interface RosterHandlers {
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
+  onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
 }
 
 /**
@@ -172,6 +173,7 @@ function RosterRow({
   onCaptainToggle,
   onRemove,
   onUpdated,
+  onTransferredOut,
 }: {
   player: SquadPlayerVM;
   seasonId: string;
@@ -249,6 +251,7 @@ function RosterRow({
           squadPlayerId={player.id}
           ageReference={ageReference}
           onUpdated={(patch) => onUpdated(player.id, patch)}
+          onTransferredOut={(counterpartClub) => onTransferredOut(player.id, player.name, counterpartClub)}
           aria-label={`Ver perfil de ${player.name}`}
           className="block w-full"
         >

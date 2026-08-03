@@ -85,6 +85,42 @@ async function resolveDestinationBucket(
 }
 
 /**
+ * §22/§23: mirrors a club-side Transfer into the player's PlayerCareer, if
+ * they have one linked to the same CachedPlayer — a no-op otherwise (a
+ * career is opt-in, most players don't have one). Copied once at creation,
+ * same "reference not sync" principle as CareerStint.seasonId: later
+ * edits/deletes of the source Transfer never touch this row. `order`
+ * reuses career.service.ts's nextOrder logic (max across both
+ * CareerStint.order and CareerTransfer.order — same numeric sequence).
+ */
+async function mirrorTransferOnCareer(
+  transferId: string,
+  cachedPlayerId: string,
+  input: { fromClubName: string | null; toClubName: string; value: number | null; year: number },
+) {
+  const career = await prisma.playerCareer.findFirst({ where: { cachedPlayerId } });
+  if (!career) return;
+
+  const [stintMax, transferMax] = await Promise.all([
+    prisma.careerStint.aggregate({ where: { careerId: career.id }, _max: { order: true } }),
+    prisma.careerTransfer.aggregate({ where: { careerId: career.id }, _max: { order: true } }),
+  ]);
+  const order = Math.max(stintMax._max.order ?? -1, transferMax._max.order ?? -1) + 1;
+
+  await prisma.careerTransfer.create({
+    data: {
+      careerId: career.id,
+      fromClubName: input.fromClubName,
+      toClubName: input.toClubName,
+      value: input.value,
+      year: input.year,
+      order,
+      sourceTransferId: transferId,
+    },
+  });
+}
+
+/**
  * Standalone (not a `seasonService` method) so `createSeason`'s return type
  * below can reference its result without a circular `typeof seasonService`
  * self-reference — TypeScript can't infer an object literal's own type
@@ -285,7 +321,13 @@ export const seasonService = {
     await prisma.seasonTitle.delete({ where: { id: titleId, seasonId } });
   },
 
-  /** §4: entrada ("in") ou saída ("out") de jogador nesta temporada — dado textual, sem vínculo com o elenco. */
+  /**
+   * Legacy free-text entry — kept only so pre-etapa-7 transfers (created
+   * before a transfer was linked to a real CachedPlayer) keep working.
+   * `transferPlayerOut`/`signPlayer` below are the real, elenco-integrated
+   * paths etapa 7 adds; nothing in the current UI calls this anymore for
+   * new transfers.
+   */
   async addTransfer(
     seasonId: string,
     input: { type: "in" | "out"; playerName: string; counterpartClub?: string | null; value?: number | null },
@@ -305,6 +347,170 @@ export const seasonService = {
 
   async removeTransfer(seasonId: string, transferId: string) {
     await prisma.transfer.delete({ where: { id: transferId, seasonId } });
+  },
+
+  /**
+   * §2-§7: a real "saída" — a player picked from the season's own roster
+   * (must already be a SquadPlayer here, §33's "transferência de jogador
+   * que não pertence ao elenco"), removed from it, with a Transfer("out")
+   * recorded in the same action. `dealType` is orthogonal to §18's "livre":
+   * a free transfer is just `value: null` on a "permanent" deal, no
+   * separate type needed.
+   */
+  async transferPlayerOut(
+    seasonId: string,
+    squadPlayerId: string,
+    input: { counterpartClub: string; value?: number | null; dealType?: "permanent" | "loan" },
+  ): Promise<{ transfer: Awaited<ReturnType<typeof prisma.transfer.create>> } | { error: "not-in-squad" | "missing-club" }> {
+    const counterpartClub = input.counterpartClub?.trim();
+    if (!counterpartClub) return { error: "missing-club" };
+
+    const squadPlayer = await prisma.squadPlayer.findUnique({
+      where: { id: squadPlayerId, seasonId },
+      include: { cachedPlayer: true, season: { include: { squad: true } } },
+    });
+    if (!squadPlayer) return { error: "not-in-squad" };
+
+    const dealType = input.dealType === "loan" ? "loan" : "permanent";
+    const { _max } = await prisma.transfer.aggregate({ where: { seasonId }, _max: { order: true } });
+
+    const transfer = await prisma.transfer.create({
+      data: {
+        seasonId,
+        type: "out",
+        playerName: squadPlayer.cachedPlayer.name,
+        counterpartClub,
+        value: input.value ?? null,
+        dealType,
+        cachedPlayerId: squadPlayer.cachedPlayerId,
+        order: (_max.order ?? -1) + 1,
+      },
+    });
+
+    // Delete after creating the Transfer — the Transfer only needs
+    // cachedPlayerId (not the SquadPlayer row itself), so order here
+    // doesn't matter for that, but doing it in this sequence means a
+    // failure while creating the Transfer never leaves the roster missing
+    // a player with nothing recorded.
+    await prisma.squadPlayer.delete({ where: { id: squadPlayerId } });
+
+    await mirrorTransferOnCareer(transfer.id, squadPlayer.cachedPlayerId, {
+      fromClubName: squadPlayer.season.squad.name,
+      toClubName: counterpartClub,
+      value: input.value ?? null,
+      year: squadPlayer.season.startYear,
+    });
+
+    return { transfer };
+  },
+
+  /**
+   * §8-§13: a real "entrada"/contratação — either an existing player
+   * (§9 opção A, same source+externalId resolution addPlayerToSeason
+   * uses) or a brand new one created in the same action (§9 opção B, same
+   * "custom" CachedPlayer creation createCustomPlayer uses) — either way,
+   * ending with that player added to the roster and a Transfer("in")
+   * recorded together, never as two separate steps (§13).
+   */
+  async signPlayer(
+    seasonId: string,
+    input: {
+      playerRef?: { source: string; externalId: string };
+      newPlayer?: {
+        name: string;
+        position?: string;
+        secondaryPositions?: string[];
+        photoUrl?: string;
+        dateOfBirth?: Date;
+        nationality?: string;
+        overall?: number;
+        potential?: number;
+        externalLink?: string;
+      };
+      shirtNumber?: number;
+      counterpartClub?: string | null;
+      value?: number | null;
+      dealType?: "permanent" | "loan";
+    },
+  ): Promise<
+    | { player: Awaited<ReturnType<typeof prisma.squadPlayer.create>>; transfer: Awaited<ReturnType<typeof prisma.transfer.create>> }
+    | { error: "already-in-squad" | "player-not-found" | "missing-player" }
+  > {
+    const season = await prisma.season.findUnique({ where: { id: seasonId }, include: { squad: true } });
+    if (!season) return { error: "player-not-found" };
+
+    let cachedPlayerId: string;
+    if (input.playerRef) {
+      const player = await playerDataService.getPlayer(input.playerRef.source, input.playerRef.externalId);
+      const cached = player && (await cacheRepository.getPlayer(input.playerRef.source, input.playerRef.externalId));
+      if (!cached) return { error: "player-not-found" };
+      cachedPlayerId = cached.id;
+    } else if (input.newPlayer) {
+      const externalId = crypto.randomUUID();
+      const cached = await cacheRepository.upsertPlayer(CUSTOM_PLAYER_SOURCE, externalId, {
+        name: input.newPlayer.name,
+        position: input.newPlayer.position,
+        secondaryPositions: input.newPlayer.secondaryPositions ?? [],
+        photoUrl: input.newPlayer.photoUrl,
+        dateOfBirth: input.newPlayer.dateOfBirth,
+        nationality: input.newPlayer.nationality,
+        overall: input.newPlayer.overall,
+        potential: input.newPlayer.potential,
+        externalLink: input.newPlayer.externalLink,
+        rawData: { custom: true },
+        expiresAt: new Date(Date.now() + CUSTOM_PLAYER_TTL_MS),
+      });
+      cachedPlayerId = cached.id;
+    } else {
+      return { error: "missing-player" };
+    }
+
+    const existing = await prisma.squadPlayer.findUnique({
+      where: { seasonId_cachedPlayerId: { seasonId, cachedPlayerId } },
+    });
+    if (existing) return { error: "already-in-squad" };
+
+    const [{ _max: playerMax }, bucket, { _max: transferMax }] = await Promise.all([
+      prisma.squadPlayer.aggregate({ where: { seasonId }, _max: { order: true } }),
+      resolveDestinationBucket(seasonId, "bench"),
+      prisma.transfer.aggregate({ where: { seasonId }, _max: { order: true } }),
+    ]);
+
+    const squadPlayer = await prisma.squadPlayer.create({
+      data: {
+        seasonId,
+        cachedPlayerId,
+        isStarter: false,
+        ...bucket,
+        shirtNumber: input.shirtNumber,
+        order: (playerMax.order ?? -1) + 1,
+      },
+      include: { cachedPlayer: true },
+    });
+
+    const dealType = input.dealType === "loan" ? "loan" : "permanent";
+    const counterpartClub = input.counterpartClub?.trim() || null;
+    const transfer = await prisma.transfer.create({
+      data: {
+        seasonId,
+        type: "in",
+        playerName: squadPlayer.cachedPlayer.name,
+        counterpartClub,
+        value: input.value ?? null,
+        dealType,
+        cachedPlayerId,
+        order: (transferMax.order ?? -1) + 1,
+      },
+    });
+
+    await mirrorTransferOnCareer(transfer.id, cachedPlayerId, {
+      fromClubName: counterpartClub,
+      toClubName: season.squad.name,
+      value: input.value ?? null,
+      year: season.startYear,
+    });
+
+    return { player: squadPlayer, transfer };
   },
 
   /**

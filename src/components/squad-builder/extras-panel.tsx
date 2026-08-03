@@ -30,12 +30,14 @@ export function ExtrasPanel({
   ageReference,
   onRemove,
   onUpdated,
+  onTransferredOut,
 }: {
   players: SquadPlayerVM[];
   seasonId: string;
   ageReference?: { startYear: number; calendar: string };
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
+  onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "extras" });
 
@@ -67,6 +69,7 @@ export function ExtrasPanel({
                     ageReference={ageReference}
                     onRemove={onRemove}
                     onUpdated={onUpdated}
+                    onTransferredOut={onTransferredOut}
                   />
                 ))}
               </ul>
@@ -84,12 +87,14 @@ function ExtraRow({
   ageReference,
   onRemove,
   onUpdated,
+  onTransferredOut,
 }: {
   player: SquadPlayerVM;
   seasonId: string;
   ageReference?: { startYear: number; calendar: string };
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
+  onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: player.id });
 
@@ -131,6 +136,7 @@ function ExtraRow({
         squadPlayerId={player.id}
         ageReference={ageReference}
         onUpdated={(patch) => onUpdated(player.id, patch)}
+        onTransferredOut={(counterpartClub) => onTransferredOut(player.id, player.name, counterpartClub)}
         aria-label={`Ver perfil de ${player.name}`}
         className="block min-w-0 flex-1"
       >
