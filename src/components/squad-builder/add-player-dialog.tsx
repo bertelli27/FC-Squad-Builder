@@ -73,12 +73,12 @@ function squadPlayerVMFromResponse(sp: {
 }
 
 export function AddPlayerDialog({
-  squadId,
+  seasonId,
   onAdded,
   destination = "bench",
   triggerLabel = "+ Adicionar",
 }: {
-  squadId: string;
+  seasonId: string;
   onAdded: (player: SquadPlayerVM) => void;
   /** Which bucket the added player lands in — plain bench (default) or a national-team squad's watchlist. */
   destination?: "bench" | "watchlist";
@@ -140,7 +140,7 @@ export function AddPlayerDialog({
   function handleAdd(result: SearchResult) {
     const key = `${result.source}:${result.externalId}`;
     setAddingId(key);
-    fetch(`/api/squads/${squadId}/players`, {
+    fetch(`/api/seasons/${seasonId}/players`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: result.source, externalId: result.externalId, destination }),
@@ -163,7 +163,7 @@ export function AddPlayerDialog({
     }
 
     setCreating(true);
-    fetch(`/api/squads/${squadId}/players/custom`, {
+    fetch(`/api/seasons/${seasonId}/players/custom`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

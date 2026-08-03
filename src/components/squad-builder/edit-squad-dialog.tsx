@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PencilIcon, Shield, UserRound } from "lucide-react";
+import { PencilIcon, Shield, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUrlInput } from "@/components/ui/image-url-input";
+import { ColorPickerInput } from "@/components/ui/color-picker-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
@@ -18,17 +19,18 @@ import {
 } from "@/components/ui/select";
 import { CategorySelect } from "./category-select";
 import { TagsInput } from "./tags-input";
+import { SEASON_CALENDARS } from "@/lib/season";
+import { isValidHexColor } from "@/lib/club-color";
 
 export interface EditableSquadData {
   id: string;
   name: string;
   logoUrl?: string | null;
-  coachName?: string | null;
-  coachPhotoUrl?: string | null;
-  coachExternalLink?: string | null;
   categoryId?: string | null;
   tags?: { id: string; name: string }[];
   baseKind?: string | null;
+  primaryColor?: string | null;
+  seasonCalendar: string;
 }
 
 const BASE_KIND_NONE = "__none__";
@@ -39,14 +41,17 @@ function baseKindLabel(value: string): string {
   return "Não definido";
 }
 
+function calendarLabel(value: string): string {
+  return SEASON_CALENDARS.find((c) => c.value === value)?.label ?? value;
+}
+
 export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(squad.name);
   const [logoUrl, setLogoUrl] = useState(squad.logoUrl ?? "");
-  const [coachName, setCoachName] = useState(squad.coachName ?? "");
-  const [coachPhotoUrl, setCoachPhotoUrl] = useState(squad.coachPhotoUrl ?? "");
-  const [coachExternalLink, setCoachExternalLink] = useState(squad.coachExternalLink ?? "");
+  const [primaryColor, setPrimaryColor] = useState(squad.primaryColor ?? "");
+  const [seasonCalendar, setSeasonCalendar] = useState(squad.seasonCalendar);
   const [categoryId, setCategoryId] = useState<string | null>(squad.categoryId ?? null);
   const [tagNames, setTagNames] = useState<string[]>(squad.tags?.map((t) => t.name) ?? []);
   const [baseKind, setBaseKind] = useState<string | null>(squad.baseKind ?? null);
@@ -55,7 +60,11 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!name.trim()) {
-      toast.error("O elenco precisa de um nome.");
+      toast.error("O clube precisa de um nome.");
+      return;
+    }
+    if (primaryColor.trim() && !isValidHexColor(primaryColor)) {
+      toast.error("Cor inválida — use o formato #RRGGBB.");
       return;
     }
 
@@ -66,9 +75,8 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
       body: JSON.stringify({
         name,
         logoUrl,
-        coachName,
-        coachPhotoUrl,
-        coachExternalLink,
+        primaryColor: primaryColor.trim() || null,
+        seasonCalendar,
         categoryId,
         tagNames,
         baseKind,
@@ -76,7 +84,7 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then(() => {
-        toast.success("Elenco atualizado.");
+        toast.success("Clube atualizado.");
         setOpen(false);
         router.refresh();
       })
@@ -86,24 +94,24 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button variant="outline" size="sm" aria-label="Editar elenco" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" aria-label="Editar clube" onClick={() => setOpen(true)}>
         <PencilIcon className="size-4" />
         Editar
       </Button>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Editar elenco</DialogTitle>
+          <DialogTitle>Editar clube</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-3">
             <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
               <Shield className="size-3.5" />
-              Elenco
+              Clube
             </h3>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="squad-name">Nome do elenco</Label>
+              <Label htmlFor="squad-name">Nome do clube</Label>
               <Input
                 id="squad-name"
                 value={name}
@@ -134,8 +142,8 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
               </Select>
               <p className="text-muted-foreground text-xs">
                 Marcar como &quot;Seleção&quot; libera a área de observados e o elenco
-                ampliado (26 convocados) — útil pra elencos criados antes dessa
-                funcionalidade existir.
+                ampliado (26 convocados) em cada temporada — útil pra clubes criados
+                antes dessa funcionalidade existir.
               </p>
             </div>
 
@@ -152,33 +160,37 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
 
           <div className="flex flex-col gap-3 border-t pt-4">
             <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
-              <UserRound className="size-3.5" />
-              Técnico
+              <Palette className="size-3.5" />
+              Identidade visual e temporadas
             </h3>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="coach-name">Nome</Label>
-              <Input
-                id="coach-name"
-                value={coachName}
-                onChange={(e) => setCoachName(e.target.value)}
-              />
+              <Label htmlFor="squad-color">Cor principal</Label>
+              <ColorPickerInput id="squad-color" value={primaryColor} onChange={setPrimaryColor} />
+              <p className="text-muted-foreground text-xs">
+                Usada nos destaques deste clube (botões, bordas, abas) em todas as
+                temporadas. Deixe em branco para usar o verde padrão do app.
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="coach-photo">URL da foto</Label>
-              <ImageUrlInput id="coach-photo" value={coachPhotoUrl} onChange={setCoachPhotoUrl} />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="coach-link">Link externo</Label>
-              <Input
-                id="coach-link"
-                type="url"
-                placeholder="https://..."
-                value={coachExternalLink}
-                onChange={(e) => setCoachExternalLink(e.target.value)}
-              />
+              <Label>Calendário das temporadas</Label>
+              <Select value={seasonCalendar} onValueChange={(v) => v && setSeasonCalendar(v)}>
+                <SelectTrigger>
+                  <SelectValue>{(v: string) => calendarLabel(v)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {SEASON_CALENDARS.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                Brasileiro rotula temporadas como &quot;2026&quot;; europeu, como
+                &quot;26/27&quot;.
+              </p>
             </div>
           </div>
 

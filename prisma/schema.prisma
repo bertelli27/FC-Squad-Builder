@@ -68,6 +68,10 @@ model CachedNationalTeam {
 
 // ── DADOS DO USUÁRIO (customizações) ──────────────────────
 
+// Representa o CLUBE (ou seleção/time-dos-sonhos) em si — identidade,
+// organização (categoria/tags/favorito) e a cor de identidade visual.
+// Nunca guarda elenco/técnico/formação diretamente: isso é uma fotografia
+// de uma Season específica (§ Season abaixo). Um Squad tem 1+ Season.
 model Squad {
   id          String   @id @default(cuid())
   name        String // "Coritiba", "Barcelona 2011", "Time dos Sonhos"
@@ -78,14 +82,18 @@ model Squad {
   // observados no editor (ver SquadPlayer.isWatchlist).
   baseKind    String?
   logoUrl     String? // escudo do elenco — copiado do clube de origem na criação (se houver) e editável livremente depois; nunca buscado ao vivo
-  formation   String   @default("4-3-3")
 
-  // Técnico: dado inteiramente manual, sem fonte externa (nenhum provider cobre técnicos).
-  coachName         String?
-  coachPhotoUrl     String?
-  coachExternalLink String?
+  // Cor de identidade visual do clube (hex, ex: "#006B3F") — null = usa o
+  // tema verde padrão do app. Pertence ao clube, não à temporada nem à
+  // carreira de um jogador (§12.9/§12.11): todas as temporadas do mesmo
+  // clube reutilizam essa mesma cor.
+  primaryColor String?
 
-  notes String? // observações livres do usuário sobre o elenco — texto solto, sem estrutura
+  // "brasileiro" (rótulo = ano: "2026") | "europeu" (rótulo = par de anos:
+  // "26/27") — como as temporadas desse clube são exibidas. Vale pra todas
+  // as temporadas do clube (não é escolhido temporada a temporada: um
+  // clube não muda de calendário de uma temporada pra outra na vida real).
+  seasonCalendar String @default("brasileiro")
 
   isFavorite Boolean @default(false)
 
@@ -100,7 +108,41 @@ model Squad {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  seasons Season[]
+}
+
+// Uma fotografia independente do clube num período: elenco, técnico e
+// formação próprios. Editar uma Season nunca afeta outra da mesma Squad —
+// é exatamente essa independência que permite duplicar 2026 → 2027 e depois
+// divergir livremente (§ etapa 1, seção 4/6).
+model Season {
+  id      String @id @default(cuid())
+  squadId String
+  squad   Squad  @relation(fields: [squadId], references: [id], onDelete: Cascade)
+
+  // Ano-base da temporada, sempre um inteiro (mesmo no calendário europeu,
+  // onde representa o primeiro ano do par: 2026 → rótulo "26/27"). Usado
+  // tanto pra ordenar cronologicamente quanto pra montar o rótulo exibido
+  // (Squad.seasonCalendar decide o formato — ver lib/season.ts).
+  startYear Int
+
+  formation String @default("4-3-3")
+
+  // Técnico: dado inteiramente manual, sem fonte externa (nenhum provider
+  // cobre técnicos) — independente por temporada de propósito (§5).
+  coachName         String?
+  coachPhotoUrl     String?
+  coachExternalLink String?
+
+  notes String? // observações livres do usuário sobre esta temporada — texto solto, sem estrutura
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   players SquadPlayer[]
+
+  @@unique([squadId, startYear])
+  @@index([squadId])
 }
 
 model Category {
@@ -120,8 +162,13 @@ model Tag {
 
 model SquadPlayer {
   id             String       @id @default(cuid())
-  squadId        String
-  squad          Squad        @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  // Escalação de UMA temporada específica — não do clube diretamente
+  // (§ Season acima). O nome do model ficou de um desenho anterior à
+  // existência de temporadas; renomeá-lo exigiria uma migração de tabela
+  // arriscada sem ganho real, então manteve-se "SquadPlayer" mesmo
+  // pendurado em Season agora.
+  seasonId       String
+  season         Season       @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   cachedPlayerId String
   cachedPlayer   CachedPlayer @relation(fields: [cachedPlayerId], references: [id])
   shirtNumber    Int?
@@ -139,5 +186,5 @@ model SquadPlayer {
   positionSlot   String? // posição na formação, ex: "LW", "CB1"
   order          Int          @default(0)
 
-  @@unique([squadId, cachedPlayerId])
+  @@unique([seasonId, cachedPlayerId])
 }

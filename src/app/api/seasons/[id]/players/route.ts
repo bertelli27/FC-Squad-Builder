@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { squadService } from "@/services/squad.service";
+import { seasonService } from "@/services/season.service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -35,9 +35,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Invalid 'players' payload" }, { status: 400 });
   }
 
-  await squadService.updateSquadPlayers(id, body.players);
-  const squad = await squadService.getSquad(id);
-  return NextResponse.json({ squad });
+  await seasonService.updateSeasonPlayers(id, body.players);
+  const season = await seasonService.getSeason(id);
+  return NextResponse.json({ season });
 }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const destination = body.destination === "watchlist" ? "watchlist" : "bench";
-  const player = await squadService.addPlayerToSquad(
+  const player = await seasonService.addPlayerToSeason(
     id,
     { source: body.source, externalId: body.externalId },
     destination,

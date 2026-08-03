@@ -28,62 +28,127 @@ export interface SquadExportPlayer {
   };
 }
 
-export interface SquadExportEntry {
-  name: string;
+export interface SeasonExportEntry {
+  startYear: number;
   formation: string;
-  baseKind: string | null;
-  logoUrl: string | null;
   coachName: string | null;
   coachPhotoUrl: string | null;
   coachExternalLink: string | null;
   notes: string | null;
-  category: string | null;
-  tags: string[];
   players: SquadExportPlayer[];
 }
 
+export interface SquadExportEntry {
+  name: string;
+  baseKind: string | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  seasonCalendar: string;
+  category: string | null;
+  tags: string[];
+  seasons: SeasonExportEntry[];
+}
+
 export interface SquadExportFile {
-  version: 1;
+  version: 2;
   squads: SquadExportEntry[];
 }
 
-type FullSquad = NonNullable<Awaited<ReturnType<typeof squadService.getSquad>>>;
+// Deliberately NOT `NonNullable<Awaited<ReturnType<typeof squadService.getSquad>>>`
+// — that shape's `seasons` carry a `_count.players` squadService.getSquad
+// needs for its own display purposes, which neither caller of
+// toExportEntry below actually loads (they get real per-season players
+// from `seasonsWithPlayers` instead), so requiring it here would force
+// both callers to fetch data they don't need just to satisfy the type.
+interface ExportableSquad {
+  name: string;
+  baseKind: string | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  seasonCalendar: string;
+  category: { name: string } | null;
+  tags: { name: string }[];
+  seasons: {
+    id: string;
+    startYear: number;
+    formation: string;
+    coachName: string | null;
+    coachPhotoUrl: string | null;
+    coachExternalLink: string | null;
+    notes: string | null;
+  }[];
+}
 
-function toExportEntry(squad: FullSquad): SquadExportEntry {
+interface SeasonPlayerRow {
+  shirtNumber: number | null;
+  isCaptain: boolean;
+  isStarter: boolean;
+  isWatchlist: boolean;
+  isExtra: boolean;
+  positionSlot: string | null;
+  order: number;
+  cachedPlayer: {
+    source: string;
+    externalId: string;
+    name: string;
+    photoUrl: string | null;
+    nationality: string | null;
+    position: string | null;
+    club: string | null;
+    league: string | null;
+    overall: number | null;
+    potential: number | null;
+    age: number | null;
+    externalLink: string | null;
+  };
+}
+
+function toExportEntry(
+  squad: ExportableSquad,
+  seasonsWithPlayers: Map<string, { players: SeasonPlayerRow[] }>,
+): SquadExportEntry {
   return {
     name: squad.name,
-    formation: squad.formation,
     baseKind: squad.baseKind,
     logoUrl: squad.logoUrl,
-    coachName: squad.coachName,
-    coachPhotoUrl: squad.coachPhotoUrl,
-    coachExternalLink: squad.coachExternalLink,
-    notes: squad.notes,
+    primaryColor: squad.primaryColor,
+    seasonCalendar: squad.seasonCalendar,
     category: squad.category?.name ?? null,
     tags: squad.tags.map((t) => t.name),
-    players: squad.players.map((p) => ({
-      shirtNumber: p.shirtNumber,
-      isCaptain: p.isCaptain,
-      isStarter: p.isStarter,
-      isWatchlist: p.isWatchlist,
-      isExtra: p.isExtra,
-      positionSlot: p.positionSlot,
-      order: p.order,
-      player: {
-        source: p.cachedPlayer.source,
-        externalId: p.cachedPlayer.externalId,
-        name: p.cachedPlayer.name,
-        photoUrl: p.cachedPlayer.photoUrl,
-        nationality: p.cachedPlayer.nationality,
-        position: p.cachedPlayer.position,
-        club: p.cachedPlayer.club,
-        league: p.cachedPlayer.league,
-        overall: p.cachedPlayer.overall,
-        potential: p.cachedPlayer.potential,
-        age: p.cachedPlayer.age,
-        externalLink: p.cachedPlayer.externalLink,
-      },
-    })),
+    seasons: squad.seasons.map((season) => {
+      const withPlayers = seasonsWithPlayers.get(season.id);
+      return {
+        startYear: season.startYear,
+        formation: season.formation,
+        coachName: season.coachName,
+        coachPhotoUrl: season.coachPhotoUrl,
+        coachExternalLink: season.coachExternalLink,
+        notes: season.notes,
+        players: (withPlayers?.players ?? []).map((p) => ({
+          shirtNumber: p.shirtNumber,
+          isCaptain: p.isCaptain,
+          isStarter: p.isStarter,
+          isWatchlist: p.isWatchlist,
+          isExtra: p.isExtra,
+          positionSlot: p.positionSlot,
+          order: p.order,
+          player: {
+            source: p.cachedPlayer.source,
+            externalId: p.cachedPlayer.externalId,
+            name: p.cachedPlayer.name,
+            photoUrl: p.cachedPlayer.photoUrl,
+            nationality: p.cachedPlayer.nationality,
+            position: p.cachedPlayer.position,
+            club: p.cachedPlayer.club,
+            league: p.cachedPlayer.league,
+            overall: p.cachedPlayer.overall,
+            potential: p.cachedPlayer.potential,
+            age: p.cachedPlayer.age,
+            externalLink: p.cachedPlayer.externalLink,
+          },
+        })),
+      };
+    }),
   };
 }
 
@@ -95,29 +160,10 @@ function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/**
- * Manually validated (no schema-validation dependency, matching the
- * `optionalStringField`-style parsing already used across the API routes)
- * — invalid squad entries are skipped with a reason rather than aborting
- * the whole file, per "validar o arquivo, evitar dados inválidos".
- */
-function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | { error: string } {
-  if (typeof raw !== "object" || raw === null) {
-    return { error: `Item ${index + 1}: não é um objeto válido.` };
-  }
-  const obj = raw as Record<string, unknown>;
-  if (typeof obj.name !== "string" || obj.name.trim() === "") {
-    return { error: `Item ${index + 1}: "name" é obrigatório.` };
-  }
-  if (typeof obj.formation !== "string" || obj.formation.trim() === "") {
-    return { error: `Item ${index + 1} ("${obj.name}"): "formation" é obrigatório.` };
-  }
-  if (!Array.isArray(obj.players)) {
-    return { error: `Item ${index + 1} ("${obj.name}"): "players" precisa ser uma lista.` };
-  }
-
+function parsePlayers(raw: unknown): SquadExportPlayer[] {
+  if (!Array.isArray(raw)) return [];
   const players: SquadExportPlayer[] = [];
-  for (const rawPlayer of obj.players) {
+  for (const rawPlayer of raw) {
     if (typeof rawPlayer !== "object" || rawPlayer === null) continue;
     const p = rawPlayer as Record<string, unknown>;
     const playerData = p.player;
@@ -150,20 +196,73 @@ function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | 
       },
     });
   }
+  return players;
+}
+
+/**
+ * Manually validated (no schema-validation dependency, matching the
+ * `optionalStringField`-style parsing already used across the API routes)
+ * — invalid squad entries are skipped with a reason rather than aborting
+ * the whole file, per "validar o arquivo, evitar dados inválidos".
+ *
+ * Accepts both the current club+seasons shape ("seasons": [...]) and the
+ * older pre-temporadas shape (a single flat "formation"/"players" straight
+ * on the squad) so exports made before this etapa still import cleanly —
+ * an old file is treated as one season, year = current year.
+ */
+function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | { error: string } {
+  if (typeof raw !== "object" || raw === null) {
+    return { error: `Item ${index + 1}: não é um objeto válido.` };
+  }
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.name !== "string" || obj.name.trim() === "") {
+    return { error: `Item ${index + 1}: "name" é obrigatório.` };
+  }
+
+  let seasons: SeasonExportEntry[];
+  if (Array.isArray(obj.seasons)) {
+    seasons = [];
+    for (const rawSeason of obj.seasons) {
+      if (typeof rawSeason !== "object" || rawSeason === null) continue;
+      const s = rawSeason as Record<string, unknown>;
+      const startYear = num(s.startYear);
+      if (startYear === null || typeof s.formation !== "string" || s.formation.trim() === "") continue;
+      seasons.push({
+        startYear,
+        formation: s.formation,
+        coachName: str(s.coachName),
+        coachPhotoUrl: str(s.coachPhotoUrl),
+        coachExternalLink: str(s.coachExternalLink),
+        notes: str(s.notes),
+        players: parsePlayers(s.players),
+      });
+    }
+  } else if (typeof obj.formation === "string" && obj.formation.trim() !== "") {
+    seasons = [
+      {
+        startYear: new Date().getFullYear(),
+        formation: obj.formation,
+        coachName: str(obj.coachName),
+        coachPhotoUrl: str(obj.coachPhotoUrl),
+        coachExternalLink: str(obj.coachExternalLink),
+        notes: str(obj.notes),
+        players: parsePlayers(obj.players),
+      },
+    ];
+  } else {
+    return { error: `Item ${index + 1} ("${obj.name}"): nenhuma temporada válida encontrada.` };
+  }
 
   return {
     entry: {
       name: obj.name,
-      formation: obj.formation,
       baseKind: str(obj.baseKind),
       logoUrl: str(obj.logoUrl),
-      coachName: str(obj.coachName),
-      coachPhotoUrl: str(obj.coachPhotoUrl),
-      coachExternalLink: str(obj.coachExternalLink),
-      notes: str(obj.notes),
+      primaryColor: str(obj.primaryColor),
+      seasonCalendar: obj.seasonCalendar === "europeu" ? "europeu" : "brasileiro",
       category: str(obj.category),
       tags: Array.isArray(obj.tags) ? obj.tags.filter((t): t is string => typeof t === "string") : [],
-      players,
+      seasons,
     },
   };
 }
@@ -186,28 +285,38 @@ export function parseImportFile(raw: unknown): { entries: SquadExportEntry[]; er
   return { entries, errors };
 }
 
+async function loadSeasonsWithPlayers(squadIds: string[]) {
+  const seasons = await prisma.season.findMany({
+    where: { squadId: { in: squadIds } },
+    include: { players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } } },
+  });
+  return new Map(seasons.map((s) => [s.id, s]));
+}
+
 export const squadTransferService = {
   async exportSquad(id: string): Promise<SquadExportFile | null> {
     const squad = await squadService.getSquad(id);
     if (!squad) return null;
-    return { version: 1, squads: [toExportEntry(squad)] };
+    const seasonsWithPlayers = await loadSeasonsWithPlayers([id]);
+    return { version: 2, squads: [toExportEntry(squad, seasonsWithPlayers)] };
   },
 
   async exportAllSquads(): Promise<SquadExportFile> {
     const squads = await prisma.squad.findMany({
       include: {
-        players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
+        seasons: { orderBy: { startYear: "asc" } },
         category: true,
         tags: true,
       },
       orderBy: { updatedAt: "desc" },
     });
-    return { version: 1, squads: squads.map(toExportEntry) };
+    const seasonsWithPlayers = await loadSeasonsWithPlayers(squads.map((s) => s.id));
+    return { version: 2, squads: squads.map((s) => toExportEntry(s, seasonsWithPlayers)) };
   },
 
   /**
    * `strategy` is a single choice for the whole batch (not per-squad) —
-   * "replace" deletes any existing squad with the same name before
+   * "replace" deletes any existing club with the same name before
    * recreating it, "keep-both" renames the incoming one instead.
    */
   async importSquads(entries: SquadExportEntry[], strategy: "replace" | "keep-both") {
@@ -238,47 +347,58 @@ export const squadTransferService = {
       const squad = await prisma.squad.create({
         data: {
           name,
-          formation: entry.formation,
           baseKind: entry.baseKind,
           logoUrl: entry.logoUrl,
-          coachName: entry.coachName,
-          coachPhotoUrl: entry.coachPhotoUrl,
-          coachExternalLink: entry.coachExternalLink,
-          notes: entry.notes,
+          primaryColor: entry.primaryColor,
+          seasonCalendar: entry.seasonCalendar,
           categoryId: category?.id,
           tags: tags.length ? { connect: tags.map((t) => ({ id: t.id })) } : undefined,
         },
       });
 
-      for (const p of entry.players) {
-        const cached = await cacheRepository.upsertPlayer(p.player.source, p.player.externalId, {
-          name: p.player.name,
-          photoUrl: p.player.photoUrl,
-          nationality: p.player.nationality,
-          position: p.player.position,
-          club: p.player.club,
-          league: p.player.league,
-          overall: p.player.overall,
-          potential: p.player.potential,
-          age: p.player.age,
-          externalLink: p.player.externalLink,
-          rawData: { imported: true },
-          expiresAt: defaultExpiresAt(),
-        });
-
-        await prisma.squadPlayer.create({
+      for (const seasonEntry of entry.seasons) {
+        const season = await prisma.season.create({
           data: {
             squadId: squad.id,
-            cachedPlayerId: cached.id,
-            shirtNumber: p.shirtNumber,
-            isCaptain: p.isCaptain,
-            isStarter: p.isStarter,
-            isWatchlist: p.isWatchlist,
-            isExtra: p.isExtra,
-            positionSlot: p.positionSlot,
-            order: p.order,
+            startYear: seasonEntry.startYear,
+            formation: seasonEntry.formation,
+            coachName: seasonEntry.coachName,
+            coachPhotoUrl: seasonEntry.coachPhotoUrl,
+            coachExternalLink: seasonEntry.coachExternalLink,
+            notes: seasonEntry.notes,
           },
         });
+
+        for (const p of seasonEntry.players) {
+          const cached = await cacheRepository.upsertPlayer(p.player.source, p.player.externalId, {
+            name: p.player.name,
+            photoUrl: p.player.photoUrl,
+            nationality: p.player.nationality,
+            position: p.player.position,
+            club: p.player.club,
+            league: p.player.league,
+            overall: p.player.overall,
+            potential: p.player.potential,
+            age: p.player.age,
+            externalLink: p.player.externalLink,
+            rawData: { imported: true },
+            expiresAt: defaultExpiresAt(),
+          });
+
+          await prisma.squadPlayer.create({
+            data: {
+              seasonId: season.id,
+              cachedPlayerId: cached.id,
+              shirtNumber: p.shirtNumber,
+              isCaptain: p.isCaptain,
+              isStarter: p.isStarter,
+              isWatchlist: p.isWatchlist,
+              isExtra: p.isExtra,
+              positionSlot: p.positionSlot,
+              order: p.order,
+            },
+          });
+        }
       }
 
       imported += 1;

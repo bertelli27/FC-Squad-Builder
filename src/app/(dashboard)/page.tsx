@@ -53,17 +53,22 @@ export default async function HomePage() {
         </div>
       ) : (
         <SquadListClient
-          squads={squads.map((squad) => ({
-            id: squad.id,
-            name: squad.name,
-            formation: squad.formation,
-            playerCount: squad._count.players,
-            logoUrl: squad.logoUrl,
-            isFavorite: squad.isFavorite,
-            categoryId: squad.categoryId,
-            categoryName: squad.category?.name ?? null,
-            tags: squad.tags,
-          }))}
+          squads={squads.map((squad) => {
+            const latestSeason = squad.seasons[0];
+            return {
+              id: squad.id,
+              name: squad.name,
+              formation: latestSeason?.formation ?? null,
+              playerCount: latestSeason?._count.players ?? 0,
+              seasonCount: squad._count.seasons,
+              logoUrl: squad.logoUrl,
+              primaryColor: squad.primaryColor,
+              isFavorite: squad.isFavorite,
+              categoryId: squad.categoryId,
+              categoryName: squad.category?.name ?? null,
+              tags: squad.tags,
+            };
+          })}
           categories={categories}
           tags={tags}
         />

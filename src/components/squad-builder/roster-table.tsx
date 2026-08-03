@@ -60,12 +60,12 @@ interface RosterHandlers {
  */
 export function RosterTable({
   bench,
-  squadId,
+  seasonId,
   duplicateNumbers,
   ...handlers
 }: {
   bench: SquadPlayerVM[];
-  squadId: string;
+  seasonId: string;
   /** Shirt numbers that appear more than once across starters+bench — flagged with a red ring wherever they're shown. */
   duplicateNumbers: Set<number>;
 } & RosterHandlers) {
@@ -110,7 +110,7 @@ export function RosterTable({
                 key={group}
                 group={group}
                 players={players}
-                squadId={squadId}
+                seasonId={seasonId}
                 duplicateNumbers={duplicateNumbers}
                 {...handlers}
               />
@@ -125,13 +125,13 @@ export function RosterTable({
 function RosterGroup({
   group,
   players,
-  squadId,
+  seasonId,
   duplicateNumbers,
   ...handlers
 }: {
   group: string;
   players: SquadPlayerVM[];
-  squadId: string;
+  seasonId: string;
   duplicateNumbers: Set<number>;
 } & RosterHandlers) {
   return (
@@ -148,7 +148,7 @@ function RosterGroup({
         <RosterRow
           key={player.id}
           player={player}
-          squadId={squadId}
+          seasonId={seasonId}
           isDuplicateNumber={player.shirtNumber != null && duplicateNumbers.has(player.shirtNumber)}
           {...handlers}
         />
@@ -159,13 +159,13 @@ function RosterGroup({
 
 function RosterRow({
   player,
-  squadId,
+  seasonId,
   isDuplicateNumber,
   onNumberChange,
   onCaptainToggle,
   onRemove,
   onUpdated,
-}: { player: SquadPlayerVM; squadId: string; isDuplicateNumber: boolean } & RosterHandlers) {
+}: { player: SquadPlayerVM; seasonId: string; isDuplicateNumber: boolean } & RosterHandlers) {
   // No transform/translate here on purpose: CSS transforms on <tr> render
   // inconsistently across engines (table-row boxes aren't a normal
   // transformable element the way a <div> is), which is what made
@@ -228,7 +228,7 @@ function RosterRow({
       <td className="px-2 py-1.5">
         <PlayerProfileDialog
           player={profileInfo}
-          squadId={squadId}
+          seasonId={seasonId}
           squadPlayerId={player.id}
           onUpdated={(patch) => onUpdated(player.id, patch)}
           aria-label={`Ver perfil de ${player.name}`}

@@ -44,7 +44,7 @@ const CUSTOM_SOURCE = "custom";
 
 export function PlayerProfileDialog({
   player: known,
-  squadId,
+  seasonId,
   squadPlayerId,
   onUpdated,
   className,
@@ -53,7 +53,7 @@ export function PlayerProfileDialog({
 }: {
   player: KnownPlayerInfo;
   /** Only needed to enable editing — a custom player viewed without these just can't show the pencil button. */
-  squadId?: string;
+  seasonId?: string;
   squadPlayerId?: string;
   onUpdated?: (patch: Partial<KnownPlayerInfo>) => void;
   className?: string;
@@ -66,7 +66,7 @@ export function PlayerProfileDialog({
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
   const isCustom = known.source === CUSTOM_SOURCE;
-  const canEdit = isCustom && !!squadId && !!squadPlayerId;
+  const canEdit = isCustom && !!seasonId && !!squadPlayerId;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -145,10 +145,10 @@ export function PlayerProfileDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {mode === "edit" && squadId && squadPlayerId ? (
+        {mode === "edit" && seasonId && squadPlayerId ? (
           <EditCustomPlayerForm
             known={known}
-            squadId={squadId}
+            seasonId={seasonId}
             squadPlayerId={squadPlayerId}
             onCancel={() => setMode("view")}
             onSaved={(patch) => {
@@ -166,13 +166,13 @@ export function PlayerProfileDialog({
 
 function EditCustomPlayerForm({
   known,
-  squadId,
+  seasonId,
   squadPlayerId,
   onSaved,
   onCancel,
 }: {
   known: KnownPlayerInfo;
-  squadId: string;
+  seasonId: string;
   squadPlayerId: string;
   onSaved: (patch: Partial<KnownPlayerInfo>) => void;
   onCancel: () => void;
@@ -201,7 +201,7 @@ function EditCustomPlayerForm({
       photoUrl: photoUrl || null,
       externalLink: externalLink || null,
     };
-    fetch(`/api/squads/${squadId}/players/${squadPlayerId}`, {
+    fetch(`/api/seasons/${seasonId}/players/${squadPlayerId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),

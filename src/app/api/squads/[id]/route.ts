@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { squadService } from "@/services/squad.service";
+import { isValidHexColor } from "@/lib/club-color";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -18,6 +19,17 @@ function baseKindField(value: unknown): string | null | undefined {
   return value === "club" || value === "nationalTeam" ? value : undefined;
 }
 
+// Same convention, restricted to a valid "#rrggbb" hex string.
+function primaryColorField(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return typeof value === "string" && isValidHexColor(value) ? value : undefined;
+}
+
+function seasonCalendarField(value: unknown): string | undefined {
+  return value === "brasileiro" || value === "europeu" ? value : undefined;
+}
+
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   const squad = await squadService.getSquad(id);
@@ -32,52 +44,39 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const body = await request.json().catch(() => null);
   const name = typeof body?.name === "string" && body.name.trim() ? body.name : undefined;
-  const formation = typeof body?.formation === "string" ? body.formation : undefined;
   const logoUrl = optionalStringField(body?.logoUrl);
-  const coachName = optionalStringField(body?.coachName);
-  const coachPhotoUrl = optionalStringField(body?.coachPhotoUrl);
-  const coachExternalLink = optionalStringField(body?.coachExternalLink);
-  const notes = optionalStringField(body?.notes);
   const isFavorite = typeof body?.isFavorite === "boolean" ? body.isFavorite : undefined;
   const categoryId = optionalStringField(body?.categoryId);
   const tagNames = Array.isArray(body?.tagNames)
     ? body.tagNames.filter((t: unknown): t is string => typeof t === "string")
     : undefined;
   const baseKind = baseKindField(body?.baseKind);
+  const primaryColor = primaryColorField(body?.primaryColor);
+  const seasonCalendar = seasonCalendarField(body?.seasonCalendar);
 
   if (
     name !== undefined ||
     logoUrl !== undefined ||
-    coachName !== undefined ||
-    coachPhotoUrl !== undefined ||
-    coachExternalLink !== undefined ||
-    notes !== undefined ||
     isFavorite !== undefined ||
     categoryId !== undefined ||
     tagNames !== undefined ||
-    baseKind !== undefined
+    baseKind !== undefined ||
+    primaryColor !== undefined ||
+    seasonCalendar !== undefined
   ) {
     await squadService.updateSquad(id, {
       name,
       logoUrl,
-      coachName,
-      coachPhotoUrl,
-      coachExternalLink,
-      notes,
       isFavorite,
       categoryId,
       tagNames,
       baseKind,
+      primaryColor,
+      seasonCalendar,
     });
   }
 
-  // Changing formation remaps the starting XI onto the new slot set
-  // (see squadService.changeFormation), not just a plain field update.
-  const squad =
-    formation !== undefined && formation !== existing.formation
-      ? await squadService.changeFormation(id, formation)
-      : await squadService.getSquad(id);
-
+  const squad = await squadService.getSquad(id);
   return NextResponse.json({ squad });
 }
 

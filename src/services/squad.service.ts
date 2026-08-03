@@ -1,12 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { cacheRepository } from "@/repositories/cache.repository";
-import { getFormationSlots } from "@/lib/formations";
-import { normalizePositionCategory } from "@/lib/position-category";
 import { clubDataService } from "./club-data.service";
 import { nationalTeamDataService } from "./national-team-data.service";
-import { playerDataService } from "./player-data.service";
 import { tagService } from "./tag.service";
-import { NATIONAL_TEAM_SQUAD_SIZE } from "@/lib/national-team";
+import { seasonService } from "./season.service";
 import type { Player } from "@/types/domain";
 
 export interface CreateSquadInput {
@@ -17,6 +13,8 @@ export interface CreateSquadInput {
   categoryId?: string | null;
   /** Tag names — resolved/created via tagService.findOrCreateTags and connected. */
   tagNames?: string[];
+  /** First season's year — defaults to the current calendar year. */
+  startYear?: number;
 }
 
 async function resolveBase(
@@ -41,124 +39,63 @@ async function resolveBase(
   };
 }
 
-interface SquadPlayerAssignment {
-  cachedPlayerId: string;
-  positionSlot: string | null;
-  isStarter: boolean;
-  order: number;
-}
-
-/**
- * Greedily fills each formation slot with the best remaining player whose
- * position matches the slot's category (GK/DEF/MID/ATT), falling back to
- * any remaining player if the category is exhausted. Whatever's left over
- * becomes the bench. Not an optimal assignment (no swapping to fix a
- * mismatch elsewhere) — good enough for an initial lineup the user then
- * edits by hand in the tactical editor.
- */
-function assignStartingXI(
-  players: { cachedPlayerId: string; position?: string; overall?: number }[],
-  formation: string,
-): SquadPlayerAssignment[] {
-  const pool = players
-    .map((p) => ({ ...p, category: normalizePositionCategory(p.position) }))
-    .sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0));
-
-  const used = new Set<number>();
-  const starters: SquadPlayerAssignment[] = [];
-
-  getFormationSlots(formation).forEach((slot, order) => {
-    let index = pool.findIndex((p, i) => !used.has(i) && p.category === slot.category);
-    if (index === -1) index = pool.findIndex((_, i) => !used.has(i));
-    if (index === -1) return;
-
-    used.add(index);
-    starters.push({
-      cachedPlayerId: pool[index].cachedPlayerId,
-      positionSlot: slot.slot,
-      isStarter: true,
-      order,
-    });
-  });
-
-  const bench: SquadPlayerAssignment[] = pool
-    .filter((_, i) => !used.has(i))
-    .map((p, i) => ({
-      cachedPlayerId: p.cachedPlayerId,
-      positionSlot: null,
-      isStarter: false,
-      order: starters.length + i,
-    }));
-
-  return [...starters, ...bench];
-}
-
-/**
- * Manual additions respect the same 26-man cap as the automatic load
- * (§ createSquad): once a national-team squad already has 26 official
- * members (starter or bench, i.e. neither watchlist nor extra), a new
- * bench-bound addition becomes an "extra" instead. Watchlist additions
- * are never capped — observados were never part of the 26 to begin with.
- */
-async function resolveDestinationBucket(
-  squadId: string,
-  destination: "bench" | "watchlist",
-): Promise<{ isWatchlist: boolean; isExtra: boolean }> {
-  if (destination === "watchlist") return { isWatchlist: true, isExtra: false };
-
-  const squad = await prisma.squad.findUnique({ where: { id: squadId }, select: { baseKind: true } });
-  if (squad?.baseKind !== "nationalTeam") return { isWatchlist: false, isExtra: false };
-
-  const officialCount = await prisma.squadPlayer.count({
-    where: { squadId, isWatchlist: false, isExtra: false },
-  });
-  return { isWatchlist: false, isExtra: officialCount >= NATIONAL_TEAM_SQUAD_SIZE };
-}
-
 export const squadService = {
   /**
-   * All squads with just enough to power the home page's cards and its
-   * client-side favorite/category/tag/search filtering (§V2) — no need for
-   * full player rosters here, that's what getSquad is for.
+   * All clubs with just enough to power the home page's cards and its
+   * client-side favorite/category/tag/search filtering (§V2), plus their
+   * most recent season (for the formation/player-count shown on the card)
+   * — no need for full rosters here, that's what getSquad/getSeason are for.
    */
   async listSquads() {
     return prisma.squad.findMany({
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { players: true } }, category: true, tags: true },
+      include: {
+        category: true,
+        tags: true,
+        _count: { select: { seasons: true } },
+        seasons: {
+          orderBy: { startYear: "desc" },
+          take: 1,
+          include: { _count: { select: { players: { where: { isWatchlist: false, isExtra: false } } } } },
+        },
+      },
     });
   },
 
+  /** Club overview: identity + organizational metadata + the list of seasons (no player rosters — see seasonService.getSeason for that). */
   async getSquad(id: string) {
     return prisma.squad.findUnique({
       where: { id },
       include: {
-        players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
         category: true,
         tags: true,
+        seasons: {
+          orderBy: { startYear: "desc" },
+          include: { _count: { select: { players: { where: { isWatchlist: false, isExtra: false } } } } },
+        },
       },
     });
   },
 
   /**
-   * Creates a squad, optionally auto-loading its base roster (§1: "carregando
-   * o elenco base automaticamente") and assigning a starting XI across the
-   * chosen formation's slots by position. Numbering/captain are left unset
-   * — that's the tactical editor's job (roadmap step 11).
+   * Creates a club and its first season, optionally auto-loading the
+   * season's base roster (§1: "carregando o elenco base automaticamente")
+   * from a real club/national team.
    *
    * If loaded from a real club/national team, its badge/flag is copied
    * into `logoUrl` as a one-time convenience default — never re-fetched
    * live afterward (see updateSquad for editing it, including for
-   * from-scratch squads that never had one to begin with).
+   * from-scratch clubs that never had one to begin with).
    */
   async createSquad(input: CreateSquadInput) {
     const resolved = input.base ? await resolveBase(input.base) : null;
     const formation = input.formation ?? "4-3-3";
     const tags = input.tagNames?.length ? await tagService.findOrCreateTags(input.tagNames) : [];
+    const startYear = input.startYear ?? new Date().getFullYear();
 
     const squad = await prisma.squad.create({
       data: {
         name: input.name,
-        formation,
         baseClubRef: resolved?.externalId,
         baseKind: input.base?.kind ?? null,
         logoUrl: resolved?.logoUrl,
@@ -167,66 +104,36 @@ export const squadService = {
       },
     });
 
-    if (resolved && resolved.players.length > 0) {
-      const cachedRows = await Promise.all(
-        resolved.players.map((p) => cacheRepository.getPlayer(p.source, p.externalId)),
-      );
-      const validRows = cachedRows.filter((row) => row !== null);
+    const season = await seasonService.createInitialSeason(squad.id, {
+      startYear,
+      formation,
+      isNationalTeam: input.base?.kind === "nationalTeam",
+      players: resolved?.players ?? [],
+    });
 
-      const assignments = assignStartingXI(
-        validRows.map((row) => ({
-          cachedPlayerId: row.id,
-          position: row.position ?? undefined,
-          overall: row.overall ?? undefined,
-        })),
-        formation,
-      );
-
-      // A real national team's registered squad is easily 30-40+ names
-      // (not just the current 26-man call-up), so anything past the cap
-      // becomes an "extra" instead of dumping the whole pool onto the
-      // bench. Club squads (and squads without a base) are uncapped, as
-      // before.
-      const cap = input.base?.kind === "nationalTeam" ? NATIONAL_TEAM_SQUAD_SIZE : Infinity;
-
-      if (assignments.length > 0) {
-        await prisma.squadPlayer.createMany({
-          data: assignments.map((a, i) => ({
-            squadId: squad.id,
-            cachedPlayerId: a.cachedPlayerId,
-            positionSlot: i < cap ? a.positionSlot : null,
-            isStarter: i < cap && a.isStarter,
-            isExtra: i >= cap,
-            order: a.order,
-          })),
-        });
-      }
-    }
-
-    return squad;
+    return { squad, season };
   },
 
   async updateSquad(
     id: string,
     data: {
       name?: string;
-      formation?: string;
       logoUrl?: string | null;
-      coachName?: string | null;
-      coachPhotoUrl?: string | null;
-      coachExternalLink?: string | null;
-      notes?: string | null;
       isFavorite?: boolean;
       categoryId?: string | null;
-      /** Full replace: the squad's tags become exactly this set (undefined leaves tags untouched). */
+      /** Full replace: the club's tags become exactly this set (undefined leaves tags untouched). */
       tagNames?: string[];
       /**
        * "club" | "nationalTeam" | null — normally set once at creation and
-       * left alone, but exposed as editable so a squad created before this
+       * left alone, but exposed as editable so a club created before this
        * concept existed can retroactively unlock the observados/elenco
        * ampliado areas without losing anything already customized on it.
        */
       baseKind?: string | null;
+      /** Hex identity color (§12), or null to go back to the default theme. */
+      primaryColor?: string | null;
+      /** "brasileiro" | "europeu" — how this club's seasons are labeled. */
+      seasonCalendar?: string;
     },
   ) {
     const { tagNames, ...rest } = data;
@@ -246,280 +153,63 @@ export const squadService = {
   },
 
   /**
-   * Clones a squad's settings and lineup — not its players' underlying
-   * data, since CachedPlayer is a read-only mirror (§7): both squads end
-   * up pointing at the exact same cachedPlayerId rows, only the
-   * SquadPlayer "lineup" rows (number, captain, starter/bench, slot,
-   * order) are duplicated.
+   * Clones a club's identity/settings AND every one of its seasons
+   * (lineup, coach, formation, notes) — not the underlying player data,
+   * since CachedPlayer is a read-only mirror (§7): every cloned season
+   * ends up pointing at the exact same cachedPlayerId rows, only the
+   * SquadPlayer "lineup" rows are duplicated, same as a single season's
+   * own duplicate (seasonService.createSeason).
    */
   async duplicateSquad(id: string) {
     const original = await prisma.squad.findUnique({
       where: { id },
-      include: { players: true, tags: true },
+      include: { tags: true, seasons: { include: { players: true } } },
     });
     if (!original) return null;
 
     const copy = await prisma.squad.create({
       data: {
         name: `${original.name} (Cópia)`,
-        formation: original.formation,
         baseClubRef: original.baseClubRef,
         baseKind: original.baseKind,
         logoUrl: original.logoUrl,
-        coachName: original.coachName,
-        coachPhotoUrl: original.coachPhotoUrl,
-        coachExternalLink: original.coachExternalLink,
-        notes: original.notes,
+        primaryColor: original.primaryColor,
+        seasonCalendar: original.seasonCalendar,
         categoryId: original.categoryId,
         tags: original.tags.length ? { connect: original.tags.map((t) => ({ id: t.id })) } : undefined,
       },
     });
 
-    if (original.players.length > 0) {
-      await prisma.squadPlayer.createMany({
-        data: original.players.map((p) => ({
+    for (const season of original.seasons) {
+      const newSeason = await prisma.season.create({
+        data: {
           squadId: copy.id,
-          cachedPlayerId: p.cachedPlayerId,
-          shirtNumber: p.shirtNumber,
-          isCaptain: p.isCaptain,
-          isStarter: p.isStarter,
-          isWatchlist: p.isWatchlist,
-          isExtra: p.isExtra,
-          positionSlot: p.positionSlot,
-          order: p.order,
-        })),
+          startYear: season.startYear,
+          formation: season.formation,
+          coachName: season.coachName,
+          coachPhotoUrl: season.coachPhotoUrl,
+          coachExternalLink: season.coachExternalLink,
+          notes: season.notes,
+        },
       });
+
+      if (season.players.length > 0) {
+        await prisma.squadPlayer.createMany({
+          data: season.players.map((p) => ({
+            seasonId: newSeason.id,
+            cachedPlayerId: p.cachedPlayerId,
+            shirtNumber: p.shirtNumber,
+            isCaptain: p.isCaptain,
+            isStarter: p.isStarter,
+            isWatchlist: p.isWatchlist,
+            isExtra: p.isExtra,
+            positionSlot: p.positionSlot,
+            order: p.order,
+          })),
+        });
+      }
     }
 
     return squadService.getSquad(copy.id);
   },
-
-  /**
-   * Bulk-persists a new field/bench/extras/watchlist arrangement after a
-   * drag-and-drop change. Always includes `shirtNumber` (not just the
-   * bucket/position fields) because a swap that pulls someone in from
-   * extras/watchlist makes them inherit the displaced player's number —
-   * client computes the new value, this just needs to save whatever it's
-   * given (a no-op resend of the same number for plain reordering).
-   */
-  async updateSquadPlayers(
-    squadId: string,
-    updates: {
-      id: string;
-      positionSlot: string | null;
-      isStarter: boolean;
-      isWatchlist: boolean;
-      isExtra: boolean;
-      shirtNumber: number | null;
-      order: number;
-    }[],
-  ) {
-    await prisma.$transaction(
-      updates.map((u) =>
-        prisma.squadPlayer.update({
-          where: { id: u.id, squadId },
-          data: {
-            positionSlot: u.positionSlot,
-            isStarter: u.isStarter,
-            isWatchlist: u.isWatchlist,
-            isExtra: u.isExtra,
-            shirtNumber: u.shirtNumber,
-            order: u.order,
-          },
-        }),
-      ),
-    );
-  },
-
-  /** Sets shirt number and/or captain for one player. Setting isCaptain clears any previous captain in the squad. */
-  async updateSquadPlayer(
-    squadId: string,
-    playerId: string,
-    data: { shirtNumber?: number | null; isCaptain?: boolean },
-  ) {
-    if (data.isCaptain) {
-      await prisma.squadPlayer.updateMany({
-        where: { squadId, isCaptain: true },
-        data: { isCaptain: false },
-      });
-    }
-    return prisma.squadPlayer.update({ where: { id: playerId, squadId }, data });
-  },
-
-  /**
-   * Adds any player (identified by source+externalId, from a player
-   * search — Kaggle catalog or a live API-Football/TheSportsDB lookup) to
-   * the squad's bench (or, for national-team squads, its watchlist).
-   * Idempotent: adding a player already in the squad just returns their
-   * existing row instead of erroring.
-   */
-  async addPlayerToSquad(
-    squadId: string,
-    ref: { source: string; externalId: string },
-    destination: "bench" | "watchlist" = "bench",
-  ) {
-    const player = await playerDataService.getPlayer(ref.source, ref.externalId);
-    if (!player) return null;
-
-    const cached = await cacheRepository.getPlayer(ref.source, ref.externalId);
-    if (!cached) return null;
-
-    const existing = await prisma.squadPlayer.findUnique({
-      where: { squadId_cachedPlayerId: { squadId, cachedPlayerId: cached.id } },
-      include: { cachedPlayer: true },
-    });
-    if (existing) return existing;
-
-    const [{ _max }, bucket] = await Promise.all([
-      prisma.squadPlayer.aggregate({ where: { squadId }, _max: { order: true } }),
-      resolveDestinationBucket(squadId, destination),
-    ]);
-
-    return prisma.squadPlayer.create({
-      data: {
-        squadId,
-        cachedPlayerId: cached.id,
-        isStarter: false,
-        ...bucket,
-        order: (_max.order ?? -1) + 1,
-      },
-      include: { cachedPlayer: true },
-    });
-  },
-
-  async removePlayerFromSquad(squadId: string, playerId: string) {
-    await prisma.squadPlayer.delete({ where: { id: playerId, squadId } });
-  },
-
-  async getSquadPlayer(squadId: string, playerId: string) {
-    return prisma.squadPlayer.findUnique({
-      where: { id: playerId, squadId },
-      include: { cachedPlayer: true },
-    });
-  },
-
-  /**
-   * Edits a custom player's own details (name/position/photo/link) — the
-   * fields the user typed in by hand when there was no matching provider
-   * result. Deliberately refuses to touch anything whose CachedPlayer
-   * source isn't "custom": that would violate §7's "cache is only ever a
-   * mirror, never edited by the user" guarantee for real provider data.
-   * Returns null both when the SquadPlayer doesn't exist and when it does
-   * but isn't custom, so the route can 404/403 without leaking which case.
-   */
-  async updateCustomPlayerDetails(
-    squadId: string,
-    squadPlayerId: string,
-    patch: {
-      name?: string;
-      position?: string | null;
-      photoUrl?: string | null;
-      externalLink?: string | null;
-    },
-  ) {
-    const squadPlayer = await prisma.squadPlayer.findUnique({
-      where: { id: squadPlayerId, squadId },
-      include: { cachedPlayer: true },
-    });
-    if (!squadPlayer || squadPlayer.cachedPlayer.source !== CUSTOM_PLAYER_SOURCE) return null;
-
-    await prisma.cachedPlayer.update({
-      where: { id: squadPlayer.cachedPlayerId },
-      data: {
-        ...(patch.name !== undefined && { name: patch.name }),
-        ...(patch.position !== undefined && { position: patch.position }),
-        ...(patch.photoUrl !== undefined && { photoUrl: patch.photoUrl }),
-        ...(patch.externalLink !== undefined && { externalLink: patch.externalLink }),
-      },
-    });
-
-    return squadService.getSquadPlayer(squadId, squadPlayerId);
-  },
-
-  /**
-   * Creates a player that exists only in this app (not backed by any
-   * provider) — for when a search across Kaggle/API-Football/TheSportsDB
-   * still doesn't find who the user wants. Added straight to the bench
-   * (or, for national-team squads, the watchlist); `expiresAt` is set far
-   * in the future since there's no source to ever refresh it from.
-   */
-  async createCustomPlayer(
-    squadId: string,
-    input: {
-      name: string;
-      position?: string;
-      photoUrl?: string;
-      externalLink?: string;
-      shirtNumber?: number;
-      destination?: "bench" | "watchlist";
-    },
-  ) {
-    const externalId = crypto.randomUUID();
-    const cached = await cacheRepository.upsertPlayer(CUSTOM_PLAYER_SOURCE, externalId, {
-      name: input.name,
-      position: input.position,
-      photoUrl: input.photoUrl,
-      externalLink: input.externalLink,
-      rawData: { custom: true },
-      expiresAt: new Date(Date.now() + CUSTOM_PLAYER_TTL_MS),
-    });
-
-    const [{ _max }, bucket] = await Promise.all([
-      prisma.squadPlayer.aggregate({ where: { squadId }, _max: { order: true } }),
-      resolveDestinationBucket(squadId, input.destination ?? "bench"),
-    ]);
-
-    return prisma.squadPlayer.create({
-      data: {
-        squadId,
-        cachedPlayerId: cached.id,
-        isStarter: false,
-        ...bucket,
-        shirtNumber: input.shirtNumber,
-        order: (_max.order ?? -1) + 1,
-      },
-      include: { cachedPlayer: true },
-    });
-  },
-
-  /**
-   * Switches formation and remaps the current starting XI onto the new
-   * formation's slots (same greedy category match as initial squad
-   * creation), preserving who's a starter — captain/number/bench are
-   * untouched. Bench players are left alone.
-   */
-  async changeFormation(squadId: string, formation: string) {
-    const squad = await prisma.squad.findUnique({
-      where: { id: squadId },
-      include: { players: { include: { cachedPlayer: true } } },
-    });
-    if (!squad) return null;
-
-    const starters = squad.players.filter((p) => p.isStarter);
-    const assignments = assignStartingXI(
-      starters.map((p) => ({
-        cachedPlayerId: p.cachedPlayerId,
-        position: p.cachedPlayer.position ?? undefined,
-        overall: p.cachedPlayer.overall ?? undefined,
-      })),
-      formation,
-    );
-    const byCachedPlayerId = new Map(starters.map((p) => [p.cachedPlayerId, p]));
-
-    await prisma.$transaction([
-      prisma.squad.update({ where: { id: squadId }, data: { formation } }),
-      ...assignments.map((a) => {
-        const original = byCachedPlayerId.get(a.cachedPlayerId)!;
-        return prisma.squadPlayer.update({
-          where: { id: original.id },
-          data: { positionSlot: a.positionSlot, isStarter: a.isStarter, order: a.order },
-        });
-      }),
-    ]);
-
-    return squadService.getSquad(squadId);
-  },
 };
-
-const CUSTOM_PLAYER_SOURCE = "custom";
-const CUSTOM_PLAYER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;

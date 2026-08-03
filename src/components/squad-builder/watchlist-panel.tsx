@@ -17,12 +17,12 @@ import type { SquadPlayerVM } from "./squad-editor";
  */
 export function WatchlistPanel({
   players,
-  squadId,
+  seasonId,
   onRemove,
   onUpdated,
 }: {
   players: SquadPlayerVM[];
-  squadId: string;
+  seasonId: string;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }) {
@@ -53,7 +53,7 @@ export function WatchlistPanel({
                   <WatchlistRow
                     key={player.id}
                     player={player}
-                    squadId={squadId}
+                    seasonId={seasonId}
                     onRemove={onRemove}
                     onUpdated={onUpdated}
                   />
@@ -69,12 +69,12 @@ export function WatchlistPanel({
 
 function WatchlistRow({
   player,
-  squadId,
+  seasonId,
   onRemove,
   onUpdated,
 }: {
   player: SquadPlayerVM;
-  squadId: string;
+  seasonId: string;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }) {
@@ -106,7 +106,7 @@ function WatchlistRow({
       </button>
       <PlayerProfileDialog
         player={profileInfo}
-        squadId={squadId}
+        seasonId={seasonId}
         squadPlayerId={player.id}
         onUpdated={(patch) => onUpdated(player.id, patch)}
         aria-label={`Ver perfil de ${player.name}`}

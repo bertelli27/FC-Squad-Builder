@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { squadService } from "@/services/squad.service";
+import { seasonService } from "@/services/season.service";
 
 type RouteContext = { params: Promise<{ id: string; playerId: string }> };
 
@@ -39,7 +39,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   if (hasDetailFields) {
-    const updated = await squadService.updateCustomPlayerDetails(id, playerId, {
+    const updated = await seasonService.updateCustomPlayerDetails(id, playerId, {
       name,
       position,
       photoUrl,
@@ -54,15 +54,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   if (shirtNumber !== undefined || isCaptain !== undefined) {
-    await squadService.updateSquadPlayer(id, playerId, { shirtNumber, isCaptain });
+    await seasonService.updateSeasonPlayer(id, playerId, { shirtNumber, isCaptain });
   }
 
-  const player = await squadService.getSquadPlayer(id, playerId);
+  const player = await seasonService.getSeasonPlayer(id, playerId);
   return NextResponse.json({ player });
 }
 
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   const { id, playerId } = await params;
-  await squadService.removePlayerFromSquad(id, playerId);
+  await seasonService.removePlayerFromSeason(id, playerId);
   return new NextResponse(null, { status: 204 });
 }

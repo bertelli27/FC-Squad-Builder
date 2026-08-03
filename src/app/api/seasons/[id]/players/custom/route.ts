@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { squadService } from "@/services/squad.service";
+import { seasonService } from "@/services/season.service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const shirtNumber = typeof body.shirtNumber === "number" ? body.shirtNumber : undefined;
   const destination = body.destination === "watchlist" ? "watchlist" : "bench";
 
-  const player = await squadService.createCustomPlayer(id, {
+  const player = await seasonService.createCustomPlayer(id, {
     name: body.name,
     position: typeof body.position === "string" ? body.position : undefined,
     photoUrl: typeof body.photoUrl === "string" ? body.photoUrl : undefined,

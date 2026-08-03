@@ -26,12 +26,12 @@ import type { SquadPlayerVM } from "./squad-editor";
  */
 export function ExtrasPanel({
   players,
-  squadId,
+  seasonId,
   onRemove,
   onUpdated,
 }: {
   players: SquadPlayerVM[];
-  squadId: string;
+  seasonId: string;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }) {
@@ -61,7 +61,7 @@ export function ExtrasPanel({
                   <ExtraRow
                     key={player.id}
                     player={player}
-                    squadId={squadId}
+                    seasonId={seasonId}
                     onRemove={onRemove}
                     onUpdated={onUpdated}
                   />
@@ -77,12 +77,12 @@ export function ExtrasPanel({
 
 function ExtraRow({
   player,
-  squadId,
+  seasonId,
   onRemove,
   onUpdated,
 }: {
   player: SquadPlayerVM;
-  squadId: string;
+  seasonId: string;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
 }) {
@@ -117,7 +117,7 @@ function ExtraRow({
       </button>
       <PlayerProfileDialog
         player={profileInfo}
-        squadId={squadId}
+        seasonId={seasonId}
         squadPlayerId={player.id}
         onUpdated={(patch) => onUpdated(player.id, patch)}
         aria-label={`Ver perfil de ${player.name}`}

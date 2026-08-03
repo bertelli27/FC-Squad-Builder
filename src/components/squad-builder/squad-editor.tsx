@@ -102,12 +102,12 @@ function buildInitialState(players: SquadPlayerVM[], formation: string): EditorS
 }
 
 export function SquadEditor({
-  squadId,
+  seasonId,
   formation,
   players,
   baseKind,
 }: {
-  squadId: string;
+  seasonId: string;
   formation: string;
   players: SquadPlayerVM[];
   baseKind?: string | null;
@@ -191,7 +191,7 @@ export function SquadEditor({
       })),
     ];
 
-    const res = await fetch(`/api/squads/${squadId}/players`, {
+    const res = await fetch(`/api/seasons/${seasonId}/players`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ players: payload }),
@@ -336,7 +336,7 @@ export function SquadEditor({
       return;
     }
     updatePlayerLocal(playerId, { shirtNumber });
-    const res = await fetch(`/api/squads/${squadId}/players/${playerId}`, {
+    const res = await fetch(`/api/seasons/${seasonId}/players/${playerId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ shirtNumber }),
@@ -346,7 +346,7 @@ export function SquadEditor({
 
   async function handleCaptainToggle(playerId: string, isCaptain: boolean) {
     updatePlayerLocal(playerId, { isCaptain });
-    const res = await fetch(`/api/squads/${squadId}/players/${playerId}`, {
+    const res = await fetch(`/api/seasons/${seasonId}/players/${playerId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isCaptain }),
@@ -375,7 +375,7 @@ export function SquadEditor({
       };
     });
 
-    const res = await fetch(`/api/squads/${squadId}/players/${playerId}`, { method: "DELETE" });
+    const res = await fetch(`/api/seasons/${seasonId}/players/${playerId}`, { method: "DELETE" });
     if (!res.ok) toast.error("Não foi possível remover o jogador.");
   }
 
@@ -460,7 +460,7 @@ export function SquadEditor({
                   x={s.x}
                   y={s.y}
                   player={state.slots[s.slot]}
-                  squadId={squadId}
+                  seasonId={seasonId}
                   duplicateNumbers={duplicateNumbers}
                   {...chipHandlers}
                 />
@@ -481,7 +481,7 @@ export function SquadEditor({
                 </span>
               )}
             </CardTitle>
-            <AddPlayerDialog squadId={squadId} onAdded={handlePlayerAdded} />
+            <AddPlayerDialog seasonId={seasonId} onAdded={handlePlayerAdded} />
           </CardHeader>
           {/* relative + the roster table absolutely positioned (inset-3)
               inside it: min-h-0/flex-1 alone weren't enough, because CSS
@@ -507,7 +507,7 @@ export function SquadEditor({
           <CardContent className="relative min-h-0 flex-1 p-3 lg:p-0">
             <RosterTable
               bench={state.bench}
-              squadId={squadId}
+              seasonId={seasonId}
               duplicateNumbers={duplicateNumbers}
               {...chipHandlers}
             />
@@ -526,7 +526,7 @@ export function SquadEditor({
           <CardContent className="p-3">
             <ExtrasPanel
               players={state.extras}
-              squadId={squadId}
+              seasonId={seasonId}
               onRemove={handleRemove}
               onUpdated={updatePlayerLocal}
             />
@@ -542,7 +542,7 @@ export function SquadEditor({
               Observados ({state.watchlist.length})
             </CardTitle>
             <AddPlayerDialog
-              squadId={squadId}
+              seasonId={seasonId}
               onAdded={handleWatchlistPlayerAdded}
               destination="watchlist"
               triggerLabel="+ Observar"
@@ -551,7 +551,7 @@ export function SquadEditor({
           <CardContent className="p-3">
             <WatchlistPanel
               players={state.watchlist}
-              squadId={squadId}
+              seasonId={seasonId}
               onRemove={handleRemove}
               onUpdated={updatePlayerLocal}
             />
@@ -591,7 +591,7 @@ function DroppableSlot({
   x,
   y,
   player,
-  squadId,
+  seasonId,
   duplicateNumbers,
   onNumberChange,
   onCaptainToggle,
@@ -603,7 +603,7 @@ function DroppableSlot({
   x: number;
   y: number;
   player: SquadPlayerVM | null;
-  squadId: string;
+  seasonId: string;
   duplicateNumbers: Set<number>;
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
@@ -621,7 +621,7 @@ function DroppableSlot({
       {player ? (
         <PlayerChip
           player={player}
-          squadId={squadId}
+          seasonId={seasonId}
           isDuplicateNumber={player.shirtNumber != null && duplicateNumbers.has(player.shirtNumber)}
           onNumberChange={onNumberChange}
           onCaptainToggle={onCaptainToggle}
@@ -661,7 +661,7 @@ function DragOverlayChip({ player }: { player: SquadPlayerVM }) {
 
 function PlayerChip({
   player,
-  squadId,
+  seasonId,
   isDuplicateNumber,
   onNumberChange,
   onCaptainToggle,
@@ -669,7 +669,7 @@ function PlayerChip({
   onUpdated,
 }: {
   player: SquadPlayerVM;
-  squadId: string;
+  seasonId: string;
   isDuplicateNumber: boolean;
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
@@ -752,7 +752,7 @@ function PlayerChip({
       <div className="relative">
         <PlayerProfileDialog
           player={profileInfo}
-          squadId={squadId}
+          seasonId={seasonId}
           squadPlayerId={player.id}
           onUpdated={(patch) => onUpdated(player.id, patch)}
           aria-label={`Ver perfil de ${player.name}`}

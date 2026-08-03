@@ -21,9 +21,12 @@ import { ClubBadge } from "./club-badge";
 export interface SquadCardData {
   id: string;
   name: string;
-  formation: string;
+  /** From the club's most recent season — null when the club has no seasons yet. */
+  formation: string | null;
   playerCount: number;
+  seasonCount: number;
   logoUrl?: string | null;
+  primaryColor?: string | null;
   isFavorite: boolean;
   categoryId: string | null;
   categoryName: string | null;
@@ -80,8 +83,18 @@ export function SquadCard({
     <>
       <Card className="group relative gap-0 overflow-hidden py-0 transition-shadow hover:shadow-md">
         {/* Accent strip: the one purely decorative touch that makes this
-            read as a "tile" in a dashboard grid rather than a plain card. */}
-        <div className="from-primary to-primary/40 h-1.5 bg-gradient-to-r" />
+            read as a "tile" in a dashboard grid rather than a plain card.
+            Clubs with their own identity color (§12.6 "cards") use it here
+            directly via inline style — no need for the full ClubThemeScope
+            override machinery for a single, isolated element like this. */}
+        <div
+          className={cn("h-1.5", !squad.primaryColor && "from-primary to-primary/40 bg-gradient-to-r")}
+          style={
+            squad.primaryColor
+              ? { background: `linear-gradient(to right, ${squad.primaryColor}, ${squad.primaryColor}66)` }
+              : undefined
+          }
+        />
         <CardHeader className="py-4">
           <CardTitle className="flex items-center gap-2">
             <ClubBadge src={squad.logoUrl} name={squad.name} size="sm" />
@@ -145,13 +158,22 @@ export function SquadCard({
           </CardAction>
         </CardHeader>
         <CardContent className="flex items-center gap-3 pb-4 text-sm">
-          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-            {squad.formation}
-          </Badge>
-          <span className="text-muted-foreground flex items-center gap-1">
-            <Users className="size-3.5" />
-            {squad.playerCount}
-          </span>
+          {squad.formation ? (
+            <>
+              <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                {squad.formation}
+              </Badge>
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Users className="size-3.5" />
+                {squad.playerCount}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">Nenhuma temporada ainda</span>
+          )}
+          {squad.seasonCount > 1 && (
+            <span className="text-muted-foreground ml-auto text-xs">{squad.seasonCount} temporadas</span>
+          )}
         </CardContent>
       </Card>
       {dialog}

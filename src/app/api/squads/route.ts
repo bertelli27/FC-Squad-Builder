@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       ? { kind: body.base.kind, name: body.base.name }
       : undefined;
 
-  const squad = await squadService.createSquad({
+  const { squad, season } = await squadService.createSquad({
     name: body.name,
     formation: typeof body.formation === "string" ? body.formation : undefined,
     base,
@@ -27,5 +27,5 @@ export async function POST(request: NextRequest) {
     tagNames: Array.isArray(body.tagNames) ? body.tagNames.filter((t: unknown) => typeof t === "string") : undefined,
   });
 
-  return NextResponse.json({ squad }, { status: 201 });
+  return NextResponse.json({ squad, season }, { status: 201 });
 }

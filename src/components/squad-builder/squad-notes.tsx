@@ -15,7 +15,15 @@ const AUTOSAVE_DELAY_MS = 1000;
  * "Salvando…/Salvo" label next to the title is enough feedback for
  * something that saves this often.
  */
-export function SquadNotes({ squadId, notes }: { squadId: string; notes?: string | null }) {
+export function SquadNotes({
+  squadId,
+  seasonId,
+  notes,
+}: {
+  squadId: string;
+  seasonId: string;
+  notes?: string | null;
+}) {
   const [value, setValue] = useState(notes ?? "");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const savedValueRef = useRef(notes ?? "");
@@ -30,7 +38,7 @@ export function SquadNotes({ squadId, notes }: { squadId: string; notes?: string
   function save(next: string) {
     if (next === savedValueRef.current) return;
     setStatus("saving");
-    fetch(`/api/squads/${squadId}`, {
+    fetch(`/api/squads/${squadId}/seasons/${seasonId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notes: next }),

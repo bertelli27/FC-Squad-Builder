@@ -108,9 +108,9 @@ export function NewSquadForm() {
         return;
       }
 
-      const { squad } = await res.json();
+      const { squad, season } = await res.json();
       toast.success(`Elenco "${squad.name}" criado.`);
-      router.push(`/squads/${squad.id}`);
+      router.push(`/squads/${squad.id}/seasons/${season.id}`);
     });
   }
 
