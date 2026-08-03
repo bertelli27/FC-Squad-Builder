@@ -157,6 +157,10 @@ export function AddPlayerDialog({
       toast.error("Dê um nome ao jogador.");
       return;
     }
+    if (!position) {
+      toast.error("Escolha uma posição.");
+      return;
+    }
 
     setCreating(true);
     fetch(`/api/squads/${squadId}/players/custom`, {
@@ -164,7 +168,7 @@ export function AddPlayerDialog({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
-        position: position || undefined,
+        position,
         shirtNumber: shirtNumber ? Number(shirtNumber) : undefined,
         photoUrl: photoUrl || undefined,
         externalLink: externalLink || undefined,

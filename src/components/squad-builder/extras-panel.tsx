@@ -12,9 +12,14 @@ import type { SquadPlayerVM } from "./squad-editor";
  * The part of a real national-team roster beyond the 26 called up (see
  * squad.service.ts's cap at NATIONAL_TEAM_SQUAD_SIZE) — laid out as
  * columns by position, unlike watchlist-panel.tsx's single list, since
- * this is meant to read like an actual squad sheet. All 6 groups always
- * render (even empty) so the columns stay aligned. One droppable for the
- * whole panel (no per-player swap target here, same as the bench's
+ * this is meant to read like an actual squad sheet. The 5 real position
+ * groups always render (even empty) so the columns stay aligned; "Outros"
+ * is skipped when empty — position is required when creating a custom
+ * player now, so that bucket should stay unused in practice, and an
+ * always-empty "Outros" column was just clutter. Still rendered if it
+ * ever DOES hold someone (e.g. older data from before position was
+ * required), so nobody becomes invisible. One droppable for the whole
+ * panel (no per-player swap target here, same as the bench's
  * whole-container "bench" id) — dragging FROM here onto a specific pitch
  * slot or bench row is what performs the swap, handled in
  * squad-editor.tsx.
@@ -42,6 +47,7 @@ export function ExtrasPanel({
     >
       {GROUP_ORDER.map((group) => {
         const groupPlayers = players.filter((p) => positionGroup(p.position) === group);
+        if (group === "Outros" && groupPlayers.length === 0) return null;
         return (
           <div key={group} className="min-w-36 flex-1">
             <div className="text-muted-foreground font-heading px-1 py-1 text-[10px] font-semibold tracking-wide uppercase">

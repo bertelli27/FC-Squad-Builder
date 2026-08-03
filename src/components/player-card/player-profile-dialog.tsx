@@ -189,11 +189,15 @@ function EditCustomPlayerForm({
       toast.error("O jogador precisa de um nome.");
       return;
     }
+    if (!position) {
+      toast.error("Escolha uma posição.");
+      return;
+    }
 
     setSaving(true);
     const patch = {
       name,
-      position: position || null,
+      position,
       photoUrl: photoUrl || null,
       externalLink: externalLink || null,
     };
