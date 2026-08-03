@@ -10,6 +10,13 @@ function optionalStringField(value: unknown): string | null | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+// undefined = field not sent, leave untouched. Negative numbers make no
+// sense for a match tally, so they're rejected the same as a non-number.
+function nonNegativeIntField(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { seasonId } = await params;
   const season = await seasonService.getSeason(seasonId);
@@ -28,14 +35,28 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const coachPhotoUrl = optionalStringField(body?.coachPhotoUrl);
   const coachExternalLink = optionalStringField(body?.coachExternalLink);
   const notes = optionalStringField(body?.notes);
+  const wins = nonNegativeIntField(body?.wins);
+  const draws = nonNegativeIntField(body?.draws);
+  const losses = nonNegativeIntField(body?.losses);
 
   if (
     coachName !== undefined ||
     coachPhotoUrl !== undefined ||
     coachExternalLink !== undefined ||
-    notes !== undefined
+    notes !== undefined ||
+    wins !== undefined ||
+    draws !== undefined ||
+    losses !== undefined
   ) {
-    await seasonService.updateSeason(seasonId, { coachName, coachPhotoUrl, coachExternalLink, notes });
+    await seasonService.updateSeason(seasonId, {
+      coachName,
+      coachPhotoUrl,
+      coachExternalLink,
+      notes,
+      wins,
+      draws,
+      losses,
+    });
   }
 
   // Changing formation remaps the starting XI onto the new slot set

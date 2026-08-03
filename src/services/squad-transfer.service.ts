@@ -3,6 +3,7 @@ import { cacheRepository, defaultExpiresAt } from "@/repositories/cache.reposito
 import { categoryService } from "./category.service";
 import { tagService } from "./tag.service";
 import { squadService } from "./squad.service";
+import { competitionService } from "./competition.service";
 
 export interface SquadExportPlayer {
   shirtNumber: number | null;
@@ -28,6 +29,18 @@ export interface SquadExportPlayer {
   };
 }
 
+export interface SeasonExportTitle {
+  competitionName: string;
+  trophyImageUrl: string | null;
+}
+
+export interface SeasonExportTransfer {
+  type: string; // "in" | "out"
+  playerName: string;
+  counterpartClub: string | null;
+  value: number | null;
+}
+
 export interface SeasonExportEntry {
   startYear: number;
   formation: string;
@@ -35,7 +48,12 @@ export interface SeasonExportEntry {
   coachPhotoUrl: string | null;
   coachExternalLink: string | null;
   notes: string | null;
+  wins: number;
+  draws: number;
+  losses: number;
   players: SquadExportPlayer[];
+  titles: SeasonExportTitle[];
+  transfers: SeasonExportTransfer[];
 }
 
 export interface SquadExportEntry {
@@ -76,6 +94,9 @@ interface ExportableSquad {
     coachPhotoUrl: string | null;
     coachExternalLink: string | null;
     notes: string | null;
+    wins: number;
+    draws: number;
+    losses: number;
   }[];
 }
 
@@ -103,9 +124,26 @@ interface SeasonPlayerRow {
   };
 }
 
+interface SeasonTitleRow {
+  competition: { name: string; trophyImageUrl: string | null };
+}
+
+interface SeasonTransferRow {
+  type: string;
+  playerName: string;
+  counterpartClub: string | null;
+  value: number | null;
+}
+
+interface SeasonExtras {
+  players: SeasonPlayerRow[];
+  titles: SeasonTitleRow[];
+  transfers: SeasonTransferRow[];
+}
+
 function toExportEntry(
   squad: ExportableSquad,
-  seasonsWithPlayers: Map<string, { players: SeasonPlayerRow[] }>,
+  seasonExtras: Map<string, SeasonExtras>,
 ): SquadExportEntry {
   return {
     name: squad.name,
@@ -116,7 +154,7 @@ function toExportEntry(
     category: squad.category?.name ?? null,
     tags: squad.tags.map((t) => t.name),
     seasons: squad.seasons.map((season) => {
-      const withPlayers = seasonsWithPlayers.get(season.id);
+      const extras = seasonExtras.get(season.id);
       return {
         startYear: season.startYear,
         formation: season.formation,
@@ -124,7 +162,20 @@ function toExportEntry(
         coachPhotoUrl: season.coachPhotoUrl,
         coachExternalLink: season.coachExternalLink,
         notes: season.notes,
-        players: (withPlayers?.players ?? []).map((p) => ({
+        wins: season.wins,
+        draws: season.draws,
+        losses: season.losses,
+        titles: (extras?.titles ?? []).map((t) => ({
+          competitionName: t.competition.name,
+          trophyImageUrl: t.competition.trophyImageUrl,
+        })),
+        transfers: (extras?.transfers ?? []).map((t) => ({
+          type: t.type,
+          playerName: t.playerName,
+          counterpartClub: t.counterpartClub,
+          value: t.value,
+        })),
+        players: (extras?.players ?? []).map((p) => ({
           shirtNumber: p.shirtNumber,
           isCaptain: p.isCaptain,
           isStarter: p.isStarter,
@@ -199,6 +250,36 @@ function parsePlayers(raw: unknown): SquadExportPlayer[] {
   return players;
 }
 
+function parseTitles(raw: unknown): SeasonExportTitle[] {
+  if (!Array.isArray(raw)) return [];
+  const titles: SeasonExportTitle[] = [];
+  for (const rawTitle of raw) {
+    if (typeof rawTitle !== "object" || rawTitle === null) continue;
+    const t = rawTitle as Record<string, unknown>;
+    if (typeof t.competitionName !== "string" || t.competitionName.trim() === "") continue;
+    titles.push({ competitionName: t.competitionName, trophyImageUrl: str(t.trophyImageUrl) });
+  }
+  return titles;
+}
+
+function parseTransfers(raw: unknown): SeasonExportTransfer[] {
+  if (!Array.isArray(raw)) return [];
+  const transfers: SeasonExportTransfer[] = [];
+  for (const rawTransfer of raw) {
+    if (typeof rawTransfer !== "object" || rawTransfer === null) continue;
+    const t = rawTransfer as Record<string, unknown>;
+    if (t.type !== "in" && t.type !== "out") continue;
+    if (typeof t.playerName !== "string" || t.playerName.trim() === "") continue;
+    transfers.push({
+      type: t.type,
+      playerName: t.playerName,
+      counterpartClub: str(t.counterpartClub),
+      value: num(t.value),
+    });
+  }
+  return transfers;
+}
+
 /**
  * Manually validated (no schema-validation dependency, matching the
  * `optionalStringField`-style parsing already used across the API routes)
@@ -234,10 +315,17 @@ function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | 
         coachPhotoUrl: str(s.coachPhotoUrl),
         coachExternalLink: str(s.coachExternalLink),
         notes: str(s.notes),
+        wins: num(s.wins) ?? 0,
+        draws: num(s.draws) ?? 0,
+        losses: num(s.losses) ?? 0,
         players: parsePlayers(s.players),
+        titles: parseTitles(s.titles),
+        transfers: parseTransfers(s.transfers),
       });
     }
   } else if (typeof obj.formation === "string" && obj.formation.trim() !== "") {
+    // Arquivo de antes da etapa 2 (sem desempenho/títulos/transferências) —
+    // essa temporada única simplesmente começa zerada nesses campos.
     seasons = [
       {
         startYear: new Date().getFullYear(),
@@ -246,7 +334,12 @@ function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | 
         coachPhotoUrl: str(obj.coachPhotoUrl),
         coachExternalLink: str(obj.coachExternalLink),
         notes: str(obj.notes),
+        wins: 0,
+        draws: 0,
+        losses: 0,
         players: parsePlayers(obj.players),
+        titles: [],
+        transfers: [],
       },
     ];
   } else {
@@ -285,10 +378,14 @@ export function parseImportFile(raw: unknown): { entries: SquadExportEntry[]; er
   return { entries, errors };
 }
 
-async function loadSeasonsWithPlayers(squadIds: string[]) {
+async function loadSeasonExtras(squadIds: string[]): Promise<Map<string, SeasonExtras>> {
   const seasons = await prisma.season.findMany({
     where: { squadId: { in: squadIds } },
-    include: { players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } } },
+    include: {
+      players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
+      titles: { include: { competition: true } },
+      transfers: { orderBy: { order: "asc" } },
+    },
   });
   return new Map(seasons.map((s) => [s.id, s]));
 }
@@ -297,8 +394,8 @@ export const squadTransferService = {
   async exportSquad(id: string): Promise<SquadExportFile | null> {
     const squad = await squadService.getSquad(id);
     if (!squad) return null;
-    const seasonsWithPlayers = await loadSeasonsWithPlayers([id]);
-    return { version: 2, squads: [toExportEntry(squad, seasonsWithPlayers)] };
+    const seasonExtras = await loadSeasonExtras([id]);
+    return { version: 2, squads: [toExportEntry(squad, seasonExtras)] };
   },
 
   async exportAllSquads(): Promise<SquadExportFile> {
@@ -310,8 +407,8 @@ export const squadTransferService = {
       },
       orderBy: { updatedAt: "desc" },
     });
-    const seasonsWithPlayers = await loadSeasonsWithPlayers(squads.map((s) => s.id));
-    return { version: 2, squads: squads.map((s) => toExportEntry(s, seasonsWithPlayers)) };
+    const seasonExtras = await loadSeasonExtras(squads.map((s) => s.id));
+    return { version: 2, squads: squads.map((s) => toExportEntry(s, seasonExtras)) };
   },
 
   /**
@@ -366,8 +463,34 @@ export const squadTransferService = {
             coachPhotoUrl: seasonEntry.coachPhotoUrl,
             coachExternalLink: seasonEntry.coachExternalLink,
             notes: seasonEntry.notes,
+            wins: seasonEntry.wins,
+            draws: seasonEntry.draws,
+            losses: seasonEntry.losses,
           },
         });
+
+        for (const title of seasonEntry.titles) {
+          const competition = await competitionService.findOrCreateCompetition(
+            title.competitionName,
+            title.trophyImageUrl,
+          );
+          await prisma.seasonTitle.create({
+            data: { seasonId: season.id, competitionId: competition.id },
+          });
+        }
+
+        if (seasonEntry.transfers.length > 0) {
+          await prisma.transfer.createMany({
+            data: seasonEntry.transfers.map((t, i) => ({
+              seasonId: season.id,
+              type: t.type,
+              playerName: t.playerName,
+              counterpartClub: t.counterpartClub,
+              value: t.value,
+              order: i,
+            })),
+          });
+        }
 
         for (const p of seasonEntry.players) {
           const cached = await cacheRepository.upsertPlayer(p.player.source, p.player.externalId, {

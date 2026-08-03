@@ -3,6 +3,7 @@ import { cacheRepository } from "@/repositories/cache.repository";
 import { getFormationSlots } from "@/lib/formations";
 import { normalizePositionCategory } from "@/lib/position-category";
 import { playerDataService } from "./player-data.service";
+import { competitionService } from "./competition.service";
 import { NATIONAL_TEAM_SQUAD_SIZE } from "@/lib/national-team";
 import type { Player } from "@/types/domain";
 
@@ -95,6 +96,8 @@ function getSeasonById(id: string) {
     include: {
       squad: true,
       players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
+      titles: { include: { competition: true }, orderBy: { createdAt: "asc" } },
+      transfers: { orderBy: { order: "asc" } },
     },
   });
 }
@@ -232,6 +235,9 @@ export const seasonService = {
       coachPhotoUrl?: string | null;
       coachExternalLink?: string | null;
       notes?: string | null;
+      wins?: number;
+      draws?: number;
+      losses?: number;
     },
   ) {
     return prisma.season.update({ where: { id }, data });
@@ -239,6 +245,66 @@ export const seasonService = {
 
   async deleteSeason(id: string) {
     await prisma.season.delete({ where: { id } });
+  },
+
+  /**
+   * Adds a title to this season, resolving the competition either by an
+   * existing id or by name (creating it if new — see
+   * competitionService.findOrCreateCompetition). Idempotent per
+   * competition (§1: a season can't have the same title twice — the
+   * SeasonTitle unique constraint would reject a plain duplicate insert,
+   * so this just returns the existing row instead of erroring).
+   */
+  async addTitle(
+    seasonId: string,
+    input: { competitionId?: string; competitionName?: string; trophyImageUrl?: string | null },
+  ) {
+    let competitionId = input.competitionId;
+    if (!competitionId) {
+      if (!input.competitionName?.trim()) return null;
+      const competition = await competitionService.findOrCreateCompetition(
+        input.competitionName,
+        input.trophyImageUrl,
+      );
+      competitionId = competition.id;
+    }
+
+    const existing = await prisma.seasonTitle.findUnique({
+      where: { seasonId_competitionId: { seasonId, competitionId } },
+      include: { competition: true },
+    });
+    if (existing) return existing;
+
+    return prisma.seasonTitle.create({
+      data: { seasonId, competitionId },
+      include: { competition: true },
+    });
+  },
+
+  async removeTitle(seasonId: string, titleId: string) {
+    await prisma.seasonTitle.delete({ where: { id: titleId, seasonId } });
+  },
+
+  /** §4: entrada ("in") ou saída ("out") de jogador nesta temporada — dado textual, sem vínculo com o elenco. */
+  async addTransfer(
+    seasonId: string,
+    input: { type: "in" | "out"; playerName: string; counterpartClub?: string | null; value?: number | null },
+  ) {
+    const { _max } = await prisma.transfer.aggregate({ where: { seasonId }, _max: { order: true } });
+    return prisma.transfer.create({
+      data: {
+        seasonId,
+        type: input.type,
+        playerName: input.playerName.trim(),
+        counterpartClub: input.counterpartClub?.trim() || null,
+        value: input.value ?? null,
+        order: (_max.order ?? -1) + 1,
+      },
+    });
+  },
+
+  async removeTransfer(seasonId: string, transferId: string) {
+    await prisma.transfer.delete({ where: { id: transferId, seasonId } });
   },
 
   /**

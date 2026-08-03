@@ -11,6 +11,9 @@ import { SeasonSwitcher } from "@/components/squad-builder/season-switcher";
 import { EditSeasonCoachDialog } from "@/components/squad-builder/edit-season-coach-dialog";
 import { CoachCard } from "@/components/squad-builder/coach-card";
 import { SquadNotes } from "@/components/squad-builder/squad-notes";
+import { PerformanceCard } from "@/components/squad-builder/performance-card";
+import { SeasonTitlesCard } from "@/components/squad-builder/season-titles-card";
+import { TransfersCard } from "@/components/squad-builder/transfers-card";
 import { formatSeasonLabel } from "@/lib/season";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -77,6 +80,17 @@ export default async function SeasonPage({
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <PerformanceCard
+          squadId={squad.id}
+          seasonId={season.id}
+          wins={season.wins}
+          draws={season.draws}
+          losses={season.losses}
+        />
+        <SeasonTitlesCard seasonId={season.id} titles={season.titles} />
+      </div>
+
       <SquadEditor
         key={season.formation}
         seasonId={season.id}
@@ -97,6 +111,17 @@ export default async function SeasonPage({
           isExtra: sp.isExtra,
           positionSlot: sp.positionSlot,
           externalLink: sp.cachedPlayer.externalLink,
+        }))}
+      />
+
+      <TransfersCard
+        seasonId={season.id}
+        transfers={season.transfers.map((t) => ({
+          id: t.id,
+          type: t.type,
+          playerName: t.playerName,
+          counterpartClub: t.counterpartClub,
+          value: t.value,
         }))}
       />
 

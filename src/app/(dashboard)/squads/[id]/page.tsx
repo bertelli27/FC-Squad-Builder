@@ -4,11 +4,12 @@ import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { EditSquadDialog } from "@/components/squad-builder/edit-squad-dialog";
 import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
 import { SeasonsSection } from "@/components/squad-builder/seasons-section";
+import { PalmaresCard } from "@/components/squad-builder/palmares-card";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const squad = await squadService.getSquad(id);
+  const [squad, palmares] = await Promise.all([squadService.getSquad(id), squadService.getPalmares(id)]);
   if (!squad) notFound();
 
   return (
@@ -33,6 +34,8 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
           />
         </CardContent>
       </Card>
+
+      <PalmaresCard entries={palmares} />
 
       <SeasonsSection
         squadId={squad.id}

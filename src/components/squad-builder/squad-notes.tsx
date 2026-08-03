@@ -8,10 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 const AUTOSAVE_DELAY_MS = 1000;
 
 /**
- * Free-text notes about the squad — tactics, transfer targets, whatever.
+ * "Resumo da temporada" (§7 etapa 2) — free-text, specific to this season
+ * (never copied when duplicating one — see seasonService.createSeason).
  * Autosaves 1s after typing stops (and immediately on blur), same PATCH
- * /api/squads/[id] endpoint EditSquadDialog uses for its other fields.
- * No toasts on every keystroke-triggered save — a quiet inline
+ * /api/squads/[id]/seasons/[seasonId] endpoint the coach/formation edits
+ * use. No toasts on every keystroke-triggered save — a quiet inline
  * "Salvando…/Salvo" label next to the title is enough feedback for
  * something that saves this often.
  */
@@ -68,7 +69,7 @@ export function SquadNotes({
       <CardHeader className="flex-row items-center justify-between border-b py-3 [.border-b]:pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <NotebookPen className="text-primary size-4" />
-          Observações
+          Resumo da temporada
         </CardTitle>
         <span className="text-muted-foreground text-xs">
           {status === "saving" ? "Salvando…" : status === "saved" ? "Salvo" : ""}
@@ -79,7 +80,7 @@ export function SquadNotes({
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onBlur={handleBlur}
-          placeholder="Anotações sobre o elenco — tática, alvos de contratação, o que quiser…"
+          placeholder="O que aconteceu nessa temporada — campanha, destaques, o que quiser…"
           className="min-h-32"
         />
       </CardContent>

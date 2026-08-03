@@ -17,3 +17,18 @@ export function formatSeasonLabel(startYear: number, calendar: string): string {
   }
   return String(startYear);
 }
+
+/**
+ * "Partidas" is never stored on its own — it's always wins+draws+losses,
+ * so "partidas ≠ vitórias+empates+derrotas" can't happen (see
+ * schema.prisma's comment on Season.wins).
+ */
+export function matchesPlayed(perf: { wins: number; draws: number; losses: number }): number {
+  return perf.wins + perf.draws + perf.losses;
+}
+
+/** "€2.500.000" / "-€500.000" — pt-BR grouping, no decimals (transfer values are always whole units in the examples). */
+export function formatMoney(value: number): string {
+  const sign = value < 0 ? "-" : "";
+  return `${sign}€${Math.abs(value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+}

@@ -134,15 +134,76 @@ model Season {
   coachPhotoUrl     String?
   coachExternalLink String?
 
-  notes String? // observações livres do usuário sobre esta temporada — texto solto, sem estrutura
+  notes String? // "Resumo da temporada" — texto livre sobre esta temporada, sem estrutura. Deliberadamente NUNCA copiado ao duplicar uma temporada (seasonService.createSeason) — é específico dela, não faz parte da "base" reaproveitável.
+
+  // Desempenho da temporada (§ etapa 2). "Partidas" não é uma coluna
+  // própria — é sempre wins+draws+losses (ver lib/season.ts), o que torna
+  // a inconsistência "partidas ≠ vitórias+empates+derrotas" estruturalmente
+  // impossível em vez de precisar validar isso toda vez que os 3 campos
+  // são editados.
+  wins   Int @default(0)
+  draws  Int @default(0)
+  losses Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  players SquadPlayer[]
+  players   SquadPlayer[]
+  titles    SeasonTitle[]
+  transfers Transfer[]
 
   @@unique([squadId, startYear])
   @@index([squadId])
+}
+
+// Uma competição/torneio (Brasileirão, Paranaense, Copa do Brasil...) —
+// existe uma vez só, reutilizada por SeasonTitle de qualquer temporada de
+// qualquer clube, para que o troféu (imagem informada pelo usuário, nunca
+// inventada) só precise ser cadastrado uma vez e já valha pra sempre.
+model Competition {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  trophyImageUrl String?
+  createdAt      DateTime @default(now())
+
+  titles SeasonTitle[]
+}
+
+// Um título conquistado NUMA temporada específica — nunca "vaza" pra outra
+// (§1: "os títulos de uma temporada não podem aparecer automaticamente em
+// outra"). O palmarés geral do clube (§3) é sempre calculado agregando
+// esses registros nas temporadas do clube, nunca um total guardado à parte
+// (evita o total "descolar" da soma real dos títulos por temporada).
+model SeasonTitle {
+  id            String      @id @default(cuid())
+  seasonId      String
+  season        Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@unique([seasonId, competitionId])
+  @@index([seasonId])
+}
+
+// Uma entrada (contratação) ou saída (venda) de jogador na temporada
+// (§4) — dado inteiramente manual/textual (nome do jogador e do clube
+// contraparte), sem vínculo com CachedPlayer/SquadPlayer: uma
+// transferência registra HISTÓRICO de mercado, não necessariamente alguém
+// que chegou a entrar no elenco da temporada (ex: uma venda de alguém que
+// já tinha saído do elenco antes dessa funcionalidade existir).
+model Transfer {
+  id              String   @id @default(cuid())
+  seasonId        String
+  season          Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  type            String // "in" | "out"
+  playerName      String
+  counterpartClub String? // clube de origem (in) ou de destino (out)
+  value           Float? // valor da transferência; null = não informado
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([seasonId])
 }
 
 model Category {

@@ -163,7 +163,7 @@ export const squadService = {
   async duplicateSquad(id: string) {
     const original = await prisma.squad.findUnique({
       where: { id },
-      include: { tags: true, seasons: { include: { players: true } } },
+      include: { tags: true, seasons: { include: { players: true, titles: true, transfers: true } } },
     });
     if (!original) return null;
 
@@ -190,6 +190,9 @@ export const squadService = {
           coachPhotoUrl: season.coachPhotoUrl,
           coachExternalLink: season.coachExternalLink,
           notes: season.notes,
+          wins: season.wins,
+          draws: season.draws,
+          losses: season.losses,
         },
       });
 
@@ -208,8 +211,54 @@ export const squadService = {
           })),
         });
       }
+
+      // This is a full historical clone of the club (unlike duplicating a
+      // single season into a new year — seasonService.createSeason — which
+      // deliberately starts titles/transfers blank for a season that
+      // hasn't happened yet), so what already happened in each season
+      // (titles, transfers) is copied along with it.
+      if (season.titles.length > 0) {
+        await prisma.seasonTitle.createMany({
+          data: season.titles.map((t) => ({ seasonId: newSeason.id, competitionId: t.competitionId })),
+        });
+      }
+      if (season.transfers.length > 0) {
+        await prisma.transfer.createMany({
+          data: season.transfers.map((t) => ({
+            seasonId: newSeason.id,
+            type: t.type,
+            playerName: t.playerName,
+            counterpartClub: t.counterpartClub,
+            value: t.value,
+            order: t.order,
+          })),
+        });
+      }
     }
 
     return squadService.getSquad(copy.id);
+  },
+
+  /**
+   * Aggregated palmarés across every season of this club (§3) — always
+   * computed fresh from SeasonTitle rows, never a stored total, so it can
+   * never drift out of sync with what each season actually shows.
+   */
+  async getPalmares(squadId: string) {
+    const titles = await prisma.seasonTitle.findMany({
+      where: { season: { squadId } },
+      include: { competition: true },
+    });
+
+    const byCompetition = new Map<string, { competition: (typeof titles)[number]["competition"]; count: number }>();
+    for (const title of titles) {
+      const entry = byCompetition.get(title.competitionId);
+      if (entry) entry.count += 1;
+      else byCompetition.set(title.competitionId, { competition: title.competition, count: 1 });
+    }
+
+    return [...byCompetition.values()].sort(
+      (a, b) => b.count - a.count || a.competition.name.localeCompare(b.competition.name),
+    );
   },
 };
