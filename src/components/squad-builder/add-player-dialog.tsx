@@ -42,6 +42,7 @@ function squadPlayerVMFromResponse(sp: {
   isCaptain: boolean;
   isStarter: boolean;
   isWatchlist: boolean;
+  isExtra: boolean;
   positionSlot: string | null;
   cachedPlayer: {
     source: string;
@@ -65,6 +66,7 @@ function squadPlayerVMFromResponse(sp: {
     isCaptain: sp.isCaptain,
     isStarter: sp.isStarter,
     isWatchlist: sp.isWatchlist,
+    isExtra: sp.isExtra,
     positionSlot: sp.positionSlot,
     externalLink: sp.cachedPlayer.externalLink,
   };

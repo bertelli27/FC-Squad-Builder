@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { GripVerticalIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -60,8 +61,14 @@ interface RosterHandlers {
 export function RosterTable({
   bench,
   squadId,
+  duplicateNumbers,
   ...handlers
-}: { bench: SquadPlayerVM[]; squadId: string } & RosterHandlers) {
+}: {
+  bench: SquadPlayerVM[];
+  squadId: string;
+  /** Shirt numbers that appear more than once across starters+bench — flagged with a red ring wherever they're shown. */
+  duplicateNumbers: Set<number>;
+} & RosterHandlers) {
   const { setNodeRef, isOver } = useDroppable({ id: "bench" });
   const groups = groupPlayersByPosition(bench);
 
@@ -99,7 +106,14 @@ export function RosterTable({
           </thead>
           <tbody>
             {groups.map(({ group, players }) => (
-              <RosterGroup key={group} group={group} players={players} squadId={squadId} {...handlers} />
+              <RosterGroup
+                key={group}
+                group={group}
+                players={players}
+                squadId={squadId}
+                duplicateNumbers={duplicateNumbers}
+                {...handlers}
+              />
             ))}
           </tbody>
         </table>
@@ -112,8 +126,14 @@ function RosterGroup({
   group,
   players,
   squadId,
+  duplicateNumbers,
   ...handlers
-}: { group: string; players: SquadPlayerVM[]; squadId: string } & RosterHandlers) {
+}: {
+  group: string;
+  players: SquadPlayerVM[];
+  squadId: string;
+  duplicateNumbers: Set<number>;
+} & RosterHandlers) {
   return (
     <>
       <tr className="bg-muted/30">
@@ -125,7 +145,13 @@ function RosterGroup({
         </td>
       </tr>
       {players.map((player) => (
-        <RosterRow key={player.id} player={player} squadId={squadId} {...handlers} />
+        <RosterRow
+          key={player.id}
+          player={player}
+          squadId={squadId}
+          isDuplicateNumber={player.shirtNumber != null && duplicateNumbers.has(player.shirtNumber)}
+          {...handlers}
+        />
       ))}
     </>
   );
@@ -134,20 +160,40 @@ function RosterGroup({
 function RosterRow({
   player,
   squadId,
+  isDuplicateNumber,
   onNumberChange,
   onCaptainToggle,
   onRemove,
   onUpdated,
-}: { player: SquadPlayerVM; squadId: string } & RosterHandlers) {
+}: { player: SquadPlayerVM; squadId: string; isDuplicateNumber: boolean } & RosterHandlers) {
   // No transform/translate here on purpose: CSS transforms on <tr> render
   // inconsistently across engines (table-row boxes aren't a normal
   // transformable element the way a <div> is), which is what made
   // dragging a bench player look completely static until it dropped. The
   // actual moving visual comes from DragOverlay in squad-editor.tsx; this
   // row just dims in place while its clone follows the cursor.
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: player.id,
   });
+  // A second, row-specific droppable target alongside the whole-table one
+  // above ("bench") — only meaningful when an extras/observado player is
+  // dragged onto this exact row (squad-editor.tsx's handleDragEnd treats
+  // it as "swap with this player"); dropping a pitch/bench player here
+  // falls back to the same plain-append behavior as the table-wide target.
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `benchPlayer:${player.id}` });
+  // setDragRef/setDropRef are themselves stable (memoized inside dnd-kit),
+  // but an inline arrow function here would still be a brand-new closure
+  // every render — React tears down and reattaches the ref on each one,
+  // which was silently breaking dnd-kit's rect measurement for this row's
+  // droppable (it never registered as a valid drop target). useCallback
+  // keeps the combined setter itself stable across renders.
+  const setNodeRef = useCallback(
+    (node: HTMLTableRowElement | null) => {
+      setDragRef(node);
+      setDropRef(node);
+    },
+    [setDragRef, setDropRef],
+  );
 
   const profileInfo = {
     source: player.source,
@@ -165,6 +211,7 @@ function RosterRow({
       className={cn(
         "hover:bg-accent/30 border-t transition-colors",
         isDragging && "opacity-30",
+        isOver && "bg-primary/15",
       )}
     >
       <td className="text-center">
@@ -207,7 +254,10 @@ function RosterRow({
           onChange={(e) => onNumberChange(player.id, e.target.value)}
           placeholder="#"
           autoComplete="off"
-          className="bg-background text-foreground font-heading w-full rounded border-0 text-center text-sm font-bold outline-none"
+          className={cn(
+            "bg-background text-foreground font-heading w-full rounded border-0 text-center text-sm font-bold outline-none",
+            isDuplicateNumber && "ring-2 ring-destructive",
+          )}
         />
       </td>
       <td className="text-center">

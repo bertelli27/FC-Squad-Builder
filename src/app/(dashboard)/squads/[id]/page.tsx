@@ -65,6 +65,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
           isCaptain: sp.isCaptain,
           isStarter: sp.isStarter,
           isWatchlist: sp.isWatchlist,
+          isExtra: sp.isExtra,
           positionSlot: sp.positionSlot,
           externalLink: sp.cachedPlayer.externalLink,
         }))}

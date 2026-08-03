@@ -8,6 +8,8 @@ interface PlayerUpdate {
   positionSlot: string | null;
   isStarter: boolean;
   isWatchlist: boolean;
+  isExtra: boolean;
+  shirtNumber: number | null;
   order: number;
 }
 
@@ -19,6 +21,8 @@ function isValidUpdate(value: unknown): value is PlayerUpdate {
     (v.positionSlot === null || typeof v.positionSlot === "string") &&
     typeof v.isStarter === "boolean" &&
     typeof v.isWatchlist === "boolean" &&
+    typeof v.isExtra === "boolean" &&
+    (v.shirtNumber === null || typeof v.shirtNumber === "number") &&
     typeof v.order === "number"
   );
 }

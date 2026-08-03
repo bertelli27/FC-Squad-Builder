@@ -6,7 +6,7 @@ export type PositionGroup =
   | "Atacantes"
   | "Outros";
 
-const GROUP_ORDER: PositionGroup[] = [
+export const GROUP_ORDER: PositionGroup[] = [
   "Goleiros",
   "Zagueiros",
   "Laterais",

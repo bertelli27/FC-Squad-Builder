@@ -6,6 +6,7 @@ import { clubDataService } from "./club-data.service";
 import { nationalTeamDataService } from "./national-team-data.service";
 import { playerDataService } from "./player-data.service";
 import { tagService } from "./tag.service";
+import { NATIONAL_TEAM_SQUAD_SIZE } from "@/lib/national-team";
 import type { Player } from "@/types/domain";
 
 export interface CreateSquadInput {
@@ -92,6 +93,28 @@ function assignStartingXI(
   return [...starters, ...bench];
 }
 
+/**
+ * Manual additions respect the same 26-man cap as the automatic load
+ * (§ createSquad): once a national-team squad already has 26 official
+ * members (starter or bench, i.e. neither watchlist nor extra), a new
+ * bench-bound addition becomes an "extra" instead. Watchlist additions
+ * are never capped — observados were never part of the 26 to begin with.
+ */
+async function resolveDestinationBucket(
+  squadId: string,
+  destination: "bench" | "watchlist",
+): Promise<{ isWatchlist: boolean; isExtra: boolean }> {
+  if (destination === "watchlist") return { isWatchlist: true, isExtra: false };
+
+  const squad = await prisma.squad.findUnique({ where: { id: squadId }, select: { baseKind: true } });
+  if (squad?.baseKind !== "nationalTeam") return { isWatchlist: false, isExtra: false };
+
+  const officialCount = await prisma.squadPlayer.count({
+    where: { squadId, isWatchlist: false, isExtra: false },
+  });
+  return { isWatchlist: false, isExtra: officialCount >= NATIONAL_TEAM_SQUAD_SIZE };
+}
+
 export const squadService = {
   /**
    * All squads with just enough to power the home page's cards and its
@@ -159,9 +182,23 @@ export const squadService = {
         formation,
       );
 
+      // A real national team's registered squad is easily 30-40+ names
+      // (not just the current 26-man call-up), so anything past the cap
+      // becomes an "extra" instead of dumping the whole pool onto the
+      // bench. Club squads (and squads without a base) are uncapped, as
+      // before.
+      const cap = input.base?.kind === "nationalTeam" ? NATIONAL_TEAM_SQUAD_SIZE : Infinity;
+
       if (assignments.length > 0) {
         await prisma.squadPlayer.createMany({
-          data: assignments.map((a) => ({ squadId: squad.id, ...a })),
+          data: assignments.map((a, i) => ({
+            squadId: squad.id,
+            cachedPlayerId: a.cachedPlayerId,
+            positionSlot: i < cap ? a.positionSlot : null,
+            isStarter: i < cap && a.isStarter,
+            isExtra: i >= cap,
+            order: a.order,
+          })),
         });
       }
     }
@@ -240,6 +277,7 @@ export const squadService = {
           isCaptain: p.isCaptain,
           isStarter: p.isStarter,
           isWatchlist: p.isWatchlist,
+          isExtra: p.isExtra,
           positionSlot: p.positionSlot,
           order: p.order,
         })),
@@ -249,7 +287,14 @@ export const squadService = {
     return squadService.getSquad(copy.id);
   },
 
-  /** Bulk-persists a new field/bench/watchlist arrangement after a drag-and-drop change. */
+  /**
+   * Bulk-persists a new field/bench/extras/watchlist arrangement after a
+   * drag-and-drop change. Always includes `shirtNumber` (not just the
+   * bucket/position fields) because a swap that pulls someone in from
+   * extras/watchlist makes them inherit the displaced player's number —
+   * client computes the new value, this just needs to save whatever it's
+   * given (a no-op resend of the same number for plain reordering).
+   */
   async updateSquadPlayers(
     squadId: string,
     updates: {
@@ -257,6 +302,8 @@ export const squadService = {
       positionSlot: string | null;
       isStarter: boolean;
       isWatchlist: boolean;
+      isExtra: boolean;
+      shirtNumber: number | null;
       order: number;
     }[],
   ) {
@@ -268,6 +315,8 @@ export const squadService = {
             positionSlot: u.positionSlot,
             isStarter: u.isStarter,
             isWatchlist: u.isWatchlist,
+            isExtra: u.isExtra,
+            shirtNumber: u.shirtNumber,
             order: u.order,
           },
         }),
@@ -314,17 +363,17 @@ export const squadService = {
     });
     if (existing) return existing;
 
-    const { _max } = await prisma.squadPlayer.aggregate({
-      where: { squadId },
-      _max: { order: true },
-    });
+    const [{ _max }, bucket] = await Promise.all([
+      prisma.squadPlayer.aggregate({ where: { squadId }, _max: { order: true } }),
+      resolveDestinationBucket(squadId, destination),
+    ]);
 
     return prisma.squadPlayer.create({
       data: {
         squadId,
         cachedPlayerId: cached.id,
         isStarter: false,
-        isWatchlist: destination === "watchlist",
+        ...bucket,
         order: (_max.order ?? -1) + 1,
       },
       include: { cachedPlayer: true },
@@ -408,17 +457,17 @@ export const squadService = {
       expiresAt: new Date(Date.now() + CUSTOM_PLAYER_TTL_MS),
     });
 
-    const { _max } = await prisma.squadPlayer.aggregate({
-      where: { squadId },
-      _max: { order: true },
-    });
+    const [{ _max }, bucket] = await Promise.all([
+      prisma.squadPlayer.aggregate({ where: { squadId }, _max: { order: true } }),
+      resolveDestinationBucket(squadId, input.destination ?? "bench"),
+    ]);
 
     return prisma.squadPlayer.create({
       data: {
         squadId,
         cachedPlayerId: cached.id,
         isStarter: false,
-        isWatchlist: input.destination === "watchlist",
+        ...bucket,
         shirtNumber: input.shirtNumber,
         order: (_max.order ?? -1) + 1,
       },

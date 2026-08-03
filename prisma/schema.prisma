@@ -131,6 +131,11 @@ model SquadPlayer {
   // quando Squad.baseKind === "nationalTeam"; nunca true por qualquer
   // fluxo de elenco de clube.
   isWatchlist    Boolean      @default(false)
+  // além dos 26 convocados (titular+banco) — só usado quando
+  // Squad.baseKind === "nationalTeam". Mutuamente exclusivo com
+  // isWatchlist na prática: cada jogador vive em exatamente um balde
+  // (titular/banco, extra, ou observado).
+  isExtra        Boolean      @default(false)
   positionSlot   String? // posição na formação, ex: "LW", "CB1"
   order          Int          @default(0)
 

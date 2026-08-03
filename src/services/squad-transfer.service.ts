@@ -9,6 +9,7 @@ export interface SquadExportPlayer {
   isCaptain: boolean;
   isStarter: boolean;
   isWatchlist: boolean;
+  isExtra: boolean;
   positionSlot: string | null;
   order: number;
   player: {
@@ -65,6 +66,7 @@ function toExportEntry(squad: FullSquad): SquadExportEntry {
       isCaptain: p.isCaptain,
       isStarter: p.isStarter,
       isWatchlist: p.isWatchlist,
+      isExtra: p.isExtra,
       positionSlot: p.positionSlot,
       order: p.order,
       player: {
@@ -129,6 +131,7 @@ function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | 
       isCaptain: p.isCaptain === true,
       isStarter: p.isStarter !== false,
       isWatchlist: p.isWatchlist === true,
+      isExtra: p.isExtra === true,
       positionSlot: str(p.positionSlot),
       order: num(p.order) ?? 0,
       player: {
@@ -271,6 +274,7 @@ export const squadTransferService = {
             isCaptain: p.isCaptain,
             isStarter: p.isStarter,
             isWatchlist: p.isWatchlist,
+            isExtra: p.isExtra,
             positionSlot: p.positionSlot,
             order: p.order,
           },

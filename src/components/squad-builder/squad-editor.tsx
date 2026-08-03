@@ -1,23 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
   closestCenter,
+  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   PointerSensor,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { toast } from "sonner";
-import { XIcon, Volleyball, Users, Eye } from "lucide-react";
+import { XIcon, Volleyball, Users, Eye, LayersIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFormationSlots } from "@/lib/formations";
 import { ratingStyle } from "@/lib/rating-tier";
+import { NATIONAL_TEAM_SQUAD_SIZE } from "@/lib/national-team";
 import { PlayerProfileDialog } from "@/components/player-card/player-profile-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -25,10 +28,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { RosterTable } from "./roster-table";
 import { AddPlayerDialog } from "./add-player-dialog";
 import { WatchlistPanel } from "./watchlist-panel";
-
-// Only informative (no hard cap enforced) — a seleção squad's starters +
-// bench are its 26 convocados; observados sit outside that count entirely.
-const NATIONAL_TEAM_SQUAD_SIZE = 26;
+import { ExtrasPanel } from "./extras-panel";
 
 export interface SquadPlayerVM {
   id: string;
@@ -42,6 +42,7 @@ export interface SquadPlayerVM {
   isCaptain: boolean;
   isStarter: boolean;
   isWatchlist: boolean;
+  isExtra: boolean;
   positionSlot?: string | null;
   externalLink?: string | null;
 }
@@ -50,7 +51,25 @@ interface EditorState {
   slots: Record<string, SquadPlayerVM | null>;
   bench: SquadPlayerVM[];
   watchlist: SquadPlayerVM[];
+  extras: SquadPlayerVM[];
 }
+
+/**
+ * Plain `closestCenter` gets ambiguous with many small, densely-packed
+ * droppables (the bench has one per row, ~36px tall) — it occasionally
+ * resolves to an ADJACENT row instead of the one actually under the
+ * cursor, since it only compares rect centers, not whether the pointer is
+ * literally inside a rect. `pointerWithin` is precise (pointer must be
+ * inside the rect) but too strict for the pitch's small circular slots,
+ * so try it first and fall back to `closestCenter` when it finds nothing
+ * — the standard dnd-kit pattern for mixing precise and forgiving targets
+ * in the same context.
+ */
+const collisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+  return closestCenter(args);
+};
 
 function buildInitialState(players: SquadPlayerVM[], formation: string): EditorState {
   const formationSlots = getFormationSlots(formation);
@@ -60,10 +79,13 @@ function buildInitialState(players: SquadPlayerVM[], formation: string): EditorS
   );
   const bench: SquadPlayerVM[] = [];
   const watchlist: SquadPlayerVM[] = [];
+  const extras: SquadPlayerVM[] = [];
 
   for (const player of players) {
     if (player.isWatchlist) {
       watchlist.push(player);
+    } else if (player.isExtra) {
+      extras.push(player);
     } else if (
       player.isStarter &&
       player.positionSlot &&
@@ -76,7 +98,7 @@ function buildInitialState(players: SquadPlayerVM[], formation: string): EditorS
     }
   }
 
-  return { slots, bench, watchlist };
+  return { slots, bench, watchlist, extras };
 }
 
 export function SquadEditor({
@@ -110,7 +132,12 @@ export function SquadEditor({
     for (const key of Object.keys(state.slots)) {
       if (state.slots[key]?.id === id) return state.slots[key];
     }
-    return state.bench.find((p) => p.id === id) ?? state.watchlist.find((p) => p.id === id) ?? null;
+    return (
+      state.bench.find((p) => p.id === id) ??
+      state.watchlist.find((p) => p.id === id) ??
+      state.extras.find((p) => p.id === id) ??
+      null
+    );
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -121,13 +148,27 @@ export function SquadEditor({
     const payload = [
       ...formationSlots.flatMap((s, i) => {
         const p = next.slots[s.slot];
-        return p ? [{ id: p.id, positionSlot: s.slot, isStarter: true, isWatchlist: false, order: i }] : [];
+        return p
+          ? [
+              {
+                id: p.id,
+                positionSlot: s.slot,
+                isStarter: true,
+                isWatchlist: false,
+                isExtra: false,
+                shirtNumber: p.shirtNumber ?? null,
+                order: i,
+              },
+            ]
+          : [];
       }),
       ...next.bench.map((p, i) => ({
         id: p.id,
         positionSlot: null,
         isStarter: false,
         isWatchlist: false,
+        isExtra: false,
+        shirtNumber: p.shirtNumber ?? null,
         order: formationSlots.length + i,
       })),
       ...next.watchlist.map((p, i) => ({
@@ -135,7 +176,18 @@ export function SquadEditor({
         positionSlot: null,
         isStarter: false,
         isWatchlist: true,
+        isExtra: false,
+        shirtNumber: p.shirtNumber ?? null,
         order: formationSlots.length + next.bench.length + i,
+      })),
+      ...next.extras.map((p, i) => ({
+        id: p.id,
+        positionSlot: null,
+        isStarter: false,
+        isWatchlist: false,
+        isExtra: true,
+        shirtNumber: p.shirtNumber ?? null,
+        order: formationSlots.length + next.bench.length + next.watchlist.length + i,
       })),
     ];
 
@@ -156,34 +208,52 @@ export function SquadEditor({
     if (activeId === overId) return;
 
     const fromSlotKey = Object.keys(state.slots).find((k) => state.slots[k]?.id === activeId);
-    const fromWatchlist = state.watchlist.some((p) => p.id === activeId);
+    const fromWatchlist = !fromSlotKey && state.watchlist.some((p) => p.id === activeId);
+    const fromExtras = !fromSlotKey && !fromWatchlist && state.extras.some((p) => p.id === activeId);
     const draggedPlayer = fromSlotKey
       ? state.slots[fromSlotKey]
-      : (fromWatchlist
-          ? state.watchlist.find((p) => p.id === activeId)
-          : state.bench.find((p) => p.id === activeId));
+      : fromWatchlist
+        ? state.watchlist.find((p) => p.id === activeId)
+        : fromExtras
+          ? state.extras.find((p) => p.id === activeId)
+          : state.bench.find((p) => p.id === activeId);
     if (!draggedPlayer) return;
 
     const slots = { ...state.slots };
     let bench = [...state.bench];
     let watchlist = [...state.watchlist];
+    let extras = [...state.extras];
 
     if (overId === "bench") {
-      if (!fromSlotKey && !fromWatchlist) return; // already on bench
+      if (!fromSlotKey && !fromWatchlist && !fromExtras) return; // already on bench
       if (fromSlotKey) slots[fromSlotKey] = null;
       if (fromWatchlist) watchlist = watchlist.filter((p) => p.id !== activeId);
+      if (fromExtras) extras = extras.filter((p) => p.id !== activeId);
       bench = [...bench, draggedPlayer];
     } else if (overId === "watchlist") {
       if (fromWatchlist) return; // already there
       if (fromSlotKey) slots[fromSlotKey] = null;
+      else if (fromExtras) extras = extras.filter((p) => p.id !== activeId);
       else bench = bench.filter((p) => p.id !== activeId);
       watchlist = [...watchlist, draggedPlayer];
+    } else if (overId === "extras") {
+      if (fromExtras) return; // already there
+      if (fromSlotKey) slots[fromSlotKey] = null;
+      else if (fromWatchlist) watchlist = watchlist.filter((p) => p.id !== activeId);
+      else bench = bench.filter((p) => p.id !== activeId);
+      extras = [...extras, draggedPlayer];
     } else if (overId.startsWith("slot:")) {
       const targetSlotKey = overId.slice("slot:".length);
       if (targetSlotKey === fromSlotKey) return;
       const displaced = slots[targetSlotKey];
+      // Calling up a scouted/extra player makes them inherit the shirt
+      // number of whoever they're replacing, instead of keeping their own.
+      const incoming =
+        displaced && (fromWatchlist || fromExtras)
+          ? { ...draggedPlayer, shirtNumber: displaced.shirtNumber }
+          : draggedPlayer;
 
-      slots[targetSlotKey] = draggedPlayer;
+      slots[targetSlotKey] = incoming;
       if (fromSlotKey) {
         // Swap within the pitch: the displaced starter takes the dragged
         // player's old slot.
@@ -193,15 +263,43 @@ export function SquadEditor({
         // becomes the observado, not a bench reserve.
         watchlist = watchlist.filter((p) => p.id !== activeId);
         if (displaced) watchlist = [...watchlist, displaced];
+      } else if (fromExtras) {
+        extras = extras.filter((p) => p.id !== activeId);
+        if (displaced) extras = [...extras, displaced];
       } else {
         bench = bench.filter((p) => p.id !== activeId);
         if (displaced) bench = [...bench, displaced];
+      }
+    } else if (overId.startsWith("benchPlayer:")) {
+      const targetPlayerId = overId.slice("benchPlayer:".length);
+      if (!fromWatchlist && !fromExtras) {
+        // No special meaning yet for a pitch/bench-origin drag landing on
+        // a specific bench row — same as dropping anywhere else in the
+        // table.
+        if (!fromSlotKey) return; // already on bench
+        slots[fromSlotKey] = null;
+        bench = [...bench, draggedPlayer];
+      } else {
+        const targetIndex = bench.findIndex((p) => p.id === targetPlayerId);
+        if (targetIndex === -1) return;
+        const displaced = bench[targetIndex];
+        // Same "inherit the number of whoever's leaving" rule as the
+        // pitch-slot swap above.
+        const incoming = { ...draggedPlayer, shirtNumber: displaced.shirtNumber };
+        bench = bench.map((p, i) => (i === targetIndex ? incoming : p));
+        if (fromWatchlist) {
+          watchlist = watchlist.filter((p) => p.id !== activeId);
+          watchlist = [...watchlist, displaced];
+        } else {
+          extras = extras.filter((p) => p.id !== activeId);
+          extras = [...extras, displaced];
+        }
       }
     } else {
       return;
     }
 
-    const next = { slots, bench, watchlist };
+    const next = { slots, bench, watchlist, extras };
     setState(next);
     persistArrangement(next);
   }
@@ -225,7 +323,10 @@ export function SquadEditor({
       const watchlist = prev.watchlist.map((p) =>
         p.id === playerId ? { ...p, ...patch } : patch.isCaptain ? { ...p, isCaptain: false } : p,
       );
-      return { slots, bench, watchlist };
+      const extras = prev.extras.map((p) =>
+        p.id === playerId ? { ...p, ...patch } : patch.isCaptain ? { ...p, isCaptain: false } : p,
+      );
+      return { slots, bench, watchlist, extras };
     });
   }
 
@@ -270,6 +371,7 @@ export function SquadEditor({
         slots,
         bench: prev.bench.filter((p) => p.id !== playerId),
         watchlist: prev.watchlist.filter((p) => p.id !== playerId),
+        extras: prev.extras.filter((p) => p.id !== playerId),
       };
     });
 
@@ -278,14 +380,40 @@ export function SquadEditor({
   }
 
   function handlePlayerAdded(player: SquadPlayerVM) {
-    setState((prev) => ({ ...prev, bench: [...prev.bench, player] }));
-    toast.success(`${player.name} adicionado ao elenco.`);
+    // The backend itself decides isExtra (26-man cap check) — a national
+    // team squad already at 26 routes a fresh addition into extras
+    // instead of the bench.
+    if (player.isExtra) {
+      setState((prev) => ({ ...prev, extras: [...prev.extras, player] }));
+      toast.success(`${player.name} adicionado ao elenco ampliado (os 26 já estão completos).`);
+    } else {
+      setState((prev) => ({ ...prev, bench: [...prev.bench, player] }));
+      toast.success(`${player.name} adicionado ao elenco.`);
+    }
   }
 
   function handleWatchlistPlayerAdded(player: SquadPlayerVM) {
     setState((prev) => ({ ...prev, watchlist: [...prev.watchlist, player] }));
     toast.success(`${player.name} adicionado aos observados.`);
   }
+
+  // Numbers shared by more than one starter/bench player — bench+starters
+  // are the only surfaces with an editable number field, so that's all
+  // that's checked (extras/observados never show one).
+  const duplicateNumbers = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const p of Object.values(state.slots)) {
+      if (p?.shirtNumber != null) counts.set(p.shirtNumber, (counts.get(p.shirtNumber) ?? 0) + 1);
+    }
+    for (const p of state.bench) {
+      if (p.shirtNumber != null) counts.set(p.shirtNumber, (counts.get(p.shirtNumber) ?? 0) + 1);
+    }
+    const duplicates = new Set<number>();
+    for (const [number, count] of counts) {
+      if (count > 1) duplicates.add(number);
+    }
+    return duplicates;
+  }, [state.slots, state.bench]);
 
   const chipHandlers = {
     onNumberChange: handleNumberChange,
@@ -298,7 +426,7 @@ export function SquadEditor({
     <DndContext
       id="squad-editor"
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActivePlayer(null)}
@@ -333,6 +461,7 @@ export function SquadEditor({
                   y={s.y}
                   player={state.slots[s.slot]}
                   squadId={squadId}
+                  duplicateNumbers={duplicateNumbers}
                   {...chipHandlers}
                 />
               ))}
@@ -376,10 +505,34 @@ export function SquadEditor({
               instead of the desktop inset-3 trick) reserves real space for
               it on mobile; see roster-table.tsx's matching lg: override. */}
           <CardContent className="relative min-h-0 flex-1 p-3 lg:p-0">
-            <RosterTable bench={state.bench} squadId={squadId} {...chipHandlers} />
+            <RosterTable
+              bench={state.bench}
+              squadId={squadId}
+              duplicateNumbers={duplicateNumbers}
+              {...chipHandlers}
+            />
           </CardContent>
         </Card>
       </div>
+
+      {isNationalTeam && (
+        <Card className="mt-6 gap-0 py-0">
+          <CardHeader className="border-b py-3 [.border-b]:pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <LayersIcon className="text-primary size-4" />
+              Elenco ampliado ({state.extras.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            <ExtrasPanel
+              players={state.extras}
+              squadId={squadId}
+              onRemove={handleRemove}
+              onUpdated={updatePlayerLocal}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {isNationalTeam && (
         <Card className="mt-6 gap-0 py-0">
@@ -439,6 +592,7 @@ function DroppableSlot({
   y,
   player,
   squadId,
+  duplicateNumbers,
   onNumberChange,
   onCaptainToggle,
   onRemove,
@@ -450,6 +604,7 @@ function DroppableSlot({
   y: number;
   player: SquadPlayerVM | null;
   squadId: string;
+  duplicateNumbers: Set<number>;
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
@@ -467,6 +622,7 @@ function DroppableSlot({
         <PlayerChip
           player={player}
           squadId={squadId}
+          isDuplicateNumber={player.shirtNumber != null && duplicateNumbers.has(player.shirtNumber)}
           onNumberChange={onNumberChange}
           onCaptainToggle={onCaptainToggle}
           onRemove={onRemove}
@@ -506,6 +662,7 @@ function DragOverlayChip({ player }: { player: SquadPlayerVM }) {
 function PlayerChip({
   player,
   squadId,
+  isDuplicateNumber,
   onNumberChange,
   onCaptainToggle,
   onRemove,
@@ -513,6 +670,7 @@ function PlayerChip({
 }: {
   player: SquadPlayerVM;
   squadId: string;
+  isDuplicateNumber: boolean;
   onNumberChange: (id: string, value: string) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
@@ -532,7 +690,10 @@ function PlayerChip({
       onPointerDown={(e) => e.stopPropagation()}
       placeholder="#"
       autoComplete="off"
-      className="bg-background/90 text-foreground font-heading w-10 shrink-0 rounded-md py-0.5 text-center text-lg font-bold outline-none"
+      className={cn(
+        "bg-background/90 text-foreground font-heading w-10 shrink-0 rounded-md py-0.5 text-center text-lg font-bold outline-none",
+        isDuplicateNumber && "ring-2 ring-destructive",
+      )}
     />
   );
 
