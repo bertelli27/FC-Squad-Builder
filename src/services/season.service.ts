@@ -84,14 +84,21 @@ async function resolveDestinationBucket(
   return { isWatchlist: false, isExtra: officialCount >= NATIONAL_TEAM_SQUAD_SIZE };
 }
 
+/** Shared by mirrorTransferOnCareer and ensureCareerStintForSeason below — both append to the same timeline sequence. */
+async function nextCareerOrder(careerId: string): Promise<number> {
+  const [stintMax, transferMax] = await Promise.all([
+    prisma.careerStint.aggregate({ where: { careerId }, _max: { order: true } }),
+    prisma.careerTransfer.aggregate({ where: { careerId }, _max: { order: true } }),
+  ]);
+  return Math.max(stintMax._max.order ?? -1, transferMax._max.order ?? -1) + 1;
+}
+
 /**
  * §22/§23: mirrors a club-side Transfer into the player's PlayerCareer, if
  * they have one linked to the same CachedPlayer — a no-op otherwise (a
  * career is opt-in, most players don't have one). Copied once at creation,
  * same "reference not sync" principle as CareerStint.seasonId: later
- * edits/deletes of the source Transfer never touch this row. `order`
- * reuses career.service.ts's nextOrder logic (max across both
- * CareerStint.order and CareerTransfer.order — same numeric sequence).
+ * edits/deletes of the source Transfer never touch this row.
  */
 async function mirrorTransferOnCareer(
   transferId: string,
@@ -101,11 +108,7 @@ async function mirrorTransferOnCareer(
   const career = await prisma.playerCareer.findFirst({ where: { cachedPlayerId } });
   if (!career) return;
 
-  const [stintMax, transferMax] = await Promise.all([
-    prisma.careerStint.aggregate({ where: { careerId: career.id }, _max: { order: true } }),
-    prisma.careerTransfer.aggregate({ where: { careerId: career.id }, _max: { order: true } }),
-  ]);
-  const order = Math.max(stintMax._max.order ?? -1, transferMax._max.order ?? -1) + 1;
+  const order = await nextCareerOrder(career.id);
 
   await prisma.careerTransfer.create({
     data: {
@@ -116,6 +119,46 @@ async function mirrorTransferOnCareer(
       year: input.year,
       order,
       sourceTransferId: transferId,
+    },
+  });
+}
+
+/**
+ * CORREÇÃO — sincronização bidirecional: até agora só existia a direção
+ * carreira → clube (career.service.ts#addStint criava o SquadPlayer). Um
+ * jogador adicionado a um elenco diretamente pelo Modo Clubes
+ * (addPlayerToSeason/createCustomPlayer/signPlayer) nunca refletia na
+ * carreira dele, mesmo já tendo uma. Esta função é a única responsável
+ * por criar esse vínculo, chamada dos dois lados — tanto daqui (clube →
+ * carreira) quanto de career.service.ts#addStint (carreira → clube, que
+ * internamente chama signPlayer/addPlayerToSeason e por isso já dispara
+ * esta mesma função) — então não importa qual lado agiu primeiro, o
+ * `findFirst` abaixo garante que nunca se cria uma segunda CareerStint
+ * para o mesmo par (carreira, temporada). Não faz nada se o jogador não
+ * tiver carreira (a maioria não tem — carreira é opt-in, §"não quero uma
+ * integração automática de todos os jogadores existentes").
+ */
+export async function ensureCareerStintForSeason(cachedPlayerId: string, seasonId: string) {
+  const career = await prisma.playerCareer.findFirst({ where: { cachedPlayerId } });
+  if (!career) return null;
+
+  const existing = await prisma.careerStint.findFirst({ where: { careerId: career.id, seasonId } });
+  if (existing) return existing;
+
+  const season = await prisma.season.findUnique({ where: { id: seasonId }, include: { squad: true } });
+  if (!season) return null;
+
+  const order = await nextCareerOrder(career.id);
+  return prisma.careerStint.create({
+    data: {
+      careerId: career.id,
+      seasonId: season.id,
+      kind: season.squad.baseKind === "nationalTeam" ? "nationalTeam" : "club",
+      clubName: season.squad.name,
+      clubLogoUrl: season.squad.logoUrl,
+      startYear: season.startYear,
+      calendar: season.squad.seasonCalendar,
+      order,
     },
   });
 }
@@ -510,6 +553,12 @@ export const seasonService = {
       year: season.startYear,
     });
 
+    // CORREÇÃO: reflete a contratação na carreira do jogador, se ele
+    // tiver uma. Chamada depois do espelho da transferência acima de
+    // propósito, pra manter a ordem certa na timeline (a transferência
+    // aparece antes da nova passagem, não depois).
+    await ensureCareerStintForSeason(cachedPlayerId, seasonId);
+
     return { player: squadPlayer, transfer };
   },
 
@@ -632,7 +681,7 @@ export const seasonService = {
       resolveDestinationBucket(seasonId, destination),
     ]);
 
-    return prisma.squadPlayer.create({
+    const squadPlayer = await prisma.squadPlayer.create({
       data: {
         seasonId,
         cachedPlayerId: cached.id,
@@ -642,6 +691,12 @@ export const seasonService = {
       },
       include: { cachedPlayer: true },
     });
+
+    // CORREÇÃO: reflete essa entrada no elenco na carreira do jogador,
+    // se ele tiver uma — ver comentário em ensureCareerStintForSeason.
+    await ensureCareerStintForSeason(cached.id, seasonId);
+
+    return squadPlayer;
   },
 
   async removePlayerFromSeason(seasonId: string, playerId: string) {

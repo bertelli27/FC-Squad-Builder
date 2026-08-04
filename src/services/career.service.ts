@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { cacheRepository } from "@/repositories/cache.repository";
 import { competitionService } from "./competition.service";
-import { seasonService } from "./season.service";
+import { seasonService, ensureCareerStintForSeason } from "./season.service";
 
 /**
  * Standalone (see season.service.ts's getSeasonById for why) so other
@@ -111,8 +111,16 @@ export const careerService = {
    * seasonService.signPlayer verbatim, which already creates the real
    * Transfer AND mirrors it onto this same career — see season.service.ts
    * §22/§23 etapa 7 — so this never builds a second transfer system).
-   * Both paths are idempotent if the player is already on that roster
-   * (§7/§15): nothing duplicates, the stint just gets created either way.
+   *
+   * CORREÇÃO — sincronização bidirecional: signPlayer/addPlayerToSeason
+   * chamados abaixo já criam a CareerStint por conta própria (via
+   * ensureCareerStintForSeason, disparada também quando o jogador é
+   * adicionado direto pelo Modo Clubes — essa é a correção). Por isso este
+   * método NUNCA cria a CareerStint diretamente no caminho vinculado a uma
+   * Season: ele só chama a mesma função idempotente para obter (ou, no caso
+   * raro de a carreira não ter cachedPlayer, criar) a linha certa — assim
+   * não existe ordem de execução que resulte em duas CareerStint para o
+   * mesmo par (carreira, temporada).
    */
   async addStint(
     careerId: string,
@@ -126,24 +134,12 @@ export const careerService = {
       transferIn?: { counterpartClub?: string; value?: number; dealType?: "permanent" | "loan" };
     },
   ) {
-    let clubName = input.clubName;
-    let clubLogoUrl = input.clubLogoUrl;
-    let startYear = input.startYear;
-    let calendar = input.calendar ?? "brasileiro";
-    let seasonId: string | undefined;
-    const kind = input.kind ?? "club";
-
     if (input.seasonId) {
       const season = await prisma.season.findUnique({
         where: { id: input.seasonId },
         include: { squad: true },
       });
       if (!season) return null;
-      seasonId = season.id;
-      clubName = season.squad.name;
-      clubLogoUrl = season.squad.logoUrl ?? undefined;
-      startYear = season.startYear;
-      calendar = season.squad.seasonCalendar;
 
       const career = await prisma.playerCareer.findUnique({
         where: { id: careerId },
@@ -156,14 +152,47 @@ export const careerService = {
         } else {
           await seasonService.addPlayerToSeason(season.id, playerRef, "bench");
         }
+
+        const stint = await ensureCareerStintForSeason(career.cachedPlayer.id, season.id);
+        if (!stint) return null;
+        return prisma.careerStint.findUnique({
+          where: { id: stint.id },
+          include: {
+            titles: { include: { competition: true } },
+            competitionStats: { include: { competition: true } },
+          },
+        });
       }
+
+      // Carreira sem cachedPlayer (não deveria acontecer desde a etapa 6,
+      // que garante um sempre existir) — fallback direto, sem elenco.
+      const order = await nextOrder(careerId);
+      return prisma.careerStint.create({
+        data: {
+          careerId,
+          seasonId: season.id,
+          kind: season.squad.baseKind === "nationalTeam" ? "nationalTeam" : "club",
+          clubName: season.squad.name,
+          clubLogoUrl: season.squad.logoUrl,
+          startYear: season.startYear,
+          calendar: season.squad.seasonCalendar,
+          order,
+        },
+        include: {
+          titles: { include: { competition: true } },
+          competitionStats: { include: { competition: true } },
+        },
+      });
     }
 
+    const { clubName, clubLogoUrl, startYear } = input;
+    const calendar = input.calendar ?? "brasileiro";
+    const kind = input.kind ?? "club";
     if (!clubName?.trim() || startYear === undefined) return null;
 
     const order = await nextOrder(careerId);
     return prisma.careerStint.create({
-      data: { careerId, seasonId, kind, clubName, clubLogoUrl, startYear, calendar, order },
+      data: { careerId, kind, clubName, clubLogoUrl, startYear, calendar, order },
       include: {
         titles: { include: { competition: true } },
         competitionStats: { include: { competition: true } },
