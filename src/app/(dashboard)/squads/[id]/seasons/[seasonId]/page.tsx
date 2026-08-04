@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { squadService } from "@/services/squad.service";
 import { seasonService } from "@/services/season.service";
+import { careerService } from "@/services/career.service";
 import { SquadEditor } from "@/components/squad-builder/squad-editor";
 import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
@@ -28,6 +29,11 @@ export default async function SeasonPage({
     seasonService.getSeason(seasonId),
   ]);
   if (!squad || !season || season.squadId !== squad.id) notFound();
+
+  // §26: "Ver carreira" from a player's profile, when they have one.
+  const careerIdByPlayer = await careerService.findCareerIdsByCachedPlayerIds(
+    season.players.map((sp) => sp.cachedPlayer.id),
+  );
 
   return (
     <ClubThemeScope clubId={squad.id} primaryColor={squad.primaryColor} className="flex flex-col gap-6">
@@ -117,6 +123,7 @@ export default async function SeasonPage({
           isExtra: sp.isExtra,
           positionSlot: sp.positionSlot,
           externalLink: sp.cachedPlayer.externalLink,
+          careerId: careerIdByPlayer.get(sp.cachedPlayer.id) ?? null,
         }))}
       />
 

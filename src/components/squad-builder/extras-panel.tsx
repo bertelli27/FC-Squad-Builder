@@ -111,6 +111,7 @@ function ExtraRow({
     overall: player.overall,
     potential: player.potential,
     externalLink: player.externalLink,
+    careerId: player.careerId,
   };
 
   return (

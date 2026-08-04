@@ -51,6 +51,8 @@ export interface SquadPlayerVM {
   isExtra: boolean;
   positionSlot?: string | null;
   externalLink?: string | null;
+  /** §26 etapa 8 — set when this player has a linked PlayerCareer, to show "Ver carreira" in the profile. */
+  careerId?: string | null;
 }
 
 interface EditorState {
@@ -798,6 +800,7 @@ function PlayerChip({
     overall: player.overall,
     potential: player.potential,
     externalLink: player.externalLink,
+    careerId: player.careerId,
   };
   // No onPointerDown/stopPropagation here on purpose: dnd-kit only starts a
   // drag past a small movement threshold, and doesn't fire a `click` event

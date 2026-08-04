@@ -20,6 +20,11 @@ import { SEASON_CALENDARS, formatSeasonLabel } from "@/lib/season";
 import type { CareerStintKind } from "@/lib/career";
 import type { CareerStintVM } from "./types";
 
+const DEAL_TYPES = [
+  { value: "permanent", label: "Venda/Compra" },
+  { value: "loan", label: "Empréstimo" },
+];
+
 interface SquadOption {
   id: string;
   name: string;
@@ -64,6 +69,13 @@ export function AddStintDialog({
   const [startYear, setStartYear] = useState(new Date().getFullYear());
   const [calendar, setCalendar] = useState("brasileiro");
 
+  // §11-§16: recording this stint as a real transfer is optional — a
+  // player's very first club (debut) isn't a transfer from anywhere.
+  const [asTransfer, setAsTransfer] = useState(false);
+  const [transferClub, setTransferClub] = useState("");
+  const [transferDealType, setTransferDealType] = useState("permanent");
+  const [transferValue, setTransferValue] = useState("");
+
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -104,6 +116,10 @@ export function AddStintDialog({
     setClubLogoUrl("");
     setStartYear(new Date().getFullYear());
     setCalendar("brasileiro");
+    setAsTransfer(false);
+    setTransferClub("");
+    setTransferDealType("permanent");
+    setTransferValue("");
   }
 
   function handleSubmit(event: React.FormEvent) {
@@ -112,7 +128,17 @@ export function AddStintDialog({
     const body =
       mode === "existing"
         ? seasonId
-          ? { kind, seasonId }
+          ? {
+              kind,
+              seasonId,
+              transferIn: asTransfer
+                ? {
+                    counterpartClub: transferClub || undefined,
+                    dealType: transferDealType,
+                    value: transferValue ? Number(transferValue) : undefined,
+                  }
+                : undefined,
+            }
           : null
         : clubName.trim() && Number.isInteger(startYear)
           ? { kind, clubName, clubLogoUrl: clubLogoUrl || undefined, startYear, calendar }
@@ -208,6 +234,73 @@ export function AddStintDialog({
                     <p className="text-muted-foreground text-xs">
                       {isNationalTeam ? "Essa seleção ainda não tem temporadas." : "Esse clube ainda não tem temporadas."}
                     </p>
+                  )}
+                </div>
+              )}
+
+              {seasonId && !isNationalTeam && (
+                <div className="flex flex-col gap-3 rounded-lg border p-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={asTransfer}
+                      onChange={(e) => setAsTransfer(e.target.checked)}
+                    />
+                    Registrar como transferência
+                  </label>
+                  {asTransfer && (
+                    <>
+                      <p className="text-muted-foreground text-xs">
+                        Cria uma transferência real (§11-§16) — o mesmo sistema usado no Modo Clubes, visível nas
+                        transferências desta temporada. Deixe desmarcado para uma estreia (sem clube de origem).
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="stint-transfer-club">Clube de origem</Label>
+                        <Input
+                          id="stint-transfer-club"
+                          value={transferClub}
+                          onChange={(e) => setTransferClub(e.target.value)}
+                          placeholder="Opcional"
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="flex flex-1 flex-col gap-1.5">
+                          <Label htmlFor="stint-transfer-type">Tipo</Label>
+                          <Select value={transferDealType} onValueChange={(v) => v && setTransferDealType(v)}>
+                            <SelectTrigger id="stint-transfer-type">
+                              <SelectValue>
+                                {(v: string) => DEAL_TYPES.find((d) => d.value === v)?.label ?? v}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DEAL_TYPES.map((d) => (
+                                <SelectItem key={d.value} value={d.value}>
+                                  {d.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex flex-1 flex-col gap-1.5">
+                          <Label htmlFor="stint-transfer-value">Valor</Label>
+                          <div className="relative">
+                            <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
+                              €
+                            </span>
+                            <Input
+                              id="stint-transfer-value"
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="pl-7"
+                              value={transferValue}
+                              onChange={(e) => setTransferValue(e.target.value)}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               )}

@@ -21,7 +21,18 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     );
   }
 
-  const stint = await careerService.addStint(id, { kind, seasonId, clubName, clubLogoUrl, startYear, calendar });
+  // Etapa 8 (§11-§16): only meaningful when linking to an existing Season
+  // — career.service.ts ignores it otherwise.
+  const transferIn =
+    seasonId && body?.transferIn && typeof body.transferIn === "object"
+      ? {
+          counterpartClub: typeof body.transferIn.counterpartClub === "string" ? body.transferIn.counterpartClub : undefined,
+          value: typeof body.transferIn.value === "number" ? body.transferIn.value : undefined,
+          dealType: body.transferIn.dealType === "loan" ? ("loan" as const) : ("permanent" as const),
+        }
+      : undefined;
+
+  const stint = await careerService.addStint(id, { kind, seasonId, clubName, clubLogoUrl, startYear, calendar, transferIn });
   if (!stint) return NextResponse.json({ error: "Could not create stint" }, { status: 400 });
 
   return NextResponse.json({ stint }, { status: 201 });

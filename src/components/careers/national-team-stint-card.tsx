@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
-import { TrophyIcon, XIcon, ShieldIcon, ChartNoAxesColumnIcon } from "lucide-react";
+import Link from "next/link";
+import { TrophyIcon, XIcon, ShieldIcon, ChartNoAxesColumnIcon, ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -161,151 +162,174 @@ export function NationalTeamStintCard({
             {age != null && ` · ${age} anos`}
           </span>
         </CardTitle>
-        <button
-          type="button"
-          onClick={() => onRemove(stint, confirm)}
-          aria-label={`Remover ano na seleção ${stint.clubName}`}
-          className="text-muted-foreground hover:text-destructive opacity-0 transition-opacity group-hover/stint:opacity-100"
-        >
-          <XIcon className="size-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/careers/${careerId}/stints/${stint.id}`}
+            className="text-primary flex items-center gap-1 text-sm underline underline-offset-2"
+          >
+            Ver temporada
+            <ExternalLinkIcon className="size-3" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => onRemove(stint, confirm)}
+            aria-label={`Remover ano na seleção ${stint.clubName}`}
+            className="text-muted-foreground hover:text-destructive opacity-0 transition-opacity group-hover/stint:opacity-100"
+          >
+            <XIcon className="size-4" />
+          </button>
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 py-4">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
-              <ChartNoAxesColumnIcon className="size-3.5" />
-              Estatísticas por competição
-            </h3>
-            {!addingStats && (
-              <Button size="xs" variant="outline" onClick={() => setAddingStats(true)}>
-                + Adicionar
-              </Button>
-            )}
-          </div>
+        {stint.seasonId ? (
+          // §29: mesma ideia do ClubStintCard — dados reais do elenco da
+          // seleção agora vivem na página da temporada.
+          <p className="text-muted-foreground text-sm">
+            Jogos, gols, assistências, títulos e o resumo deste ano estão na{" "}
+            <Link href={`/careers/${careerId}/stints/${stint.id}`} className="text-primary underline underline-offset-2">
+              página da temporada
+            </Link>
+            .
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+                  <ChartNoAxesColumnIcon className="size-3.5" />
+                  Estatísticas por competição
+                </h3>
+                {!addingStats && (
+                  <Button size="xs" variant="outline" onClick={() => setAddingStats(true)}>
+                    + Adicionar
+                  </Button>
+                )}
+              </div>
 
-          {stint.competitionStats.length === 0 && !addingStats ? (
-            <p className="text-muted-foreground text-xs">Nenhuma competição registrada neste ano.</p>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {stint.competitionStats.length > 0 && (
-                <div className="text-muted-foreground grid grid-cols-[1fr_2.5rem_2.5rem_2.5rem_1.25rem] gap-1 px-1 text-[10px] font-semibold tracking-wide uppercase">
-                  <span>Competição</span>
-                  <span className="text-center">Jogos</span>
-                  <span className="text-center">Gols</span>
-                  <span className="text-center">Assist.</span>
-                  <span />
+              {stint.competitionStats.length === 0 && !addingStats ? (
+                <p className="text-muted-foreground text-xs">Nenhuma competição registrada neste ano.</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {stint.competitionStats.length > 0 && (
+                    <div className="text-muted-foreground grid grid-cols-[1fr_2.5rem_2.5rem_2.5rem_1.25rem] gap-1 px-1 text-[10px] font-semibold tracking-wide uppercase">
+                      <span>Competição</span>
+                      <span className="text-center">Jogos</span>
+                      <span className="text-center">Gols</span>
+                      <span className="text-center">Assist.</span>
+                      <span />
+                    </div>
+                  )}
+                  {stint.competitionStats.map((s) => (
+                    <div
+                      key={s.id}
+                      className="hover:bg-accent/30 group/stats-row grid grid-cols-[1fr_2.5rem_2.5rem_2.5rem_1.25rem] items-center gap-1 rounded-md px-1 py-0.5"
+                    >
+                      <span className="truncate text-sm">{s.competition.name}</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={s.appearances}
+                        onChange={(e) => saveStatField(s.id, "appearances", e.target.value)}
+                        className="h-7 px-1 text-center text-xs"
+                      />
+                      <Input
+                        type="number"
+                        min={0}
+                        value={s.goals}
+                        onChange={(e) => saveStatField(s.id, "goals", e.target.value)}
+                        className="h-7 px-1 text-center text-xs"
+                      />
+                      <Input
+                        type="number"
+                        min={0}
+                        value={s.assists}
+                        onChange={(e) => saveStatField(s.id, "assists", e.target.value)}
+                        className="h-7 px-1 text-center text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveStats(s.id, s.competition.name)}
+                        aria-label={`Remover estatísticas de ${s.competition.name}`}
+                        className="text-muted-foreground hover:text-destructive flex items-center justify-center opacity-0 transition-opacity group-hover/stats-row:opacity-100"
+                      >
+                        <XIcon className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {stint.competitionStats.length > 0 && (
+                    <div className="grid grid-cols-[1fr_2.5rem_2.5rem_2.5rem_1.25rem] items-center gap-1 border-t px-1 pt-1 text-sm font-bold">
+                      <span>Total</span>
+                      <span className="text-center">{total.appearances}</span>
+                      <span className="text-center">{total.goals}</span>
+                      <span className="text-center">{total.assists}</span>
+                      <span />
+                    </div>
+                  )}
                 </div>
               )}
-              {stint.competitionStats.map((s) => (
-                <div
-                  key={s.id}
-                  className="hover:bg-accent/30 group/stats-row grid grid-cols-[1fr_2.5rem_2.5rem_2.5rem_1.25rem] items-center gap-1 rounded-md px-1 py-0.5"
-                >
-                  <span className="truncate text-sm">{s.competition.name}</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={s.appearances}
-                    onChange={(e) => saveStatField(s.id, "appearances", e.target.value)}
-                    className="h-7 px-1 text-center text-xs"
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    value={s.goals}
-                    onChange={(e) => saveStatField(s.id, "goals", e.target.value)}
-                    className="h-7 px-1 text-center text-xs"
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    value={s.assists}
-                    onChange={(e) => saveStatField(s.id, "assists", e.target.value)}
-                    className="h-7 px-1 text-center text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveStats(s.id, s.competition.name)}
-                    aria-label={`Remover estatísticas de ${s.competition.name}`}
-                    className="text-muted-foreground hover:text-destructive flex items-center justify-center opacity-0 transition-opacity group-hover/stats-row:opacity-100"
-                  >
-                    <XIcon className="size-3.5" />
-                  </button>
-                </div>
-              ))}
-              {stint.competitionStats.length > 0 && (
-                <div className="grid grid-cols-[1fr_2.5rem_2.5rem_2.5rem_1.25rem] items-center gap-1 border-t px-1 pt-1 text-sm font-bold">
-                  <span>Total</span>
-                  <span className="text-center">{total.appearances}</span>
-                  <span className="text-center">{total.goals}</span>
-                  <span className="text-center">{total.assists}</span>
-                  <span />
-                </div>
+
+              {addingStats && (
+                <AddCompetitionStatsForm
+                  careerId={careerId}
+                  stintId={stint.id}
+                  existingCompetitionIds={stint.competitionStats.map((s) => s.competition.id)}
+                  onAdded={(stats) => {
+                    onStatsAdded(stats);
+                    setAddingStats(false);
+                  }}
+                  onCancel={() => setAddingStats(false)}
+                />
               )}
             </div>
-          )}
 
-          {addingStats && (
-            <AddCompetitionStatsForm
-              careerId={careerId}
-              stintId={stint.id}
-              existingCompetitionIds={stint.competitionStats.map((s) => s.competition.id)}
-              onAdded={(stats) => {
-                onStatsAdded(stats);
-                setAddingStats(false);
-              }}
-              onCancel={() => setAddingStats(false)}
-            />
-          )}
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-heading text-xs font-semibold tracking-wide uppercase">
+                  Títulos
+                </span>
+                <Button size="xs" variant="outline" onClick={() => setAddTitleOpen(true)}>
+                  + Adicionar
+                </Button>
+              </div>
+              {stint.titles.length === 0 ? (
+                <p className="text-muted-foreground text-xs">Nenhum título nesse ano.</p>
+              ) : (
+                <ul className="flex flex-wrap gap-2">
+                  {stint.titles.map((title) => (
+                    <li
+                      key={title.id}
+                      className="group/title bg-muted/40 flex items-center gap-1.5 rounded-full border py-1 pr-1 pl-2 text-xs"
+                    >
+                      <TrophyIcon className="size-3 shrink-0" />
+                      {title.competition.name}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTitle(title.id, title.competition.name)}
+                        aria-label={`Remover título de ${title.competition.name}`}
+                        className="text-muted-foreground hover:text-destructive flex size-4 items-center justify-center rounded-full opacity-0 transition-opacity group-hover/title:opacity-100"
+                      >
+                        <XIcon className="size-2.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground font-heading text-xs font-semibold tracking-wide uppercase">
-              Títulos
-            </span>
-            <Button size="xs" variant="outline" onClick={() => setAddTitleOpen(true)}>
-              + Adicionar
-            </Button>
-          </div>
-          {stint.titles.length === 0 ? (
-            <p className="text-muted-foreground text-xs">Nenhum título nesse ano.</p>
-          ) : (
-            <ul className="flex flex-wrap gap-2">
-              {stint.titles.map((title) => (
-                <li
-                  key={title.id}
-                  className="group/title bg-muted/40 flex items-center gap-1.5 rounded-full border py-1 pr-1 pl-2 text-xs"
-                >
-                  <TrophyIcon className="size-3 shrink-0" />
-                  {title.competition.name}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTitle(title.id, title.competition.name)}
-                    aria-label={`Remover título de ${title.competition.name}`}
-                    className="text-muted-foreground hover:text-destructive flex size-4 items-center justify-center rounded-full opacity-0 transition-opacity group-hover/title:opacity-100"
-                  >
-                    <XIcon className="size-2.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <span className="text-muted-foreground font-heading text-xs font-semibold tracking-wide uppercase">
-            Resumo do ano
-          </span>
-          <Textarea
-            value={summary}
-            onChange={(e) => handleSummaryChange(e.target.value)}
-            onBlur={handleSummaryBlur}
-            placeholder="Como foi esse ano pela seleção..."
-            className="min-h-20"
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-muted-foreground font-heading text-xs font-semibold tracking-wide uppercase">
+                Resumo do ano
+              </span>
+              <Textarea
+                value={summary}
+                onChange={(e) => handleSummaryChange(e.target.value)}
+                onBlur={handleSummaryBlur}
+                placeholder="Como foi esse ano pela seleção..."
+                className="min-h-20"
+              />
+            </div>
+          </>
+        )}
       </CardContent>
 
       <AddCareerTitleDialog

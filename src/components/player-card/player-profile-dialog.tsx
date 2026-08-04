@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { PencilIcon, ArrowRightLeftIcon } from "lucide-react";
+import Link from "next/link";
+import { PencilIcon, ArrowRightLeftIcon, UserRoundIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,8 @@ export interface KnownPlayerInfo {
   overall?: number | null;
   potential?: number | null;
   externalLink?: string | null;
+  /** §26 etapa 8 — set when this player has a linked PlayerCareer, to show "Ver carreira". */
+  careerId?: string | null;
 }
 
 const CUSTOM_SOURCE = "custom";
@@ -167,6 +170,15 @@ export function PlayerProfileDialog({
                   >
                     <ArrowRightLeftIcon className="size-4" />
                   </button>
+                )}
+                {known.careerId && (
+                  <Link
+                    href={`/careers/${known.careerId}`}
+                    aria-label="Ver carreira"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <UserRoundIcon className="size-4" />
+                  </Link>
                 )}
               </span>
             )}

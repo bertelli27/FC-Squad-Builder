@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { cacheRepository } from "@/repositories/cache.repository";
 import { competitionService } from "./competition.service";
+import { seasonService } from "./season.service";
 
 /**
  * Standalone (see season.service.ts's getSeasonById for why) so other
@@ -102,6 +103,16 @@ export const careerService = {
    * and so the stint survives even if that Season is later deleted — see
    * schema.prisma's comment on CareerStint) or fully manual for a club
    * that was never modeled in the Clubes module.
+   *
+   * Etapa 8 (§6/§43/§44): linking to a real Season now also makes the
+   * player a real member of that season's roster — not just a visual
+   * entry in the career timeline. `transferIn`, when provided, records
+   * this as a real transfer instead of a plain roster add (reusing
+   * seasonService.signPlayer verbatim, which already creates the real
+   * Transfer AND mirrors it onto this same career — see season.service.ts
+   * §22/§23 etapa 7 — so this never builds a second transfer system).
+   * Both paths are idempotent if the player is already on that roster
+   * (§7/§15): nothing duplicates, the stint just gets created either way.
    */
   async addStint(
     careerId: string,
@@ -112,6 +123,7 @@ export const careerService = {
       clubLogoUrl?: string;
       startYear?: number;
       calendar?: string;
+      transferIn?: { counterpartClub?: string; value?: number; dealType?: "permanent" | "loan" };
     },
   ) {
     let clubName = input.clubName;
@@ -132,6 +144,19 @@ export const careerService = {
       clubLogoUrl = season.squad.logoUrl ?? undefined;
       startYear = season.startYear;
       calendar = season.squad.seasonCalendar;
+
+      const career = await prisma.playerCareer.findUnique({
+        where: { id: careerId },
+        include: { cachedPlayer: true },
+      });
+      if (career?.cachedPlayer) {
+        const playerRef = { source: career.cachedPlayer.source, externalId: career.cachedPlayer.externalId };
+        if (input.transferIn) {
+          await seasonService.signPlayer(season.id, { playerRef, ...input.transferIn });
+        } else {
+          await seasonService.addPlayerToSeason(season.id, playerRef, "bench");
+        }
+      }
     }
 
     if (!clubName?.trim() || startYear === undefined) return null;
@@ -144,6 +169,44 @@ export const careerService = {
         competitionStats: { include: { competition: true } },
       },
     });
+  },
+
+  /**
+   * §29-§36: everything a stint's own detail page needs. When linked to a
+   * real Season, `squadPlayer` is the exact row PlayerStatsSection already
+   * knows how to read/edit (§18/§19/§47 — same data, same component, no
+   * second stats system) and `stint.season.titles` are that season's real
+   * SeasonTitle rows (§20/§21/§48 — no per-player title invented). Both are
+   * null/empty for an unlinked stint, which falls back to CareerStint's own
+   * flat fields / CareerTitle — unchanged since etapa 4/5.
+   */
+  async getStintDetail(stintId: string) {
+    const stint = await prisma.careerStint.findUnique({
+      where: { id: stintId },
+      include: {
+        career: { include: { cachedPlayer: true } },
+        titles: { include: { competition: true } },
+        competitionStats: { include: { competition: true }, orderBy: { competition: { name: "asc" } } },
+        season: {
+          include: {
+            squad: true,
+            titles: { include: { competition: true }, orderBy: { createdAt: "asc" } },
+          },
+        },
+      },
+    });
+    if (!stint) return null;
+
+    let squadPlayer = null;
+    if (stint.season && stint.career.cachedPlayerId) {
+      squadPlayer = await prisma.squadPlayer.findUnique({
+        where: {
+          seasonId_cachedPlayerId: { seasonId: stint.season.id, cachedPlayerId: stint.career.cachedPlayerId },
+        },
+      });
+    }
+
+    return { stint, squadPlayer };
   },
 
   async updateStint(
@@ -256,5 +319,20 @@ export const careerService = {
 
   async removeTransfer(careerId: string, transferId: string) {
     await prisma.careerTransfer.delete({ where: { id: transferId, careerId } });
+  },
+
+  /**
+   * §26 second half: "Ver carreira" from a club's player profile — only
+   * for players who actually have one (a career is opt-in, most players
+   * in a real roster won't). One batched query per season page load
+   * instead of N+1.
+   */
+  async findCareerIdsByCachedPlayerIds(cachedPlayerIds: string[]): Promise<Map<string, string>> {
+    if (cachedPlayerIds.length === 0) return new Map();
+    const careers = await prisma.playerCareer.findMany({
+      where: { cachedPlayerId: { in: cachedPlayerIds } },
+      select: { id: true, cachedPlayerId: true },
+    });
+    return new Map(careers.filter((c) => c.cachedPlayerId).map((c) => [c.cachedPlayerId as string, c.id]));
   },
 };
