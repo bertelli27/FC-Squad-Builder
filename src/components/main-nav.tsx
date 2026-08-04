@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldHalfIcon, UserRoundIcon } from "lucide-react";
+import { ShieldHalfIcon, UserRoundIcon, SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 export function MainNav() {
   const pathname = usePathname();
   const isCareers = pathname?.startsWith("/careers");
+  const isManagement = pathname?.startsWith("/management");
+  const isClubs = !isCareers && !isManagement;
 
   return (
     <nav className="flex items-center gap-1">
@@ -21,7 +23,7 @@ export function MainNav() {
         href="/"
         className={cn(
           "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-          !isCareers ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+          isClubs ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
         )}
       >
         <ShieldHalfIcon className="size-4" />
@@ -36,6 +38,16 @@ export function MainNav() {
       >
         <UserRoundIcon className="size-4" />
         Carreiras
+      </Link>
+      <Link
+        href="/management"
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+          isManagement ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <SettingsIcon className="size-4" />
+        Gerenciamento
       </Link>
     </nav>
   );

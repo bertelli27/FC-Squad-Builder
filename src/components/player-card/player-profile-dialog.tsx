@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { PencilIcon, ArrowRightLeftIcon, UserRoundIcon, Trash2Icon } from "lucide-react";
 import {
   Dialog,
@@ -11,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDeletePlayer } from "@/hooks/use-delete-player";
 import { PlayerAvatar } from "./player-avatar";
 import { OverallBadge } from "./overall-badge";
 import { PlayerStatsSection } from "./player-stats-section";
@@ -77,8 +76,7 @@ export function PlayerProfileDialog({
   const [enriched, setEnriched] = useState<Player | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const { confirm, dialog: confirmDialog } = useConfirmDialog();
+  const { requestDelete, deleting, dialog: confirmDialog } = useDeletePlayer();
   const isCustom = known.source === CUSTOM_SOURCE;
   // Etapa 6 (§16/§24): editing is no longer limited to "custom" players —
   // any CachedPlayer's cadastral data can be edited, since it's the same
@@ -95,39 +93,8 @@ export function PlayerProfileDialog({
 
   async function handleDelete() {
     if (!known.cachedPlayerId) return;
-    const impact = await fetch(`/api/players/${known.cachedPlayerId}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => data?.impact ?? null)
-      .catch(() => null);
-
-    const parts: string[] = [];
-    if (impact) {
-      if (impact.seasonCount > 0) {
-        parts.push(
-          `${impact.seasonCount} temporada${impact.seasonCount > 1 ? "s" : ""} em ${impact.clubCount} elenco${impact.clubCount > 1 ? "s" : ""}`,
-        );
-      }
-      if (impact.statsCount > 0) parts.push(`${impact.statsCount} registro(s) de estatística`);
-      if (impact.stintCount > 0) parts.push(`${impact.stintCount} passagem(ns) na carreira`);
-      if (impact.transferCount > 0) parts.push(`${impact.transferCount} transferência(s)`);
-    }
-    const description = `${parts.length ? `Vai remover ${known.name} de: ${parts.join(", ")}. ` : ""}Essa ação não pode ser desfeita.`;
-
-    const ok = await confirm({
-      title: `Excluir ${known.name}?`,
-      description,
-      confirmLabel: "Excluir",
-      destructive: true,
-    });
-    if (!ok) return;
-
-    setDeleting(true);
-    const res = await fetch(`/api/players/${known.cachedPlayerId}`, { method: "DELETE" });
-    setDeleting(false);
-    if (!res.ok) {
-      toast.error("Não foi possível excluir o jogador.");
-      return;
-    }
+    const deleted = await requestDelete({ cachedPlayerId: known.cachedPlayerId, name: known.name });
+    if (!deleted) return;
     setOpen(false);
     onDeleted?.();
   }

@@ -26,7 +26,57 @@ export const competitionService = {
     });
   },
 
-  async updateCompetitionTrophy(id: string, trophyImageUrl: string | null) {
-    return prisma.competition.update({ where: { id }, data: { trophyImageUrl } });
+  /**
+   * Nova etapa — Gerenciamento: general edit (name and/or trophy image) on
+   * an existing competition — the gap the etapa exists to close, since
+   * until now a competition's trophy could only ever be set once, at
+   * creation time (findOrCreateCompetition above leaves an existing row's
+   * trophy untouched). Every SeasonTitle/CareerTitle/*CompetitionStats
+   * joins to Competition live (never copies name/trophyImageUrl), so this
+   * propagates everywhere the competition is shown without touching any
+   * of those rows. Returns null on a name collision (the `name` unique
+   * constraint) instead of throwing, same convention as
+   * playerDataService.updatePlayer.
+   */
+  async updateCompetition(id: string, patch: { name?: string; trophyImageUrl?: string | null }) {
+    return prisma.competition
+      .update({
+        where: { id },
+        data: {
+          ...(patch.name !== undefined && { name: patch.name.trim() }),
+          ...(patch.trophyImageUrl !== undefined && { trophyImageUrl: patch.trophyImageUrl }),
+        },
+      })
+      .catch(() => null);
+  },
+
+  /**
+   * How many historical records reference this competition — shown as an
+   * impact summary before a delete is even attempted (the 4 FKs into
+   * Competition are all ON DELETE RESTRICT, so the DB would refuse the
+   * delete anyway; this just turns that into a clear message instead of a
+   * raw constraint-violation error, and lets the UI skip even offering
+   * the destructive action when it can't succeed).
+   */
+  async getCompetitionUsage(id: string) {
+    const [titleCount, careerTitleCount, statsCount, careerStatsCount] = await Promise.all([
+      prisma.seasonTitle.count({ where: { competitionId: id } }),
+      prisma.careerTitle.count({ where: { competitionId: id } }),
+      prisma.playerCompetitionStats.count({ where: { competitionId: id } }),
+      prisma.careerStintCompetitionStats.count({ where: { competitionId: id } }),
+    ]);
+    return {
+      titleCount: titleCount + careerTitleCount,
+      statsCount: statsCount + careerStatsCount,
+      total: titleCount + careerTitleCount + statsCount + careerStatsCount,
+    };
+  },
+
+  /** Only ever called after getCompetitionUsage confirms zero dependents — see the API route. */
+  async deleteCompetition(id: string): Promise<boolean> {
+    return prisma.competition
+      .delete({ where: { id } })
+      .then(() => true)
+      .catch(() => false);
   },
 };

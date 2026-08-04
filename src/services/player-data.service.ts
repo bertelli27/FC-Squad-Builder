@@ -12,6 +12,7 @@ import type { Player } from "@/types/domain";
 import type { PlayerProvider, PlayerSearchFilters } from "./providers/provider.interface";
 
 const SEARCH_RESULT_LIMIT = 50;
+const CUSTOM_PLAYER_SOURCE = "custom";
 
 // api-football and thesportsdb are rate-limited/network sources, so single
 // player lookups for them go through the read-through cache. Kaggle is an
@@ -93,6 +94,28 @@ export const playerDataService = {
       take: SEARCH_RESULT_LIMIT,
     });
     return rows.map(cachedPlayerToDomain);
+  },
+
+  /**
+   * Nova etapa — Gerenciamento: every player the user created directly
+   * (as opposed to imported from Kaggle/API-Football/TheSportsDB), for the
+   * central admin listing. Returns the raw CachedPlayer row (not the
+   * source:externalId-keyed Player DTO cachedPlayerToDomain produces) —
+   * the management UI needs the real CachedPlayer.id to call
+   * PATCH/DELETE /api/players/[id], which the DTO's composite id can't
+   * give it. No expiresAt gate here on purpose — that's a cache-freshness
+   * concept for provider-sourced rows, meaningless for a custom player
+   * (they'd never disappear from their own management page just because a
+   * TTL lapsed).
+   */
+  async listCustomPlayers(query?: string) {
+    return prisma.cachedPlayer.findMany({
+      where: {
+        source: CUSTOM_PLAYER_SOURCE,
+        ...(query?.trim() && { name: { contains: query.trim(), mode: "insensitive" } }),
+      },
+      orderBy: { name: "asc" },
+    });
   },
 
   /** Cache-first single player fetch, namespaced by source (matches Player.id's `${source}:${externalId}` shape). */
