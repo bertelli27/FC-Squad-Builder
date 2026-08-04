@@ -24,8 +24,22 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const name = typeof body.name === "string" && body.name.trim() ? body.name : undefined;
   const logoUrl = optionalStringField(body.logoUrl);
   const trophyImageUrl = optionalStringField(body.trophyImageUrl);
+  const kind = optionalStringField(body.kind);
+  const category = optionalStringField(body.category);
+  const organizer = optionalStringField(body.organizer);
+  const country = optionalStringField(body.country);
+  const description = optionalStringField(body.description);
 
-  const competition = await competitionService.updateCompetition(id, { name, logoUrl, trophyImageUrl });
+  const competition = await competitionService.updateCompetition(id, {
+    name,
+    logoUrl,
+    trophyImageUrl,
+    kind,
+    category,
+    organizer,
+    country,
+    description,
+  });
   if (!competition) {
     return NextResponse.json({ error: "Could not update competition (name may already exist)" }, { status: 409 });
   }

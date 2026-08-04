@@ -13,6 +13,7 @@ import type { PlayerProvider, PlayerSearchFilters } from "./providers/provider.i
 
 const SEARCH_RESULT_LIMIT = 50;
 const CUSTOM_PLAYER_SOURCE = "custom";
+const CUSTOM_PLAYER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 
 // api-football and thesportsdb are rate-limited/network sources, so single
 // player lookups for them go through the read-through cache. Kaggle is an
@@ -115,6 +116,41 @@ export const playerDataService = {
         ...(query?.trim() && { name: { contains: query.trim(), mode: "insensitive" } }),
       },
       orderBy: { name: "asc" },
+    });
+  },
+
+  /**
+   * Etapa 9 (§4-9) — Gerenciamento: cria um jogador "custom" sem exigir
+   * elenco/temporada nenhum, mesmo cadastro central (CachedPlayer) que
+   * season.service.ts#createCustomPlayer já usa — só sem o passo de criar
+   * um SquadPlayer junto. Continua sendo o MESMO registro se depois for
+   * adicionado a um elenco (busca por nome já encontra este CachedPlayer,
+   * nunca cria um segundo "Bruno" — §5).
+   */
+  async createStandalonePlayer(input: {
+    name: string;
+    position?: string;
+    secondaryPositions?: string[];
+    photoUrl?: string;
+    dateOfBirth?: Date;
+    nationality?: string;
+    overall?: number;
+    potential?: number;
+    externalLink?: string;
+  }) {
+    const externalId = crypto.randomUUID();
+    return cacheRepository.upsertPlayer(CUSTOM_PLAYER_SOURCE, externalId, {
+      name: input.name,
+      position: input.position,
+      secondaryPositions: input.secondaryPositions ?? [],
+      photoUrl: input.photoUrl,
+      dateOfBirth: input.dateOfBirth,
+      nationality: input.nationality,
+      overall: input.overall,
+      potential: input.potential,
+      externalLink: input.externalLink,
+      rawData: { custom: true },
+      expiresAt: new Date(Date.now() + CUSTOM_PLAYER_TTL_MS),
     });
   },
 

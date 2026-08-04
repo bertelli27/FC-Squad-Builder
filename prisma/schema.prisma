@@ -179,6 +179,10 @@ model Season {
   // temporada não sabe nem precisa saber quais carreiras a referenciam
   // além disso (a relação existe só pra permitir onDelete: SetNull).
   careerStints CareerStint[]
+  // Idem, pra CompetitionChampion (etapa 9, Modo B) — vínculo opcional de
+  // "esta temporada foi campeã de tal edição", sem a Season precisar saber
+  // nada além de permitir onDelete: SetNull.
+  championEntries CompetitionChampion[]
 
   @@unique([squadId, startYear])
   @@index([squadId])
@@ -215,12 +219,75 @@ model Competition {
   // ser preenchidos automaticamente um a partir do outro.
   logoUrl        String?
   trophyImageUrl String?
-  createdAt      DateTime @default(now())
+
+  // Etapa 9: classificação da competição — nenhum desses 4 campos é
+  // obrigatório (competições já cadastradas ficam com tudo null, e
+  // continuam funcionando exatamente como antes).
+  // "club" | "nationalTeam" | null (não classificado) — decide se um
+  // CompetitionChampion desta competição é um clube ou uma seleção.
+  kind String?
+  // "international" | "national" | null — organizador internacional
+  // (FIFA/UEFA/CONMEBOL...) vs. competição nacional de um país. Não são a
+  // mesma coisa (uma Champions League não tem "país", um Brasileirão não
+  // tem "organizador" no sentido de entidade continental).
+  category String?
+  // Livre (ex: "FIFA", "UEFA", "CONMEBOL") — só relevante quando
+  // category === "international". Texto livre com sugestões dos valores
+  // já usados (não é uma entidade própria: sem foto/página, é só uma
+  // categoria de agrupamento na listagem).
+  organizer String?
+  // enName de lib/countries.ts (ex: "Brazil") — só relevante quando
+  // category === "national".
+  country     String?
+  description String? // descrição/explicação livre da competição
+  createdAt   DateTime @default(now())
 
   titles       SeasonTitle[]
   playerStats  PlayerCompetitionStats[]
   careerTitles     CareerTitle[]
   careerStintStats CareerStintCompetitionStats[]
+  champions        CompetitionChampion[]
+}
+
+// Histórico de campeões de UMA edição/ano de uma competição (etapa 9) —
+// INDEPENDENTE do sistema de títulos (SeasonTitle/CareerTitle): registra
+// "quem venceu aquela edição", nunca atribui automaticamente um título ao
+// clube/seleção no perfil dele (os dois sistemas não se tocam).
+//
+// Dois modos, nunca ao mesmo tempo:
+//   Modo A (standalone): campeão histórico sem elenco cadastrado no
+//     sistema — comum pra edições antigas (Copa 1930, etc). seasonId fica
+//     null; standaloneName/standaloneLogoUrl/standaloneCountry são
+//     digitados na hora.
+//   Modo B (vinculado): referencia uma Season já cadastrada (mesmo
+//     princípio de "referência seg a, nunca sincronização" de
+//     CareerStint.seasonId — onDelete SetNull, o registro histórico nunca
+//     desaparece se a Season for apagada depois). standaloneName/
+//     standaloneLogoUrl são copiados do Squad no momento do vínculo (nunca
+//     ficam vazios, mesmo no Modo B) — funcionam como snapshot de exibição
+//     E como fallback caso a Season vinculada seja apagada depois.
+model CompetitionChampion {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  year          Int
+
+  seasonId String?
+  season   Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+
+  standaloneName    String
+  standaloneLogoUrl String?
+  // enName de lib/countries.ts, pra bandeira — Squad não guarda país
+  // próprio (só Season.baseKind === "nationalTeam" tem nome de país como
+  // nome do elenco), então vínculos com Season de clube ficam sem bandeira
+  // de propósito; registros standalone sempre podem informar um país.
+  standaloneCountry String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([competitionId, year])
+  @@index([competitionId])
+  @@index([seasonId])
 }
 
 // Um título conquistado NUMA temporada específica — nunca "vaza" pra outra

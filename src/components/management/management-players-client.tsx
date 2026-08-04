@@ -13,6 +13,7 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { OverallBadge } from "@/components/player-card/overall-badge";
 import { EditPlayerForm, type EditablePlayer as EditablePlayerBase } from "@/components/player-card/edit-player-form";
+import { CreatePlayerDialog } from "./create-player-dialog";
 import { useDeletePlayer } from "@/hooks/use-delete-player";
 import { POSITIONS } from "@/lib/positions";
 import { countryFlag } from "@/lib/countries";
@@ -107,14 +108,17 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative w-full sm:max-w-xs">
-        <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-        <Input
-          placeholder="Pesquisar jogador…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+          <Input
+            placeholder="Pesquisar jogador…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <CreatePlayerDialog onCreated={(player) => setPlayers((prev) => [{ ...player, clubs: [] }, ...prev])} />
       </div>
 
       {selected.size > 0 && (

@@ -31,6 +31,11 @@ export default async function ManagementCompetitionsPage() {
           name: c.name,
           logoUrl: c.logoUrl,
           trophyImageUrl: c.trophyImageUrl,
+          kind: c.kind,
+          category: c.category,
+          organizer: c.organizer,
+          country: c.country,
+          description: c.description,
         }))}
       />
     </div>

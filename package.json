@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "import:ratings": "tsx scripts/import-ratings.ts",
+    "db:backup": "tsx scripts/backup-db.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

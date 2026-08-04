@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { EditCoachForm, type EditableCoach } from "./edit-coach-form";
+import { CreateCoachDialog } from "./create-coach-dialog";
 import { useDeleteCoach } from "@/hooks/use-delete-coach";
 
 interface ManagementCoach extends EditableCoach {
@@ -33,14 +34,17 @@ export function ManagementCoachesClient({ coaches: initialCoaches }: { coaches: 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative w-full sm:max-w-xs">
-        <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-        <Input
-          placeholder="Pesquisar técnico…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+          <Input
+            placeholder="Pesquisar técnico…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <CreateCoachDialog onCreated={(coach) => setCoaches((prev) => [{ ...coach, clubs: [] }, ...prev])} />
       </div>
 
       {filtered.length === 0 ? (

@@ -46,6 +46,9 @@ next-env.d.ts
 # raw ratings datasets (personal use only, never redistribute)
 /data
 
+# database backups (personal use only, never commit real data)
+/backups
+
 # AI agent local settings / auto-installed skill packs
 .claude/settings.local.json
 .claude/skills/

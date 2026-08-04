@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { UserRoundIcon, TrophyIcon, MedalIcon, UsersRoundIcon, ChevronRightIcon } from "lucide-react";
+import { UserRoundIcon, TrophyIcon, UsersRoundIcon, ChevronRightIcon } from "lucide-react";
 import { playerDataService } from "@/services/player-data.service";
 import { competitionService } from "@/services/competition.service";
 import { coachService } from "@/services/coach.service";
@@ -14,7 +14,6 @@ export default async function ManagementPage() {
     competitionService.listCompetitions(),
     coachService.listCoaches(),
   ]);
-  const trophyCount = competitions.filter((c) => c.trophyImageUrl).length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -35,17 +34,9 @@ export default async function ManagementPage() {
           href="/management/competitions"
           icon={<TrophyIcon className="text-primary size-5" />}
           title="Competições"
-          description="Gerencie competições e seus troféus"
+          description="Logo, troféu, classificação e histórico de campeões"
           count={`${competitions.length} ${competitions.length === 1 ? "competição" : "competições"}`}
           actionLabel="Gerenciar competições"
-        />
-        <ManagementCard
-          href="/management/trophies"
-          icon={<MedalIcon className="text-primary size-5" />}
-          title="Troféus / Taças"
-          description="Gerencie as imagens e informações dos troféus"
-          count={`${trophyCount}/${competitions.length} com imagem`}
-          actionLabel="Gerenciar troféus"
         />
         <ManagementCard
           href="/management/coaches"

@@ -62,6 +62,36 @@ export const squadService = {
     });
   },
 
+  /**
+   * Etapa 9 (§46) — Gerenciamento → Competições → Campeões: busca temporadas
+   * já cadastradas pelo usuário (elenco real), pra vincular um campeão
+   * histórico a um Squad/Season existente em vez de digitar tudo solto.
+   * Deliberadamente NÃO filtra por Squad.baseKind mesmo quando a competição
+   * já sabe se é de clube ou seleção (§42): baseKind só é setado quando o
+   * elenco foi carregado de um clube/seleção real na criação — um elenco
+   * "do zero" (bem comum: "Time dos Sonhos", clubes fictícios etc.) fica
+   * com baseKind null pra sempre, e filtrar por ele esconderia justamente
+   * esses elencos da busca sem nenhum motivo real (§47: "não esconder
+   * opções à toa" vale mais do que a classificação ser 100% estrita aqui).
+   */
+  async searchSquadSeasons(query?: string) {
+    const seasons = await prisma.season.findMany({
+      where: {
+        squad: {
+          ...(query?.trim() && { name: { contains: query.trim(), mode: "insensitive" } }),
+        },
+      },
+      select: {
+        id: true,
+        startYear: true,
+        squad: { select: { id: true, name: true, logoUrl: true, baseKind: true, seasonCalendar: true } },
+      },
+      orderBy: [{ squad: { name: "asc" } }, { startYear: "desc" }],
+      take: 50,
+    });
+    return seasons;
+  },
+
   /** Club overview: identity + organizational metadata + the list of seasons (no player rosters — see seasonService.getSeason for that). */
   async getSquad(id: string) {
     return prisma.squad.findUnique({
