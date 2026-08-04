@@ -174,6 +174,7 @@ function getSeasonById(id: string) {
     where: { id },
     include: {
       squad: true,
+      coach: true,
       players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
       titles: { include: { competition: true }, orderBy: { createdAt: "asc" } },
       transfers: { orderBy: { order: "asc" } },
@@ -277,9 +278,11 @@ export const seasonService = {
           squadId,
           startYear: input.startYear,
           formation: source.formation,
-          coachName: source.coachName,
-          coachPhotoUrl: source.coachPhotoUrl,
-          coachExternalLink: source.coachExternalLink,
+          // Coach agora é uma entidade compartilhada (§ nova etapa) — a
+          // temporada duplicada começa com o MESMO técnico (referência),
+          // não uma cópia independente de texto como antes; editável
+          // depois igual qualquer outra temporada.
+          coachId: source.coachId,
         },
       });
 
@@ -322,9 +325,7 @@ export const seasonService = {
     id: string,
     data: {
       formation?: string;
-      coachName?: string | null;
-      coachPhotoUrl?: string | null;
-      coachExternalLink?: string | null;
+      coachId?: string | null;
       notes?: string | null;
       wins?: number;
       draws?: number;

@@ -1,16 +1,18 @@
 import Link from "next/link";
-import { UserRoundIcon, TrophyIcon, MedalIcon, ChevronRightIcon } from "lucide-react";
+import { UserRoundIcon, TrophyIcon, MedalIcon, UsersRoundIcon, ChevronRightIcon } from "lucide-react";
 import { playerDataService } from "@/services/player-data.service";
 import { competitionService } from "@/services/competition.service";
+import { coachService } from "@/services/coach.service";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
 export default async function ManagementPage() {
-  const [players, competitions] = await Promise.all([
+  const [players, competitions, coaches] = await Promise.all([
     playerDataService.listCustomPlayers(),
     competitionService.listCompetitions(),
+    coachService.listCoaches(),
   ]);
   const trophyCount = competitions.filter((c) => c.trophyImageUrl).length;
 
@@ -44,6 +46,14 @@ export default async function ManagementPage() {
           description="Gerencie as imagens e informações dos troféus"
           count={`${trophyCount}/${competitions.length} com imagem`}
           actionLabel="Gerenciar troféus"
+        />
+        <ManagementCard
+          href="/management/coaches"
+          icon={<UsersRoundIcon className="text-primary size-5" />}
+          title="Técnicos"
+          description="Gerencie os técnicos criados por você"
+          count={`${coaches.length} ${coaches.length === 1 ? "técnico" : "técnicos"}`}
+          actionLabel="Gerenciar técnicos"
         />
       </div>
     </div>

@@ -144,11 +144,18 @@ model Season {
 
   formation String @default("4-3-3")
 
-  // Técnico: dado inteiramente manual, sem fonte externa (nenhum provider
-  // cobre técnicos) — independente por temporada de propósito (§5).
-  coachName         String?
-  coachPhotoUrl     String?
-  coachExternalLink String?
+  // Técnico (§ nova etapa): agora uma entidade compartilhada (Coach) — o
+  // mesmo técnico pode ser reaproveitado em várias temporadas, e editá-lo
+  // no Gerenciamento reflete em todas elas (referência, não cópia — mesmo
+  // princípio de CareerStint.seasonId: identidade compartilhada, nunca
+  // sincronizada por texto). Antes de dezembro/2026 eram 3 campos de texto
+  // soltos e independentes por temporada; a migration desta etapa criou um
+  // Coach próprio pra cada temporada que já tinha técnico preenchido, sem
+  // nunca mesclar nomes iguais de temporadas diferentes automaticamente
+  // (podem ser pessoas diferentes). SetNull: apagar um técnico no
+  // Gerenciamento só limpa esta referência, nunca a temporada em si.
+  coachId String?
+  coach   Coach?  @relation(fields: [coachId], references: [id], onDelete: SetNull)
 
   notes String? // "Resumo da temporada" — texto livre sobre esta temporada, sem estrutura. Deliberadamente NUNCA copiado ao duplicar uma temporada (seasonService.createSeason) — é específico dela, não faz parte da "base" reaproveitável.
 
@@ -175,6 +182,23 @@ model Season {
 
   @@unique([squadId, startYear])
   @@index([squadId])
+  @@index([coachId])
+}
+
+// Um técnico (§ nova etapa) — existe uma vez só, reaproveitável por
+// qualquer temporada de qualquer clube (Season.coachId), mesmo padrão de
+// Competition acima. Dado inteiramente manual, sem fonte externa (nenhum
+// provider cobre técnicos). Nome deliberadamente NÃO único: duas pessoas
+// reais podem ter o mesmo nome, e tratar isso como "a mesma" seria
+// misatribuir histórico — ver comentário da migration desta etapa.
+model Coach {
+  id           String   @id @default(cuid())
+  name         String
+  photoUrl     String?
+  externalLink String?
+  createdAt    DateTime @default(now())
+
+  seasons Season[]
 }
 
 // Uma competição/torneio (Brasileirão, Paranaense, Copa do Brasil...) —
@@ -182,8 +206,14 @@ model Season {
 // qualquer clube, para que o troféu (imagem informada pelo usuário, nunca
 // inventada) só precise ser cadastrado uma vez e já valha pra sempre.
 model Competition {
-  id             String   @id @default(cuid())
-  name           String   @unique
+  id   String @id @default(cuid())
+  name String @unique
+  // Identidade visual da competição (§ nova etapa) — usada nas telas de
+  // ESTATÍSTICA (jogos/gols/assistências por competição). Distinto de
+  // trophyImageUrl (a taça física conquistada, usada nas telas de TÍTULO):
+  // são dois conceitos diferentes que só coincidem por acaso, nunca devem
+  // ser preenchidos automaticamente um a partir do outro.
+  logoUrl        String?
   trophyImageUrl String?
   createdAt      DateTime @default(now())
 

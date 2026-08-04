@@ -10,6 +10,7 @@ import { ImageUrlInput } from "@/components/ui/image-url-input";
 export interface EditableCompetition {
   id: string;
   name: string;
+  logoUrl: string | null;
   trophyImageUrl: string | null;
 }
 
@@ -17,8 +18,13 @@ export interface EditableCompetition {
  * Nova etapa — Gerenciamento: shared between management/competitions and
  * management/trophies (same Competition row, two entry points) — this is
  * the fix for the original gap: a competition created without a trophy
- * image (or with the wrong one) can now be edited directly, instead of
+ * image (or without a logo) can now be edited directly, instead of
  * needing to be recreated.
+ *
+ * Logo e troféu são dois conceitos distintos (§1-§7 desta etapa): logo é a
+ * identidade visual usada nas telas de ESTATÍSTICA, troféu é a taça física
+ * usada nas telas de TÍTULO. Nunca preenchidos automaticamente um a partir
+ * do outro.
  */
 export function EditCompetitionForm({
   competition,
@@ -26,10 +32,11 @@ export function EditCompetitionForm({
   onCancel,
 }: {
   competition: EditableCompetition;
-  onSaved: (patch: { name: string; trophyImageUrl: string | null }) => void;
+  onSaved: (patch: { name: string; logoUrl: string | null; trophyImageUrl: string | null }) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(competition.name);
+  const [logoUrl, setLogoUrl] = useState(competition.logoUrl ?? "");
   const [trophyImageUrl, setTrophyImageUrl] = useState(competition.trophyImageUrl ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -41,7 +48,7 @@ export function EditCompetitionForm({
     }
 
     setSaving(true);
-    const patch = { name, trophyImageUrl: trophyImageUrl || null };
+    const patch = { name, logoUrl: logoUrl || null, trophyImageUrl: trophyImageUrl || null };
     fetch(`/api/competitions/${competition.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -69,8 +76,15 @@ export function EditCompetitionForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="edit-competition-trophy">Imagem do troféu</Label>
+        <Label htmlFor="edit-competition-logo">Logo da competição</Label>
+        <ImageUrlInput id="edit-competition-logo" value={logoUrl} onChange={setLogoUrl} />
+        <p className="text-muted-foreground text-xs">Usada nas telas de estatística.</p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="edit-competition-trophy">Troféu / Taça</Label>
         <ImageUrlInput id="edit-competition-trophy" value={trophyImageUrl} onChange={setTrophyImageUrl} />
+        <p className="text-muted-foreground text-xs">Usada nas telas de título.</p>
       </div>
 
       <div className="flex gap-2">

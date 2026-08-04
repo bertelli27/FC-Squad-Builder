@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ManagementPlayersPage() {
   const players = await playerDataService.listCustomPlayers();
+  const clubsByPlayer = await playerDataService.getLinkedClubsByPlayer(players.map((p) => p.id));
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,6 +37,7 @@ export default async function ManagementPlayersPage() {
           overall: p.overall,
           potential: p.potential,
           externalLink: p.externalLink,
+          clubs: clubsByPlayer.get(p.id) ?? [],
         }))}
       />
     </div>

@@ -38,12 +38,16 @@ export const competitionService = {
    * constraint) instead of throwing, same convention as
    * playerDataService.updatePlayer.
    */
-  async updateCompetition(id: string, patch: { name?: string; trophyImageUrl?: string | null }) {
+  async updateCompetition(
+    id: string,
+    patch: { name?: string; logoUrl?: string | null; trophyImageUrl?: string | null },
+  ) {
     return prisma.competition
       .update({
         where: { id },
         data: {
           ...(patch.name !== undefined && { name: patch.name.trim() }),
+          ...(patch.logoUrl !== undefined && { logoUrl: patch.logoUrl }),
           ...(patch.trophyImageUrl !== undefined && { trophyImageUrl: patch.trophyImageUrl }),
         },
       })

@@ -15,17 +15,17 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
-  const name = typeof body.name === "string" && body.name.trim() ? body.name : undefined;
-  const trophyImageUrl =
-    body.trophyImageUrl === undefined
-      ? undefined
-      : body.trophyImageUrl === null || body.trophyImageUrl === ""
-        ? null
-        : typeof body.trophyImageUrl === "string"
-          ? body.trophyImageUrl
-          : undefined;
+  function optionalStringField(value: unknown): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null || value === "") return null;
+    return typeof value === "string" ? value : undefined;
+  }
 
-  const competition = await competitionService.updateCompetition(id, { name, trophyImageUrl });
+  const name = typeof body.name === "string" && body.name.trim() ? body.name : undefined;
+  const logoUrl = optionalStringField(body.logoUrl);
+  const trophyImageUrl = optionalStringField(body.trophyImageUrl);
+
+  const competition = await competitionService.updateCompetition(id, { name, logoUrl, trophyImageUrl });
   if (!competition) {
     return NextResponse.json({ error: "Could not update competition (name may already exist)" }, { status: 409 });
   }

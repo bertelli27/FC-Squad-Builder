@@ -118,6 +118,59 @@ export const playerDataService = {
     });
   },
 
+  /**
+   * Nova etapa — Gerenciamento §20-26: distinct clubs/seleções each player
+   * is linked to, for the "escudos das equipes" badges in the management
+   * list. Two sources, batched for every player at once (avoids N+1 for
+   * the whole list):
+   *   - SquadPlayer → Season → Squad: real roster membership in Modo
+   *     Clubes (works whether or not the player has a career at all —
+   *     §25). Deduped by Squad.id, so 2019/2020/2021 of the same club
+   *     collapse into a single badge (§22).
+   *   - CareerStint WITHOUT a seasonId: a freeform career passage never
+   *     linked to a real club/season, which has no Squad.id to dedupe by
+   *     — deduped by clubName instead. Stints WITH a seasonId are already
+   *     covered by the SquadPlayer source above (same underlying Squad),
+   *     so they're excluded here to avoid a second, redundant badge.
+   */
+  async getLinkedClubsByPlayer(cachedPlayerIds: string[]) {
+    const [squadPlayers, freeformStints] = await Promise.all([
+      prisma.squadPlayer.findMany({
+        where: { cachedPlayerId: { in: cachedPlayerIds } },
+        select: {
+          cachedPlayerId: true,
+          season: { select: { squad: { select: { id: true, name: true, logoUrl: true } } } },
+        },
+      }),
+      prisma.careerStint.findMany({
+        where: { career: { cachedPlayerId: { in: cachedPlayerIds } }, seasonId: null },
+        select: { career: { select: { cachedPlayerId: true } }, clubName: true, clubLogoUrl: true },
+      }),
+    ]);
+
+    const byPlayer = new Map<string, Map<string, { name: string; logoUrl: string | null }>>();
+    function addClub(playerId: string | null, key: string, name: string, logoUrl: string | null) {
+      if (!playerId) return;
+      let clubs = byPlayer.get(playerId);
+      if (!clubs) {
+        clubs = new Map();
+        byPlayer.set(playerId, clubs);
+      }
+      if (!clubs.has(key)) clubs.set(key, { name, logoUrl });
+    }
+
+    for (const sp of squadPlayers) {
+      addClub(sp.cachedPlayerId, `squad:${sp.season.squad.id}`, sp.season.squad.name, sp.season.squad.logoUrl);
+    }
+    for (const stint of freeformStints) {
+      addClub(stint.career.cachedPlayerId, `freeform:${stint.clubName}`, stint.clubName, stint.clubLogoUrl);
+    }
+
+    const result = new Map<string, { name: string; logoUrl: string | null }[]>();
+    for (const [playerId, clubs] of byPlayer) result.set(playerId, [...clubs.values()]);
+    return result;
+  },
+
   /** Cache-first single player fetch, namespaced by source (matches Player.id's `${source}:${externalId}` shape). */
   async getPlayer(source: string, externalId: string): Promise<Player | null> {
     if (source === KAGGLE_RATINGS_SOURCE) {

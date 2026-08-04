@@ -66,6 +66,7 @@ export default async function CareerPage({ params }: { params: Promise<{ id: str
             competition: {
               id: t.competition.id,
               name: t.competition.name,
+              logoUrl: t.competition.logoUrl,
               trophyImageUrl: t.competition.trophyImageUrl,
             },
           })),
@@ -74,6 +75,7 @@ export default async function CareerPage({ params }: { params: Promise<{ id: str
             competition: {
               id: cs.competition.id,
               name: cs.competition.name,
+              logoUrl: cs.competition.logoUrl,
               trophyImageUrl: cs.competition.trophyImageUrl,
             },
             appearances: cs.appearances,

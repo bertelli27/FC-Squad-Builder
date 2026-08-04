@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { clubDataService } from "./club-data.service";
 import { nationalTeamDataService } from "./national-team-data.service";
 import { tagService } from "./tag.service";
-import { seasonService } from "./season.service";
+import { seasonService, ensureCareerStintForSeason } from "./season.service";
 import type { Player } from "@/types/domain";
 
 export interface CreateSquadInput {
@@ -71,7 +71,10 @@ export const squadService = {
         tags: true,
         seasons: {
           orderBy: { startYear: "desc" },
-          include: { _count: { select: { players: { where: { isWatchlist: false, isExtra: false } } } } },
+          include: {
+            coach: true,
+            _count: { select: { players: { where: { isWatchlist: false, isExtra: false } } } },
+          },
         },
       },
     });
@@ -186,9 +189,9 @@ export const squadService = {
           squadId: copy.id,
           startYear: season.startYear,
           formation: season.formation,
-          coachName: season.coachName,
-          coachPhotoUrl: season.coachPhotoUrl,
-          coachExternalLink: season.coachExternalLink,
+          // Coach agora é uma entidade compartilhada (§ nova etapa) — a
+          // temporada clonada começa com o MESMO técnico (referência).
+          coachId: season.coachId,
           notes: season.notes,
           wins: season.wins,
           draws: season.draws,
@@ -210,6 +213,15 @@ export const squadService = {
             order: p.order,
           })),
         });
+
+        // Mesmo bug/correção já aplicada em season.service.ts#createSeason
+        // (duplicar UMA temporada): duplicar o clube INTEIRO também cria
+        // SquadPlayer via createMany direto, sem passar por
+        // ensureCareerStintForSeason — um jogador copiado pro clube clonado
+        // nunca ganhava a passagem correspondente na carreira dele.
+        await Promise.all(
+          season.players.map((p) => ensureCareerStintForSeason(p.cachedPlayerId, newSeason.id)),
+        );
       }
 
       // This is a full historical clone of the club (unlike duplicating a

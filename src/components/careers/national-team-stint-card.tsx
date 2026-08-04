@@ -224,7 +224,21 @@ export function NationalTeamStintCard({
                       key={s.id}
                       className="hover:bg-accent/30 group/stats-row grid grid-cols-[1fr_2.5rem_2.5rem_2.5rem_1.25rem] items-center gap-1 rounded-md px-1 py-0.5"
                     >
-                      <span className="truncate text-sm">{s.competition.name}</span>
+                      <span className="flex min-w-0 items-center gap-1.5 truncate text-sm">
+                        {s.competition.logoUrl ? (
+                          <Image
+                            src={s.competition.logoUrl}
+                            alt=""
+                            width={16}
+                            height={16}
+                            className="size-4 shrink-0 object-contain"
+                            unoptimized
+                          />
+                        ) : (
+                          <ShieldIcon className="text-muted-foreground size-4 shrink-0" strokeWidth={1.5} />
+                        )}
+                        <span className="truncate">{s.competition.name}</span>
+                      </span>
                       <Input
                         type="number"
                         min={0}

@@ -4,6 +4,7 @@ import { categoryService } from "./category.service";
 import { tagService } from "./tag.service";
 import { squadService } from "./squad.service";
 import { competitionService } from "./competition.service";
+import { coachService } from "./coach.service";
 
 export interface SquadExportPlayer {
   shirtNumber: number | null;
@@ -90,9 +91,7 @@ interface ExportableSquad {
     id: string;
     startYear: number;
     formation: string;
-    coachName: string | null;
-    coachPhotoUrl: string | null;
-    coachExternalLink: string | null;
+    coach: { name: string; photoUrl: string | null; externalLink: string | null } | null;
     notes: string | null;
     wins: number;
     draws: number;
@@ -158,9 +157,9 @@ function toExportEntry(
       return {
         startYear: season.startYear,
         formation: season.formation,
-        coachName: season.coachName,
-        coachPhotoUrl: season.coachPhotoUrl,
-        coachExternalLink: season.coachExternalLink,
+        coachName: season.coach?.name ?? null,
+        coachPhotoUrl: season.coach?.photoUrl ?? null,
+        coachExternalLink: season.coach?.externalLink ?? null,
         notes: season.notes,
         wins: season.wins,
         draws: season.draws,
@@ -401,7 +400,7 @@ export const squadTransferService = {
   async exportAllSquads(): Promise<SquadExportFile> {
     const squads = await prisma.squad.findMany({
       include: {
-        seasons: { orderBy: { startYear: "asc" } },
+        seasons: { orderBy: { startYear: "asc" }, include: { coach: true } },
         category: true,
         tags: true,
       },
@@ -454,14 +453,20 @@ export const squadTransferService = {
       });
 
       for (const seasonEntry of entry.seasons) {
+        const coach = seasonEntry.coachName
+          ? await coachService.findOrCreateCoach(
+              seasonEntry.coachName,
+              seasonEntry.coachPhotoUrl,
+              seasonEntry.coachExternalLink,
+            )
+          : null;
+
         const season = await prisma.season.create({
           data: {
             squadId: squad.id,
             startYear: seasonEntry.startYear,
             formation: seasonEntry.formation,
-            coachName: seasonEntry.coachName,
-            coachPhotoUrl: seasonEntry.coachPhotoUrl,
-            coachExternalLink: seasonEntry.coachExternalLink,
+            coachId: coach?.id,
             notes: seasonEntry.notes,
             wins: seasonEntry.wins,
             draws: seasonEntry.draws,

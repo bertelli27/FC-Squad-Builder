@@ -1,6 +1,8 @@
 export interface CareerCompetitionRef {
   id: string;
   name: string;
+  /** § nova etapa: identidade visual usada em estatísticas — distinto de trophyImageUrl (a taça, usada em títulos). */
+  logoUrl: string | null;
   trophyImageUrl: string | null;
 }
 

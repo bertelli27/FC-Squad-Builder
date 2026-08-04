@@ -26,7 +26,12 @@ export default async function ManagementCompetitionsPage() {
       </div>
 
       <ManagementCompetitionsClient
-        competitions={competitions.map((c) => ({ id: c.id, name: c.name, trophyImageUrl: c.trophyImageUrl }))}
+        competitions={competitions.map((c) => ({
+          id: c.id,
+          name: c.name,
+          logoUrl: c.logoUrl,
+          trophyImageUrl: c.trophyImageUrl,
+        }))}
       />
     </div>
   );

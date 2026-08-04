@@ -31,27 +31,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const body = await request.json().catch(() => null);
   const formation = typeof body?.formation === "string" ? body.formation : undefined;
-  const coachName = optionalStringField(body?.coachName);
-  const coachPhotoUrl = optionalStringField(body?.coachPhotoUrl);
-  const coachExternalLink = optionalStringField(body?.coachExternalLink);
+  const coachId = optionalStringField(body?.coachId);
   const notes = optionalStringField(body?.notes);
   const wins = nonNegativeIntField(body?.wins);
   const draws = nonNegativeIntField(body?.draws);
   const losses = nonNegativeIntField(body?.losses);
 
-  if (
-    coachName !== undefined ||
-    coachPhotoUrl !== undefined ||
-    coachExternalLink !== undefined ||
-    notes !== undefined ||
-    wins !== undefined ||
-    draws !== undefined ||
-    losses !== undefined
-  ) {
+  if (coachId !== undefined || notes !== undefined || wins !== undefined || draws !== undefined || losses !== undefined) {
     await seasonService.updateSeason(seasonId, {
-      coachName,
-      coachPhotoUrl,
-      coachExternalLink,
+      coachId,
       notes,
       wins,
       draws,

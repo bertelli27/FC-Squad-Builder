@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { TrophyIcon, XIcon, ExternalLinkIcon } from "lucide-react";
+import Image from "next/image";
+import { TrophyIcon, ShieldIcon, XIcon, ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -242,7 +243,21 @@ function UnlinkedNationalStats({
                 key={s.id}
                 className="hover:bg-accent/30 group/row grid grid-cols-[1fr_3rem_3rem_3rem_1.5rem] items-center gap-1 rounded-md px-1 py-1"
               >
-                <span className="truncate text-sm">{s.competition.name}</span>
+                <span className="flex min-w-0 items-center gap-1.5 truncate text-sm">
+                  {s.competition.logoUrl ? (
+                    <Image
+                      src={s.competition.logoUrl}
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="size-4 shrink-0 object-contain"
+                      unoptimized
+                    />
+                  ) : (
+                    <ShieldIcon className="text-muted-foreground size-4 shrink-0" strokeWidth={1.5} />
+                  )}
+                  <span className="truncate">{s.competition.name}</span>
+                </span>
                 <Input
                   type="number"
                   min={0}

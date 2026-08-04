@@ -2,23 +2,40 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, PencilIcon, Trash2Icon } from "lucide-react";
+import Image from "next/image";
+import { toast } from "sonner";
+import { Search, PencilIcon, Trash2Icon, ShieldIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { OverallBadge } from "@/components/player-card/overall-badge";
-import { EditPlayerForm, type EditablePlayer } from "@/components/player-card/edit-player-form";
+import { EditPlayerForm, type EditablePlayer as EditablePlayerBase } from "@/components/player-card/edit-player-form";
 import { useDeletePlayer } from "@/hooks/use-delete-player";
 import { POSITIONS } from "@/lib/positions";
 import { countryFlag } from "@/lib/countries";
 import { ageToday } from "@/lib/player-age";
 
-export function ManagementPlayersClient({ players: initialPlayers }: { players: EditablePlayer[] }) {
+interface LinkedClub {
+  name: string;
+  logoUrl: string | null;
+}
+
+interface ManagementPlayer extends EditablePlayerBase {
+  clubs: LinkedClub[];
+}
+
+export function ManagementPlayersClient({ players: initialPlayers }: { players: ManagementPlayer[] }) {
   const router = useRouter();
   const [players, setPlayers] = useState(initialPlayers);
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<EditablePlayer | null>(null);
+  const [editing, setEditing] = useState<ManagementPlayer | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { requestDelete, dialog: confirmDialog } = useDeletePlayer();
+  const { confirm, dialog: bulkConfirmDialog } = useConfirmDialog();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -26,14 +43,67 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
     return players.filter((p) => p.name.toLowerCase().includes(q));
   }, [players, query]);
 
-  async function handleDelete(player: EditablePlayer) {
+  async function handleDelete(player: ManagementPlayer) {
     const deleted = await requestDelete({ cachedPlayerId: player.cachedPlayerId, name: player.name });
     if (!deleted) return;
     setPlayers((prev) => prev.filter((p) => p.cachedPlayerId !== player.cachedPlayerId));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(player.cachedPlayerId);
+      return next;
+    });
     // Este jogador pode aparecer numa carreira/elenco em outra página já
     // renderizada no servidor — não há como saber quais sem navegar até
     // lá, então não há nada além desta lista pra atualizar localmente.
   }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) => (prev.size === filtered.length ? new Set() : new Set(filtered.map((p) => p.cachedPlayerId))));
+  }
+
+  async function handleBulkDelete() {
+    const targets = players.filter((p) => selected.has(p.cachedPlayerId));
+    if (targets.length === 0) return;
+
+    const ok = await confirm({
+      title: `Excluir ${targets.length} ${targets.length === 1 ? "jogador" : "jogadores"}?`,
+      description: `Os jogadores selecionados serão removidos de acordo com as regras de exclusão do sistema (elencos, carreiras e demais relações). Essa ação não pode ser desfeita.\n\n${targets.map((p) => `• ${p.name}`).join("\n")}`,
+      confirmLabel: "Confirmar exclusão",
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setBulkDeleting(true);
+    // Mesma rota/regra da exclusão individual (DELETE /api/players/[id]),
+    // só chamada em sequência pra cada jogador selecionado — §18: "excluir
+    // 1" e "excluir 10" respeitam exatamente as mesmas relações/proteções.
+    const results = await Promise.all(
+      targets.map((p) => fetch(`/api/players/${p.cachedPlayerId}`, { method: "DELETE" }).then((res) => res.ok)),
+    );
+    setBulkDeleting(false);
+
+    const succeededIds = new Set(targets.filter((_, i) => results[i]).map((p) => p.cachedPlayerId));
+    setPlayers((prev) => prev.filter((p) => !succeededIds.has(p.cachedPlayerId)));
+    setSelected(new Set());
+
+    const failedCount = results.filter((ok) => !ok).length;
+    if (failedCount > 0) {
+      toast.error(`${succeededIds.size} excluído(s), ${failedCount} falharam.`);
+    } else {
+      toast.success(`${succeededIds.size} ${succeededIds.size === 1 ? "jogador excluído" : "jogadores excluídos"}.`);
+    }
+  }
+
+  const allSelected = filtered.length > 0 && selected.size === filtered.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -47,6 +117,18 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
         />
       </div>
 
+      {selected.size > 0 && (
+        <div className="bg-muted/40 flex items-center gap-3 rounded-lg border px-3 py-2">
+          <span className="text-sm font-medium">
+            {selected.size} {selected.size === 1 ? "jogador selecionado" : "jogadores selecionados"}
+          </span>
+          <Button size="sm" variant="destructive" disabled={bulkDeleting} onClick={handleBulkDelete}>
+            <Trash2Icon className="size-4" />
+            {bulkDeleting ? "Excluindo…" : "Excluir selecionados"}
+          </Button>
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-16 text-center">
           <p className="text-muted-foreground">
@@ -56,47 +138,86 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
           </p>
         </div>
       ) : (
-        <ul className="divide-border flex flex-col divide-y rounded-lg border">
-          {filtered.map((player) => {
-            const flag = countryFlag(player.nationality);
-            const age = player.dateOfBirth ? ageToday(player.dateOfBirth) : null;
-            const positionLabel = POSITIONS.find((p) => p.value === player.position)?.label ?? player.position;
-            return (
-              <li key={player.cachedPlayerId} className="hover:bg-accent/30 flex items-center gap-3 p-3">
-                <PlayerAvatar src={player.photoUrl} name={player.name} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-heading truncate text-sm font-bold">{player.name}</div>
-                  <div className="text-muted-foreground truncate text-xs">
-                    {[
-                      positionLabel,
-                      flag ? `${flag} ${player.nationality}` : player.nationality,
-                      age != null ? `${age} anos` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || "Sem dados cadastrados"}
+        <div className="flex flex-col rounded-lg border">
+          <div className="border-b px-3 py-2">
+            <label className="flex w-fit items-center gap-2 text-sm">
+              <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} aria-label="Selecionar todos" />
+              Selecionar todos
+            </label>
+          </div>
+          <ul className="divide-border flex flex-col divide-y">
+            {filtered.map((player) => {
+              const flag = countryFlag(player.nationality);
+              const age = player.dateOfBirth ? ageToday(player.dateOfBirth) : null;
+              const positionLabel = POSITIONS.find((p) => p.value === player.position)?.label ?? player.position;
+              return (
+                <li key={player.cachedPlayerId} className="hover:bg-accent/30 flex items-center gap-3 p-3">
+                  <Checkbox
+                    checked={selected.has(player.cachedPlayerId)}
+                    onCheckedChange={() => toggleSelected(player.cachedPlayerId)}
+                    aria-label={`Selecionar ${player.name}`}
+                  />
+                  <PlayerAvatar src={player.photoUrl} name={player.name} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-heading truncate text-sm font-bold">{player.name}</div>
+                    <div className="text-muted-foreground truncate text-xs">
+                      {[
+                        positionLabel,
+                        flag ? `${flag} ${player.nationality}` : player.nationality,
+                        age != null ? `${age} anos` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "Sem dados cadastrados"}
+                    </div>
                   </div>
-                </div>
-                <OverallBadge overall={player.overall} />
-                <button
-                  type="button"
-                  onClick={() => setEditing(player)}
-                  aria-label={`Editar ${player.name}`}
-                  className="text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-full"
-                >
-                  <PencilIcon className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(player)}
-                  aria-label={`Excluir ${player.name}`}
-                  className="text-muted-foreground hover:text-destructive flex size-8 items-center justify-center rounded-full"
-                >
-                  <Trash2Icon className="size-4" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                  {player.clubs.length > 0 && (
+                    <div className="flex shrink-0 items-center -space-x-1.5">
+                      {player.clubs.map((club) =>
+                        club.logoUrl ? (
+                          <Image
+                            key={club.name}
+                            src={club.logoUrl}
+                            alt={club.name}
+                            title={club.name}
+                            width={20}
+                            height={20}
+                            className="ring-background size-5 rounded-full bg-white object-contain ring-2"
+                            unoptimized
+                          />
+                        ) : (
+                          <span
+                            key={club.name}
+                            title={club.name}
+                            className="ring-background bg-muted flex size-5 items-center justify-center rounded-full ring-2"
+                          >
+                            <ShieldIcon className="text-muted-foreground size-3" />
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  )}
+                  <OverallBadge overall={player.overall} />
+                  <button
+                    type="button"
+                    onClick={() => setEditing(player)}
+                    aria-label={`Editar ${player.name}`}
+                    className="text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-full"
+                  >
+                    <PencilIcon className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(player)}
+                    aria-label={`Excluir ${player.name}`}
+                    className="text-muted-foreground hover:text-destructive flex size-8 items-center justify-center rounded-full"
+                  >
+                    <Trash2Icon className="size-4" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       <Dialog open={!!editing} onOpenChange={(next) => !next && setEditing(null)}>
@@ -123,6 +244,7 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
         </DialogContent>
       </Dialog>
       {confirmDialog}
+      {bulkConfirmDialog}
     </div>
   );
 }

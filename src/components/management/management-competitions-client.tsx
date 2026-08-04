@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { Search, PencilIcon, Trash2Icon, TrophyIcon } from "lucide-react";
+import { Search, PencilIcon, Trash2Icon, ShieldIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EditCompetitionForm, type EditableCompetition } from "./edit-competition-form";
@@ -54,9 +54,9 @@ export function ManagementCompetitionsClient({
         <ul className="divide-border flex flex-col divide-y rounded-lg border">
           {filtered.map((competition) => (
             <li key={competition.id} className="hover:bg-accent/30 flex items-center gap-3 p-3">
-              {competition.trophyImageUrl ? (
+              {competition.logoUrl ? (
                 <Image
-                  src={competition.trophyImageUrl}
+                  src={competition.logoUrl}
                   alt=""
                   width={28}
                   height={28}
@@ -64,12 +64,16 @@ export function ManagementCompetitionsClient({
                   unoptimized
                 />
               ) : (
-                <TrophyIcon className="text-muted-foreground size-7 shrink-0" strokeWidth={1.25} />
+                <ShieldIcon className="text-muted-foreground size-7 shrink-0" strokeWidth={1.25} />
               )}
               <div className="min-w-0 flex-1">
                 <div className="font-heading truncate text-sm font-bold">{competition.name}</div>
-                {!competition.trophyImageUrl && (
-                  <div className="text-muted-foreground text-xs">Nenhuma imagem de troféu cadastrada</div>
+                {(!competition.logoUrl || !competition.trophyImageUrl) && (
+                  <div className="text-muted-foreground text-xs">
+                    {[!competition.logoUrl && "sem logo", !competition.trophyImageUrl && "sem troféu"]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
                 )}
               </div>
               <button

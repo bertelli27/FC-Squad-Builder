@@ -59,7 +59,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
           id: season.id,
           startYear: season.startYear,
           formation: season.formation,
-          coachName: season.coachName,
+          coachName: season.coach?.name ?? null,
           playerCount: season._count.players,
         }))}
       />

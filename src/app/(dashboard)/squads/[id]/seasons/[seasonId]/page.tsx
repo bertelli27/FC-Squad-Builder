@@ -65,21 +65,15 @@ export default async function SeasonPage({
                 currentSeasonId={season.id}
               />
               <FormationSelector squadId={squad.id} seasonId={season.id} formation={season.formation} />
-              <EditSeasonCoachDialog
-                squadId={squad.id}
-                seasonId={season.id}
-                coachName={season.coachName}
-                coachPhotoUrl={season.coachPhotoUrl}
-                coachExternalLink={season.coachExternalLink}
-              />
+              <EditSeasonCoachDialog squadId={squad.id} seasonId={season.id} coachId={season.coachId} />
             </div>
           </CardContent>
-          {season.coachName && (
+          {season.coach && (
             <CardContent className="border-t py-3">
               <CoachCard
-                coachName={season.coachName}
-                coachPhotoUrl={season.coachPhotoUrl}
-                coachExternalLink={season.coachExternalLink}
+                coachName={season.coach.name}
+                coachPhotoUrl={season.coach.photoUrl}
+                coachExternalLink={season.coach.externalLink}
               />
             </CardContent>
           )}

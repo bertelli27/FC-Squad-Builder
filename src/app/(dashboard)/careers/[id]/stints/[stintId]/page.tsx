@@ -72,13 +72,19 @@ export default async function CareerStintPage({
           order: stint.order,
           titles: stint.titles.map((t) => ({
             id: t.id,
-            competition: { id: t.competition.id, name: t.competition.name, trophyImageUrl: t.competition.trophyImageUrl },
+            competition: {
+              id: t.competition.id,
+              name: t.competition.name,
+              logoUrl: t.competition.logoUrl,
+              trophyImageUrl: t.competition.trophyImageUrl,
+            },
           })),
           competitionStats: stint.competitionStats.map((cs) => ({
             id: cs.id,
             competition: {
               id: cs.competition.id,
               name: cs.competition.name,
+              logoUrl: cs.competition.logoUrl,
               trophyImageUrl: cs.competition.trophyImageUrl,
             },
             appearances: cs.appearances,

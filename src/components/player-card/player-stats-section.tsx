@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
-import { XIcon, ChartNoAxesColumnIcon } from "lucide-react";
+import { XIcon, ChartNoAxesColumnIcon, ShieldIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface CompetitionOption {
   id: string;
   name: string;
+  /** § nova etapa: identidade visual da competição — distinto do troféu, que só aparece nas telas de título. */
+  logoUrl?: string | null;
 }
 
 export interface PlayerStatsRow {
@@ -172,7 +175,21 @@ function StatsRow({
 
   return (
     <div className="hover:bg-accent/30 group/stats-row grid grid-cols-[1fr_2.5rem_2.5rem_2.5rem_1.25rem] items-center gap-1 rounded-md px-1 py-0.5">
-      <span className="truncate text-sm">{row.competition.name}</span>
+      <span className="flex min-w-0 items-center gap-1.5 truncate text-sm">
+        {row.competition.logoUrl ? (
+          <Image
+            src={row.competition.logoUrl}
+            alt=""
+            width={16}
+            height={16}
+            className="size-4 shrink-0 object-contain"
+            unoptimized
+          />
+        ) : (
+          <ShieldIcon className="text-muted-foreground size-4 shrink-0" strokeWidth={1.5} />
+        )}
+        <span className="truncate">{row.competition.name}</span>
+      </span>
       <Input
         type="number"
         min={0}
