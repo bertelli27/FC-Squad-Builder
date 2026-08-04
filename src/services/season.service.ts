@@ -297,6 +297,18 @@ export const seasonService = {
             order: p.order,
           })),
         });
+
+        // CORREÇÃO — duplicar temporada criava os SquadPlayer diretamente
+        // via createMany acima, sem passar por addPlayerToSeason/signPlayer
+        // (os únicos dois lugares que chamavam ensureCareerStintForSeason
+        // até agora) — por isso um jogador copiado pra temporada duplicada
+        // nunca ganhava a passagem correspondente na carreira dele. Mesma
+        // função, mesma idempotência (não cria uma segunda CareerStint se
+        // o jogador não tiver carreira, ou se essa temporada já estiver
+        // vinculada a uma).
+        await Promise.all(
+          source.players.map((p) => ensureCareerStintForSeason(p.cachedPlayerId, season.id)),
+        );
       }
 
       return { season: (await getSeasonById(season.id))! };

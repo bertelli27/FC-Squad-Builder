@@ -3,12 +3,7 @@ import { cacheRepository } from "@/repositories/cache.repository";
 import { competitionService } from "./competition.service";
 import { seasonService, ensureCareerStintForSeason } from "./season.service";
 
-/**
- * Standalone (see season.service.ts's getSeasonById for why) so other
- * methods below can reference its return type without a circular
- * `typeof careerService` self-reference.
- */
-function getCareerById(id: string) {
+function fetchCareerRaw(id: string) {
   return prisma.playerCareer.findUnique({
     where: { id },
     include: {
@@ -17,13 +12,92 @@ function getCareerById(id: string) {
         include: {
           titles: { include: { competition: true } },
           competitionStats: { include: { competition: true }, orderBy: { competition: { name: "asc" } } },
-          season: { select: { id: true, squadId: true } },
+          season: {
+            select: {
+              id: true,
+              squadId: true,
+              titles: { include: { competition: true }, orderBy: { createdAt: "asc" } },
+            },
+          },
         },
         orderBy: { order: "asc" },
       },
       transfers: { orderBy: { order: "asc" } },
     },
   });
+}
+
+/**
+ * CORREÇÃO — visão geral não consolidava dados de passagens vinculadas a
+ * uma temporada real: desde a etapa 8/§29, um stint com `seasonId` mostra
+ * jogos/gols/assistências/títulos direto da temporada do clube (ver
+ * club-stint-card.tsx/career-stint-page-content.tsx — "esses dados agora
+ * vivem na página da temporada"), então os campos próprios do CareerStint
+ * (appearances/goals/assists, sempre 0) e CareerTitle (sempre vazio) nunca
+ * são preenchidos para esses stints — só para os "soltos" (criados na mão,
+ * sem clube/temporada real vinculados). A "Visão geral" (career-workspace.
+ * tsx) e stintTotals() (lib/career.ts) sempre leram só esses campos
+ * próprios, então pareciam zerados para qualquer passagem vinculada.
+ *
+ * Aqui não muda nem stintTotals nem a agregação da workspace: só decora,
+ * uma vez por fetch, o `appearances/goals/assists`/`competitionStats`/
+ * `titles` de cada stint vinculado com os valores REAIS (PlayerCompetition
+ * Stats do SquadPlayer da temporada / SeasonTitle da temporada) — a mesma
+ * fonte que a página da própria temporada já usa. `competitionStats`
+ * também precisa ser decorado (não só o total achatado): stintTotals()
+ * usa exatamente esse array pra somar quando kind === "nationalTeam", em
+ * vez dos campos achatados (só clube usa esses). Nada é persistido: é uma
+ * leitura derivada a cada fetch, igual o resto do projeto já faz pra
+ * totais (nunca grava um total, sempre soma sob demanda). Stints sem
+ * `seasonId` continuam exatamente como estavam (não têm season pra puxar
+ * dado nenhum).
+ */
+async function decorateLinkedStints(career: NonNullable<Awaited<ReturnType<typeof fetchCareerRaw>>>) {
+  const cachedPlayerId = career.cachedPlayerId;
+  const linkedSeasonIds = career.stints.filter((s) => s.season).map((s) => s.season!.id);
+  if (!cachedPlayerId || linkedSeasonIds.length === 0) return career;
+
+  const squadPlayers = await prisma.squadPlayer.findMany({
+    where: { seasonId: { in: linkedSeasonIds }, cachedPlayerId },
+    include: { competitionStats: { include: { competition: true }, orderBy: { competition: { name: "asc" } } } },
+  });
+  const squadPlayerBySeasonId = new Map(squadPlayers.map((sp) => [sp.seasonId, sp]));
+
+  return {
+    ...career,
+    stints: career.stints.map((stint) => {
+      if (!stint.season) return stint;
+
+      const squadPlayer = squadPlayerBySeasonId.get(stint.season.id);
+      const effective = (squadPlayer?.competitionStats ?? []).reduce(
+        (acc, s) => ({
+          appearances: acc.appearances + s.appearances,
+          goals: acc.goals + s.goals,
+          assists: acc.assists + s.assists,
+        }),
+        { appearances: 0, goals: 0, assists: 0 },
+      );
+
+      return {
+        ...stint,
+        appearances: effective.appearances,
+        goals: effective.goals,
+        assists: effective.assists,
+        competitionStats: squadPlayer?.competitionStats ?? [],
+        titles: stint.season.titles,
+      };
+    }),
+  };
+}
+
+/**
+ * Standalone (see season.service.ts's getSeasonById for why) so other
+ * methods below can reference its return type without a circular
+ * `typeof careerService` self-reference.
+ */
+async function getCareerById(id: string) {
+  const career = await fetchCareerRaw(id);
+  return career ? decorateLinkedStints(career) : null;
 }
 
 async function nextOrder(careerId: string): Promise<number> {
