@@ -19,3 +19,27 @@ export const POSITIONS = [
   { value: "CF", label: "Segundo atacante" },
   { value: "ST", label: "Atacante" },
 ];
+
+/**
+ * Etapa 9 parte 2 — siglas curtas em português pra listagens compactas
+ * (Gerenciamento → Jogadores). Só uma forma alternativa de EXIBIR o mesmo
+ * `value` já armazenado (GK/CB/...) — nunca substitui esses valores no
+ * banco nem em nenhum outro lugar que já lê POSITIONS acima.
+ */
+export const POSITION_ABBREVIATIONS_PT: Record<string, string> = {
+  GK: "GO",
+  CB: "ZAG",
+  LB: "LE",
+  RB: "LD",
+  LWB: "AE",
+  RWB: "AD",
+  CDM: "VOL",
+  CM: "MC",
+  CAM: "MEI",
+  LM: "ME",
+  RM: "MD",
+  LW: "PE",
+  RW: "PD",
+  CF: "SA",
+  ST: "ATA",
+};

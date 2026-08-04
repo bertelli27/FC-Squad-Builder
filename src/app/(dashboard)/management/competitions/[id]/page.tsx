@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, ShieldIcon } from "lucide-react";
 import { competitionService } from "@/services/competition.service";
 import { CompetitionDetailTabs } from "@/components/management/competition-detail-tabs";
+import { KIND_OPTIONS, SCOPE_LABELS } from "@/lib/competition-classification";
+import { findCountry } from "@/lib/countries";
 
 export const dynamic = "force-dynamic";
 
-const KIND_LABELS: Record<string, string> = { club: "🏟️ Clube", nationalTeam: "🌎 Seleção" };
-const CATEGORY_LABELS: Record<string, string> = { international: "Internacional", national: "Nacional" };
+const KIND_LABELS = Object.fromEntries(KIND_OPTIONS.map((o) => [o.value, o.label]));
 
 export default async function CompetitionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,9 +44,9 @@ export default async function CompetitionDetailPage({ params }: { params: Promis
           <span className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-sm">
             {[
               competition.kind ? KIND_LABELS[competition.kind] : null,
-              competition.category ? CATEGORY_LABELS[competition.category] : null,
+              competition.scope ? SCOPE_LABELS[competition.scope] : null,
               competition.organizer,
-              competition.country,
+              competition.scope === "national" ? (findCountry(competition.country)?.label ?? competition.country) : null,
             ]
               .filter(Boolean)
               .join(" · ") || "Não classificada"}
@@ -60,7 +61,7 @@ export default async function CompetitionDetailPage({ params }: { params: Promis
           logoUrl: competition.logoUrl,
           trophyImageUrl: competition.trophyImageUrl,
           kind: competition.kind,
-          category: competition.category,
+          scope: competition.scope,
           organizer: competition.organizer,
           country: competition.country,
           description: competition.description,

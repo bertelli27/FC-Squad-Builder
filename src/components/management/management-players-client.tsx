@@ -11,13 +11,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
-import { OverallBadge } from "@/components/player-card/overall-badge";
 import { EditPlayerForm, type EditablePlayer as EditablePlayerBase } from "@/components/player-card/edit-player-form";
 import { CreatePlayerDialog } from "./create-player-dialog";
 import { useDeletePlayer } from "@/hooks/use-delete-player";
-import { POSITIONS } from "@/lib/positions";
+import { POSITION_ABBREVIATIONS_PT } from "@/lib/positions";
 import { countryFlag } from "@/lib/countries";
-import { ageToday } from "@/lib/player-age";
 
 interface LinkedClub {
   name: string;
@@ -152,10 +150,14 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
           <ul className="divide-border flex flex-col divide-y">
             {filtered.map((player) => {
               const flag = countryFlag(player.nationality);
-              const age = player.dateOfBirth ? ageToday(player.dateOfBirth) : null;
-              const positionLabel = POSITIONS.find((p) => p.value === player.position)?.label ?? player.position;
+              // Posição principal + secundárias, todas abreviadas em
+              // português — a lista respeita exatamente o que está
+              // cadastrado (§A.4), sem inventar nem esconder nenhuma.
+              const positionCodes = [player.position, ...(player.secondaryPositions ?? [])]
+                .filter((p): p is string => !!p)
+                .map((p) => POSITION_ABBREVIATIONS_PT[p] ?? p);
               return (
-                <li key={player.cachedPlayerId} className="hover:bg-accent/30 flex items-center gap-3 p-3">
+                <li key={player.cachedPlayerId} className="hover:bg-accent/30 flex flex-wrap items-center gap-3 p-3">
                   <Checkbox
                     checked={selected.has(player.cachedPlayerId)}
                     onCheckedChange={() => toggleSelected(player.cachedPlayerId)}
@@ -164,14 +166,20 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
                   <PlayerAvatar src={player.photoUrl} name={player.name} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="font-heading truncate text-sm font-bold">{player.name}</div>
-                    <div className="text-muted-foreground truncate text-xs">
-                      {[
-                        positionLabel,
-                        flag ? `${flag} ${player.nationality}` : player.nationality,
-                        age != null ? `${age} anos` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "Sem dados cadastrados"}
+                    <div className="flex flex-wrap items-center gap-1 text-xs">
+                      {flag && <span className="text-sm">{flag}</span>}
+                      {positionCodes.length > 0 ? (
+                        positionCodes.map((code, i) => (
+                          <span
+                            key={`${code}-${i}`}
+                            className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-medium"
+                          >
+                            {code}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Sem posição cadastrada</span>
+                      )}
                     </div>
                   </div>
                   {player.clubs.length > 0 && (
@@ -200,12 +208,11 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
                       )}
                     </div>
                   )}
-                  <OverallBadge overall={player.overall} />
                   <button
                     type="button"
                     onClick={() => setEditing(player)}
                     aria-label={`Editar ${player.name}`}
-                    className="text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-full"
+                    className="text-muted-foreground hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-full"
                   >
                     <PencilIcon className="size-4" />
                   </button>
@@ -213,7 +220,7 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
                     type="button"
                     onClick={() => handleDelete(player)}
                     aria-label={`Excluir ${player.name}`}
-                    className="text-muted-foreground hover:text-destructive flex size-8 items-center justify-center rounded-full"
+                    className="text-muted-foreground hover:text-destructive flex size-8 shrink-0 items-center justify-center rounded-full"
                   >
                     <Trash2Icon className="size-4" />
                   </button>

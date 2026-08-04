@@ -32,7 +32,7 @@ export default async function ManagementCompetitionsPage() {
           logoUrl: c.logoUrl,
           trophyImageUrl: c.trophyImageUrl,
           kind: c.kind,
-          category: c.category,
+          scope: c.scope,
           organizer: c.organizer,
           country: c.country,
           description: c.description,

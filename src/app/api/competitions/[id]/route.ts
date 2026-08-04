@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const logoUrl = optionalStringField(body.logoUrl);
   const trophyImageUrl = optionalStringField(body.trophyImageUrl);
   const kind = optionalStringField(body.kind);
-  const category = optionalStringField(body.category);
+  const scope = optionalStringField(body.scope);
   const organizer = optionalStringField(body.organizer);
   const country = optionalStringField(body.country);
   const description = optionalStringField(body.description);
@@ -35,7 +35,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     logoUrl,
     trophyImageUrl,
     kind,
-    category,
+    scope,
     organizer,
     country,
     description,

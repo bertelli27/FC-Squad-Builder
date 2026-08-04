@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     logoUrl: optionalStringField(body.logoUrl),
     trophyImageUrl: optionalStringField(body.trophyImageUrl),
     kind: optionalStringField(body.kind),
-    category: optionalStringField(body.category),
+    scope: optionalStringField(body.scope),
     organizer: optionalStringField(body.organizer),
     country: optionalStringField(body.country),
     description: optionalStringField(body.description),

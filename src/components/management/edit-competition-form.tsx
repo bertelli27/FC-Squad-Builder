@@ -16,6 +16,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OrganizerInput } from "./organizer-input";
+import {
+  KIND_OPTIONS,
+  SCOPE_OPTIONS_BY_KIND,
+  CONFEDERATIONS,
+  WORLD_ORGANIZER,
+  type CompetitionKind,
+} from "@/lib/competition-classification";
 
 export interface EditableCompetition {
   id: string;
@@ -23,7 +30,7 @@ export interface EditableCompetition {
   logoUrl: string | null;
   trophyImageUrl: string | null;
   kind: string | null;
-  category: string | null;
+  scope: string | null;
   organizer: string | null;
   country: string | null;
   description: string | null;
@@ -32,14 +39,6 @@ export interface EditableCompetition {
 export type CompetitionPatch = Omit<EditableCompetition, "id">;
 
 const NONE = "__none__";
-const KIND_OPTIONS = [
-  { value: "club", label: "🏟️ Clube" },
-  { value: "nationalTeam", label: "🌎 Seleção" },
-];
-const CATEGORY_OPTIONS = [
-  { value: "international", label: "Internacional" },
-  { value: "national", label: "Nacional" },
-];
 
 /**
  * Etapa 9 — formulário completo de edição de competição, usado na aba
@@ -48,6 +47,10 @@ const CATEGORY_OPTIONS = [
  * distintos (§27): logo é a identidade visual usada nas telas de
  * ESTATÍSTICA, troféu é a taça física usada nas telas de TÍTULO, nunca
  * preenchidos automaticamente um a partir do outro.
+ *
+ * Etapa 9 parte 2 (§B) — classificação em 4 níveis Tipo → Abrangência →
+ * Organização → País, "inteligente": cada nível só mostra os campos
+ * relevantes pra combinação atual (§B.5/§B.12).
  */
 export function EditCompetitionForm({
   competition,
@@ -62,16 +65,32 @@ export function EditCompetitionForm({
   const [logoUrl, setLogoUrl] = useState(competition.logoUrl ?? "");
   const [trophyImageUrl, setTrophyImageUrl] = useState(competition.trophyImageUrl ?? "");
   const [kind, setKind] = useState(competition.kind ?? NONE);
-  const [category, setCategory] = useState(competition.category ?? NONE);
+  const [scope, setScope] = useState(competition.scope ?? NONE);
   const [organizer, setOrganizer] = useState(competition.organizer ?? "");
   const [country, setCountry] = useState(competition.country ?? "");
   const [description, setDescription] = useState(competition.description ?? "");
   const [saving, setSaving] = useState(false);
 
+  const scopeOptions = kind === NONE ? [] : SCOPE_OPTIONS_BY_KIND[kind as CompetitionKind];
+
+  function handleKindChange(value: string) {
+    setKind(value);
+    const nextOptions = value === NONE ? [] : SCOPE_OPTIONS_BY_KIND[value as CompetitionKind];
+    if (!nextOptions.some((o) => o.value === scope)) setScope(NONE);
+  }
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!name.trim()) {
       toast.error("Dê um nome à competição.");
+      return;
+    }
+    if (scope === "continental" && !organizer.trim()) {
+      toast.error("Escolha a confederação organizadora.");
+      return;
+    }
+    if (scope === "national" && !country.trim()) {
+      toast.error("Escolha o país.");
       return;
     }
 
@@ -81,9 +100,10 @@ export function EditCompetitionForm({
       logoUrl: logoUrl || null,
       trophyImageUrl: trophyImageUrl || null,
       kind: kind === NONE ? null : kind,
-      category: category === NONE ? null : category,
-      organizer: category === "international" ? organizer || null : null,
-      country: category === "national" ? country || null : null,
+      scope: scope === NONE ? null : scope,
+      organizer:
+        scope === "world" ? WORLD_ORGANIZER : scope === "continental" || scope === "national" ? organizer.trim() || null : null,
+      country: scope === "national" ? country || null : null,
       description: description || null,
     };
     fetch(`/api/competitions/${competition.id}`, {
@@ -122,7 +142,7 @@ export function EditCompetitionForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="edit-competition-kind">Tipo</Label>
-          <Select value={kind} onValueChange={(v) => v && setKind(v)}>
+          <Select value={kind} onValueChange={(v) => v && handleKindChange(v)}>
             <SelectTrigger id="edit-competition-kind">
               <SelectValue>
                 {(v: string) => (v === NONE ? "Não classificado" : (KIND_OPTIONS.find((o) => o.value === v)?.label ?? v))}
@@ -140,18 +160,18 @@ export function EditCompetitionForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="edit-competition-category">Categoria</Label>
-          <Select value={category} onValueChange={(v) => v && setCategory(v)}>
-            <SelectTrigger id="edit-competition-category">
+          <Label htmlFor="edit-competition-scope">Abrangência</Label>
+          <Select value={scope} onValueChange={(v) => v && setScope(v)} disabled={kind === NONE}>
+            <SelectTrigger id="edit-competition-scope">
               <SelectValue>
                 {(v: string) =>
-                  v === NONE ? "Não classificado" : (CATEGORY_OPTIONS.find((o) => o.value === v)?.label ?? v)
+                  v === NONE ? "Não classificada" : (scopeOptions.find((o) => o.value === v)?.label ?? v)
                 }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>Não classificado</SelectItem>
-              {CATEGORY_OPTIONS.map((o) => (
+              <SelectItem value={NONE}>Não classificada</SelectItem>
+              {scopeOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
@@ -161,18 +181,43 @@ export function EditCompetitionForm({
         </div>
       </div>
 
-      {category === "international" && (
+      {scope === "world" && (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="edit-competition-organizer">Organizador</Label>
-          <OrganizerInput id="edit-competition-organizer" value={organizer} onChange={setOrganizer} />
+          <Label>Organização</Label>
+          <Input value={WORLD_ORGANIZER} disabled readOnly />
         </div>
       )}
 
-      {category === "national" && (
+      {scope === "continental" && (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="edit-competition-country">País</Label>
-          <CountrySelect id="edit-competition-country" value={country} onChange={setCountry} />
+          <Label htmlFor="edit-competition-organizer">Organização</Label>
+          <Select value={organizer || NONE} onValueChange={(v) => v && v !== NONE && setOrganizer(v)}>
+            <SelectTrigger id="edit-competition-organizer">
+              <SelectValue>{(v: string) => (v === NONE ? "Escolha a confederação" : v)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Escolha a confederação</SelectItem>
+              {CONFEDERATIONS.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+      )}
+
+      {scope === "national" && (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-competition-country">País</Label>
+            <CountrySelect id="edit-competition-country" value={country} onChange={setCountry} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-competition-organizer">Organização (federação nacional)</Label>
+            <OrganizerInput id="edit-competition-organizer" value={organizer} onChange={setOrganizer} />
+          </div>
+        </>
       )}
 
       <div className="flex flex-col gap-1.5">

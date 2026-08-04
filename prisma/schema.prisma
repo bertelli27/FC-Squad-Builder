@@ -220,24 +220,28 @@ model Competition {
   logoUrl        String?
   trophyImageUrl String?
 
-  // Etapa 9: classificação da competição — nenhum desses 4 campos é
+  // Etapa 9 parte 2: classificação da competição em 4 níveis — nenhum
   // obrigatório (competições já cadastradas ficam com tudo null, e
   // continuam funcionando exatamente como antes).
-  // "club" | "nationalTeam" | null (não classificado) — decide se um
-  // CompetitionChampion desta competição é um clube ou uma seleção.
+  // TIPO — "club" | "nationalTeam" | null (não classificado) — decide se
+  // um CompetitionChampion desta competição é um clube ou uma seleção.
   kind String?
-  // "international" | "national" | null — organizador internacional
-  // (FIFA/UEFA/CONMEBOL...) vs. competição nacional de um país. Não são a
-  // mesma coisa (uma Champions League não tem "país", um Brasileirão não
-  // tem "organizador" no sentido de entidade continental).
-  category String?
-  // Livre (ex: "FIFA", "UEFA", "CONMEBOL") — só relevante quando
-  // category === "international". Texto livre com sugestões dos valores
-  // já usados (não é uma entidade própria: sem foto/página, é só uma
-  // categoria de agrupamento na listagem).
+  // ABRANGÊNCIA — "world" | "continental" | "national" | null. Campo
+  // renomeado nesta etapa (era "category", só "international"|"national"
+  // — nenhuma competição em produção tinha isso preenchido ainda, então
+  // não houve valor antigo pra migrar). Junto com `kind` decide o que
+  // `organizer`/`country` abaixo significam.
+  scope String?
+  // ORGANIZAÇÃO — depende de `scope`: "FIFA" fixo quando scope=world;
+  // uma das 6 confederações (UEFA/CONMEBOL/CONCACAF/CAF/AFC/OFC) quando
+  // scope=continental; a federação nacional livre (ex: "CBF") quando
+  // scope=national. Continua sendo texto livre no banco (a validação de
+  // "só essas 6 confederações" é responsabilidade do formulário/serviço,
+  // não uma constraint de banco) — não é uma entidade própria, sem foto/
+  // página, só uma categoria de agrupamento na listagem.
   organizer String?
-  // enName de lib/countries.ts (ex: "Brazil") — só relevante quando
-  // category === "national".
+  // PAÍS — enName de lib/countries.ts (ex: "Brazil") — só relevante
+  // quando scope === "national".
   country     String?
   description String? // descrição/explicação livre da competição
   createdAt   DateTime @default(now())

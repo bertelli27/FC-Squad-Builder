@@ -25,7 +25,7 @@ export const competitionService = {
 
   /**
    * Etapa 9 — Gerenciamento: cria uma competição já com a classificação
-   * completa (kind/category/organizer/country/description), diferente de
+   * completa (kind/scope/organizer/country/description), diferente de
    * findOrCreateCompetition (usado pelos fluxos de título/estatística, que
    * só conhecem nome + eventualmente troféu).
    */
@@ -34,7 +34,7 @@ export const competitionService = {
     logoUrl?: string | null;
     trophyImageUrl?: string | null;
     kind?: string | null;
-    category?: string | null;
+    scope?: string | null;
     organizer?: string | null;
     country?: string | null;
     description?: string | null;
@@ -46,7 +46,7 @@ export const competitionService = {
           logoUrl: input.logoUrl || null,
           trophyImageUrl: input.trophyImageUrl || null,
           kind: input.kind || null,
-          category: input.category || null,
+          scope: input.scope || null,
           organizer: input.organizer || null,
           country: input.country || null,
           description: input.description || null,
@@ -89,7 +89,7 @@ export const competitionService = {
       logoUrl?: string | null;
       trophyImageUrl?: string | null;
       kind?: string | null;
-      category?: string | null;
+      scope?: string | null;
       organizer?: string | null;
       country?: string | null;
       description?: string | null;
@@ -103,7 +103,7 @@ export const competitionService = {
           ...(patch.logoUrl !== undefined && { logoUrl: patch.logoUrl }),
           ...(patch.trophyImageUrl !== undefined && { trophyImageUrl: patch.trophyImageUrl }),
           ...(patch.kind !== undefined && { kind: patch.kind }),
-          ...(patch.category !== undefined && { category: patch.category }),
+          ...(patch.scope !== undefined && { scope: patch.scope }),
           ...(patch.organizer !== undefined && { organizer: patch.organizer }),
           ...(patch.country !== undefined && { country: patch.country }),
           ...(patch.description !== undefined && { description: patch.description }),
