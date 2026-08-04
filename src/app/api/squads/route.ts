@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
   const { squad, season } = await squadService.createSquad({
     name: body.name,
     formation: typeof body.formation === "string" ? body.formation : undefined,
+    startYear: typeof body.startYear === "number" && Number.isInteger(body.startYear) ? body.startYear : undefined,
     base,
     categoryId: typeof body.categoryId === "string" ? body.categoryId : undefined,
     tagNames: Array.isArray(body.tagNames) ? body.tagNames.filter((t: unknown) => typeof t === "string") : undefined,

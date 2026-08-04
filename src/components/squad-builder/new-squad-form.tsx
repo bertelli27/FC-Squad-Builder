@@ -41,6 +41,7 @@ export function NewSquadForm() {
   const [selected, setSelected] = useState<SearchResult | null>(null);
   const [name, setName] = useState("");
   const [formation, setFormation] = useState(FORMATIONS[0]);
+  const [startYear, setStartYear] = useState(new Date().getFullYear());
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [tagNames, setTagNames] = useState<string[]>([]);
   const [isSubmitting, startSubmitting] = useTransition();
@@ -89,6 +90,10 @@ export function NewSquadForm() {
       toast.error("Dê um nome ao elenco.");
       return;
     }
+    if (!Number.isInteger(startYear)) {
+      toast.error("Informe um ano de início válido.");
+      return;
+    }
 
     startSubmitting(async () => {
       const res = await fetch("/api/squads", {
@@ -97,6 +102,7 @@ export function NewSquadForm() {
         body: JSON.stringify({
           name,
           formation,
+          startYear,
           base: kind !== "none" && selected ? { kind, name: selected.name } : undefined,
           categoryId,
           tagNames,
@@ -228,6 +234,18 @@ export function NewSquadForm() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="start-year">Ano de início</Label>
+            <Input
+              id="start-year"
+              type="number"
+              className="w-28"
+              value={startYear}
+              onChange={(e) => setStartYear(Number(e.target.value))}
+              required
+            />
           </div>
 
           <div className="flex flex-col gap-2">
