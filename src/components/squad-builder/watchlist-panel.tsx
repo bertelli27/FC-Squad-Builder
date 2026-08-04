@@ -22,6 +22,7 @@ export function WatchlistPanel({
   onRemove,
   onUpdated,
   onTransferredOut,
+  onDeleted,
 }: {
   players: SquadPlayerVM[];
   seasonId: string;
@@ -29,6 +30,7 @@ export function WatchlistPanel({
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
+  onDeleted: (id: string, playerName: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "watchlist" });
   const groups = groupPlayersByPosition(players);
@@ -62,6 +64,7 @@ export function WatchlistPanel({
                     onRemove={onRemove}
                     onUpdated={onUpdated}
                     onTransferredOut={onTransferredOut}
+                    onDeleted={onDeleted}
                   />
                 ))}
               </ul>
@@ -80,6 +83,7 @@ function WatchlistRow({
   onRemove,
   onUpdated,
   onTransferredOut,
+  onDeleted,
 }: {
   player: SquadPlayerVM;
   seasonId: string;
@@ -87,6 +91,7 @@ function WatchlistRow({
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
+  onDeleted: (id: string, playerName: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: player.id });
 
@@ -127,6 +132,7 @@ function WatchlistRow({
         ageReference={ageReference}
         onUpdated={(patch) => onUpdated(player.id, patch)}
         onTransferredOut={(counterpartClub) => onTransferredOut(player.id, player.name, counterpartClub)}
+        onDeleted={() => onDeleted(player.id, player.name)}
         aria-label={`Ver perfil de ${player.name}`}
         className="block min-w-0 flex-1"
       >

@@ -19,6 +19,8 @@ import { POSITIONS, MAX_SECONDARY_POSITIONS } from "@/lib/positions";
 
 export interface EditablePlayer {
   cachedPlayerId: string;
+  /** Nova etapa — só usado para restringir "Excluir jogador" a jogadores custom; o formulário de edição em si não depende disso. */
+  source?: string | null;
   name: string;
   photoUrl?: string | null;
   dateOfBirth?: string | null; // ISO

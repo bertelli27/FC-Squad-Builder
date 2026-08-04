@@ -76,3 +76,23 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (!player) return NextResponse.json({ error: "Player not found" }, { status: 404 });
   return NextResponse.json({ player });
 }
+
+/** Resumo de impacto exibido na confirmação antes de excluir o jogador (nova etapa). */
+export async function GET(_request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
+  const impact = await playerDataService.getDeleteImpact(id);
+  return NextResponse.json({ impact });
+}
+
+/**
+ * Exclui o CachedPlayer inteiro e tudo que só existe por causa dele
+ * (escalações em qualquer temporada, carreira e suas passagens/títulos/
+ * estatísticas/transferências). Diferente de DELETE
+ * /api/seasons/[id]/players/[playerId], que só remove de UMA temporada.
+ */
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
+  const deleted = await playerDataService.deletePlayer(id).catch(() => false);
+  if (!deleted) return NextResponse.json({ error: "Failed to delete player" }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

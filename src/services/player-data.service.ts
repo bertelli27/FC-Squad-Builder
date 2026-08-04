@@ -169,4 +169,64 @@ export const playerDataService = {
 
     return row ? cachedPlayerToDomain(row) : null;
   },
+
+  /**
+   * Nova etapa — exclusão de jogadores custom: resumo de impacto mostrado
+   * na confirmação, antes de apagar de fato. Usa os mesmos dados que
+   * deletePlayer já precisaria buscar para decidir o que cascateia, então
+   * não há custo extra em expor isso separadamente.
+   */
+  async getDeleteImpact(cachedPlayerId: string) {
+    const squadPlayers = await prisma.squadPlayer.findMany({
+      where: { cachedPlayerId },
+      select: { id: true, season: { select: { squadId: true } } },
+    });
+    const squadPlayerIds = squadPlayers.map((sp) => sp.id);
+
+    const [statsCount, directTransferCount, career] = await Promise.all([
+      squadPlayerIds.length
+        ? prisma.playerCompetitionStats.count({ where: { squadPlayerId: { in: squadPlayerIds } } })
+        : Promise.resolve(0),
+      prisma.transfer.count({ where: { cachedPlayerId } }),
+      prisma.playerCareer.findFirst({
+        where: { cachedPlayerId },
+        include: { _count: { select: { stints: true, transfers: true } } },
+      }),
+    ]);
+
+    return {
+      seasonCount: squadPlayers.length,
+      clubCount: new Set(squadPlayers.map((sp) => sp.season.squadId)).size,
+      statsCount,
+      transferCount: directTransferCount + (career?._count.transfers ?? 0),
+      stintCount: career?._count.stints ?? 0,
+      hasCareer: !!career,
+    };
+  },
+
+  /**
+   * Apaga o jogador (CachedPlayer) inteiro e tudo que só existe por causa
+   * dele — diferente de "remover do elenco" (removePlayerFromSeason), que
+   * tira só de UMA temporada. Ordem importa por causa do ON DELETE
+   * RESTRICT em SquadPlayer.cachedPlayerId (confirmado nas migrations
+   * aplicadas): SquadPlayer precisa sumir antes do CachedPlayer, senão o
+   * delete final falha. PlayerCareer é apagado explicitamente (em vez de
+   * confiar no ON DELETE SET NULL da FK) para não deixar uma carreira sem
+   * cachedPlayerId, o que violaria a invariante da etapa 6 de que toda
+   * carreira sempre tem um jogador vinculado — apagar a carreira já
+   * cascateia CareerStint/CareerTransfer/CareerTitle/
+   * CareerStintCompetitionStats sozinho (mesmo mecanismo de
+   * career.service.ts#deleteCareer). Transfer.cachedPlayerId fica como
+   * ON DELETE SET NULL mesmo (histórico da temporada, não do jogador).
+   * Só afeta linhas filtradas por este cachedPlayerId — nunca outros
+   * jogadores, clubes ou temporadas.
+   */
+  async deletePlayer(cachedPlayerId: string): Promise<boolean> {
+    await prisma.$transaction([
+      prisma.squadPlayer.deleteMany({ where: { cachedPlayerId } }),
+      prisma.playerCareer.deleteMany({ where: { cachedPlayerId } }),
+      prisma.cachedPlayer.delete({ where: { id: cachedPlayerId } }),
+    ]);
+    return true;
+  },
 };

@@ -425,6 +425,15 @@ export function SquadEditor({
     router.refresh();
   }
 
+  // Nova etapa — exclusão: PlayerProfileDialog already handled the
+  // confirm+impact-summary+DELETE itself before calling this, so unlike
+  // handleRemove this is just local bookkeeping (same shape as
+  // handleTransferredOut above).
+  function handleDeleted(playerId: string, playerName: string) {
+    removePlayerLocal(playerId);
+    toast.success(`${playerName} excluído.`);
+  }
+
   function handlePlayerAdded(player: SquadPlayerVM) {
     // The backend itself decides isExtra (26-man cap check) — a national
     // team squad already at 26 routes a fresh addition into extras
@@ -467,6 +476,7 @@ export function SquadEditor({
     onRemove: handleRemove,
     onUpdated: updatePlayerLocal,
     onTransferredOut: handleTransferredOut,
+    onDeleted: handleDeleted,
   };
 
   return (
@@ -580,6 +590,7 @@ export function SquadEditor({
               onRemove={handleRemove}
               onUpdated={updatePlayerLocal}
               onTransferredOut={handleTransferredOut}
+              onDeleted={handleDeleted}
             />
           </CardContent>
         </Card>
@@ -607,6 +618,7 @@ export function SquadEditor({
               onRemove={handleRemove}
               onUpdated={updatePlayerLocal}
               onTransferredOut={handleTransferredOut}
+              onDeleted={handleDeleted}
             />
           </CardContent>
         </Card>
@@ -652,6 +664,7 @@ function DroppableSlot({
   onRemove,
   onUpdated,
   onTransferredOut,
+  onDeleted,
 }: {
   slotKey: string;
   label: string;
@@ -666,6 +679,7 @@ function DroppableSlot({
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
+  onDeleted: (id: string, playerName: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot:${slotKey}` });
 
@@ -686,6 +700,7 @@ function DroppableSlot({
           onRemove={onRemove}
           onUpdated={onUpdated}
           onTransferredOut={onTransferredOut}
+          onDeleted={onDeleted}
         />
       ) : (
         <div
@@ -728,6 +743,7 @@ function PlayerChip({
   onRemove,
   onUpdated,
   onTransferredOut,
+  onDeleted,
 }: {
   player: SquadPlayerVM;
   seasonId: string;
@@ -738,6 +754,7 @@ function PlayerChip({
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
+  onDeleted: (id: string, playerName: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: player.id,
@@ -826,6 +843,7 @@ function PlayerChip({
           ageReference={ageReference}
           onUpdated={(patch) => onUpdated(player.id, patch)}
           onTransferredOut={(counterpartClub) => onTransferredOut(player.id, player.name, counterpartClub)}
+          onDeleted={() => onDeleted(player.id, player.name)}
           aria-label={`Ver perfil de ${player.name}`}
           className="block rounded-full"
         >

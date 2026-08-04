@@ -32,6 +32,7 @@ export default async function CareerPage({ params }: { params: Promise<{ id: str
       <CareerHeader
         player={{
           cachedPlayerId,
+          source: career.cachedPlayer?.source ?? null,
           name: career.cachedPlayer?.name ?? career.name,
           photoUrl: career.cachedPlayer?.photoUrl ?? career.photoUrl,
           dateOfBirth: career.cachedPlayer?.dateOfBirth?.toISOString() ?? null,

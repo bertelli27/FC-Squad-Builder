@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PencilIcon } from "lucide-react";
+import { toast } from "sonner";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { EditPlayerForm, type EditablePlayer } from "@/components/player-card/edit-player-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { countryFlag } from "@/lib/countries";
 import { ageToday } from "@/lib/player-age";
+
+const CUSTOM_SOURCE = "custom";
 
 /**
  * §17/§20/§22/§23: "Editar jogador" reachable straight from the career
@@ -20,8 +24,51 @@ export function CareerHeader({ player }: { player: EditablePlayer }) {
   const router = useRouter();
   const [current, setCurrent] = useState(player);
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const flag = countryFlag(current.nationality);
   const age = current.dateOfBirth ? ageToday(current.dateOfBirth) : null;
+  // Nova etapa — exclusão restrita a jogadores criados pelo usuário
+  // (source "custom"), mesma regra do player-profile-dialog.tsx.
+  const canDelete = current.source === CUSTOM_SOURCE && !!current.cachedPlayerId;
+
+  async function handleDelete() {
+    const impact = await fetch(`/api/players/${current.cachedPlayerId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data?.impact ?? null)
+      .catch(() => null);
+
+    const parts: string[] = [];
+    if (impact) {
+      if (impact.seasonCount > 0) {
+        parts.push(
+          `${impact.seasonCount} temporada${impact.seasonCount > 1 ? "s" : ""} em ${impact.clubCount} elenco${impact.clubCount > 1 ? "s" : ""}`,
+        );
+      }
+      if (impact.statsCount > 0) parts.push(`${impact.statsCount} registro(s) de estatística`);
+      if (impact.stintCount > 0) parts.push(`${impact.stintCount} passagem(ns) na carreira`);
+      if (impact.transferCount > 0) parts.push(`${impact.transferCount} transferência(s)`);
+    }
+    const description = `${parts.length ? `Vai remover ${current.name} de: ${parts.join(", ")}. ` : ""}Essa ação não pode ser desfeita.`;
+
+    const ok = await confirm({
+      title: `Excluir ${current.name}?`,
+      description,
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setDeleting(true);
+    const res = await fetch(`/api/players/${current.cachedPlayerId}`, { method: "DELETE" });
+    setDeleting(false);
+    if (!res.ok) {
+      toast.error("Não foi possível excluir o jogador.");
+      return;
+    }
+    toast.success(`${current.name} excluído.`);
+    router.push("/careers");
+  }
 
   return (
     <>
@@ -50,6 +97,17 @@ export function CareerHeader({ player }: { player: EditablePlayer }) {
               <PencilIcon className="size-4" />
             </button>
           )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              aria-label="Excluir jogador"
+              className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+            >
+              <Trash2Icon className="size-4" />
+            </button>
+          )}
         </CardContent>
       </Card>
 
@@ -74,6 +132,7 @@ export function CareerHeader({ player }: { player: EditablePlayer }) {
           />
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   );
 }

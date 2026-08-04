@@ -31,6 +31,7 @@ export function ExtrasPanel({
   onRemove,
   onUpdated,
   onTransferredOut,
+  onDeleted,
 }: {
   players: SquadPlayerVM[];
   seasonId: string;
@@ -38,6 +39,7 @@ export function ExtrasPanel({
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
+  onDeleted: (id: string, playerName: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "extras" });
 
@@ -70,6 +72,7 @@ export function ExtrasPanel({
                     onRemove={onRemove}
                     onUpdated={onUpdated}
                     onTransferredOut={onTransferredOut}
+                    onDeleted={onDeleted}
                   />
                 ))}
               </ul>
@@ -88,6 +91,7 @@ function ExtraRow({
   onRemove,
   onUpdated,
   onTransferredOut,
+  onDeleted,
 }: {
   player: SquadPlayerVM;
   seasonId: string;
@@ -95,6 +99,7 @@ function ExtraRow({
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
+  onDeleted: (id: string, playerName: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: player.id });
 
@@ -138,6 +143,7 @@ function ExtraRow({
         ageReference={ageReference}
         onUpdated={(patch) => onUpdated(player.id, patch)}
         onTransferredOut={(counterpartClub) => onTransferredOut(player.id, player.name, counterpartClub)}
+        onDeleted={() => onDeleted(player.id, player.name)}
         aria-label={`Ver perfil de ${player.name}`}
         className="block min-w-0 flex-1"
       >

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { PencilIcon, ArrowRightLeftIcon, UserRoundIcon } from "lucide-react";
+import { toast } from "sonner";
+import { PencilIcon, ArrowRightLeftIcon, UserRoundIcon, Trash2Icon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PlayerAvatar } from "./player-avatar";
 import { OverallBadge } from "./overall-badge";
 import { PlayerStatsSection } from "./player-stats-section";
@@ -51,6 +53,7 @@ export function PlayerProfileDialog({
   ageReference,
   onUpdated,
   onTransferredOut,
+  onDeleted,
   className,
   "aria-label": ariaLabel,
   children,
@@ -63,6 +66,8 @@ export function PlayerProfileDialog({
   onUpdated?: (patch: Partial<Omit<KnownPlayerInfo, "cachedPlayerId">>) => void;
   /** Etapa 7 (§2-§7) — only needed to show "Transferir jogador"; called (with the destination club) after a successful transfer, once the player has already left this season's roster server-side. */
   onTransferredOut?: (counterpartClub: string) => void;
+  /** Nova etapa — exclusão: called after the CachedPlayer itself (and everything that only exists because of it) has been deleted server-side. */
+  onDeleted?: () => void;
   className?: string;
   "aria-label"?: string;
   children: React.ReactNode;
@@ -72,6 +77,8 @@ export function PlayerProfileDialog({
   const [enriched, setEnriched] = useState<Player | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const isCustom = known.source === CUSTOM_SOURCE;
   // Etapa 6 (§16/§24): editing is no longer limited to "custom" players —
   // any CachedPlayer's cadastral data can be edited, since it's the same
@@ -80,6 +87,50 @@ export function PlayerProfileDialog({
   // §2: transferring is only meaningful for a player actually on this
   // season's roster right now, not e.g. a search result before adding.
   const canTransfer = !!onTransferredOut && !!seasonId && !!squadPlayerId;
+  // Nova etapa: exclusão de jogador é restrita a jogadores criados pelo
+  // usuário (source "custom") — jogadores importados (Kaggle/API-Football/
+  // TheSportsDB) não ganham essa ação, por pedido explícito de não alterar
+  // a lógica deles.
+  const canDelete = isCustom && !!known.cachedPlayerId && !!onDeleted;
+
+  async function handleDelete() {
+    if (!known.cachedPlayerId) return;
+    const impact = await fetch(`/api/players/${known.cachedPlayerId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data?.impact ?? null)
+      .catch(() => null);
+
+    const parts: string[] = [];
+    if (impact) {
+      if (impact.seasonCount > 0) {
+        parts.push(
+          `${impact.seasonCount} temporada${impact.seasonCount > 1 ? "s" : ""} em ${impact.clubCount} elenco${impact.clubCount > 1 ? "s" : ""}`,
+        );
+      }
+      if (impact.statsCount > 0) parts.push(`${impact.statsCount} registro(s) de estatística`);
+      if (impact.stintCount > 0) parts.push(`${impact.stintCount} passagem(ns) na carreira`);
+      if (impact.transferCount > 0) parts.push(`${impact.transferCount} transferência(s)`);
+    }
+    const description = `${parts.length ? `Vai remover ${known.name} de: ${parts.join(", ")}. ` : ""}Essa ação não pode ser desfeita.`;
+
+    const ok = await confirm({
+      title: `Excluir ${known.name}?`,
+      description,
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setDeleting(true);
+    const res = await fetch(`/api/players/${known.cachedPlayerId}`, { method: "DELETE" });
+    setDeleting(false);
+    if (!res.ok) {
+      toast.error("Não foi possível excluir o jogador.");
+      return;
+    }
+    setOpen(false);
+    onDeleted?.();
+  }
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -141,6 +192,7 @@ export function PlayerProfileDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger className={className} aria-label={ariaLabel}>
         {children}
@@ -179,6 +231,17 @@ export function PlayerProfileDialog({
                   >
                     <UserRoundIcon className="size-4" />
                   </Link>
+                )}
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    aria-label="Excluir jogador"
+                    className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                  >
+                    <Trash2Icon className="size-4" />
+                  </button>
                 )}
               </span>
             )}
@@ -225,6 +288,8 @@ export function PlayerProfileDialog({
         )}
       </DialogContent>
     </Dialog>
+    {confirmDialog}
+    </>
   );
 }
 
