@@ -157,15 +157,15 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
                 .filter((p): p is string => !!p)
                 .map((p) => POSITION_ABBREVIATIONS_PT[p] ?? p);
               return (
-                <li key={player.cachedPlayerId} className="hover:bg-accent/30 flex flex-wrap items-center gap-3 p-3">
+                <li key={player.cachedPlayerId} className="hover:bg-accent/30 flex flex-wrap items-center gap-4 p-4">
                   <Checkbox
                     checked={selected.has(player.cachedPlayerId)}
                     onCheckedChange={() => toggleSelected(player.cachedPlayerId)}
                     aria-label={`Selecionar ${player.name}`}
                   />
-                  <PlayerAvatar src={player.photoUrl} name={player.name} size="sm" />
+                  <PlayerAvatar src={player.photoUrl} name={player.name} size="default" />
                   <div className="min-w-0 flex-1">
-                    <div className="font-heading truncate text-sm font-bold">{player.name}</div>
+                    <div className="font-heading truncate text-base font-bold">{player.name}</div>
                     <div className="flex flex-wrap items-center gap-1 text-xs">
                       {flag && <span className="text-sm">{flag}</span>}
                       {positionCodes.length > 0 ? (

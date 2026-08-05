@@ -5,6 +5,7 @@ import { normalizePositionCategory } from "@/lib/position-category";
 import { playerDataService } from "./player-data.service";
 import { competitionService } from "./competition.service";
 import { NATIONAL_TEAM_SQUAD_SIZE } from "@/lib/national-team";
+import { KIT_TYPES } from "@/lib/kits";
 import type { Player } from "@/types/domain";
 
 interface SquadPlayerAssignment {
@@ -178,6 +179,7 @@ function getSeasonById(id: string) {
       players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
       titles: { include: { competition: true }, orderBy: { createdAt: "asc" } },
       transfers: { orderBy: { order: "asc" } },
+      kits: true,
     },
   });
 }
@@ -314,6 +316,18 @@ export const seasonService = {
         );
       }
 
+      // Kits (§1.5 da etapa) — deliberadamente NÃO copiados pra temporada
+      // duplicada, diferente de formation/coachId acima. O motivo é o
+      // oposto do de coachId: formation/técnico tendem a se repetir de um
+      // ano pro outro e valem como "base" reaproveitável, mas o uniforme é
+      // exatamente o tipo de dado que MUDA a cada temporada — é a própria
+      // razão da feature existir (§1.1/§1.4: Coritiba 2019 ≠ 2020 ≠ 2021).
+      // Copiar arriscaria deixar o kit de 2026 mostrando o de 2025 até o
+      // usuário notar e trocar manualmente; ficar em branco (mesmo
+      // comportamento de qualquer temporada nova, §1.8) é o padrão seguro.
+      // Mesmo tratamento de `notes` acima: específico da temporada, não
+      // parte da base copiada.
+
       return { season: (await getSeasonById(season.id))! };
     }
 
@@ -375,6 +389,26 @@ export const seasonService = {
 
   async removeTitle(seasonId: string, titleId: string) {
     await prisma.seasonTitle.delete({ where: { id: titleId, seasonId } });
+  },
+
+  /**
+   * Etapa 9 parte 3 — minikits: adiciona OU substitui (upsert por
+   * [seasonId, type], §1.7 "adicionar"/"substituir" são a mesma ação do
+   * ponto de vista do dado). Nunca cria os outros tipos junto — cada
+   * chamada afeta só o `type` passado.
+   */
+  async setKit(seasonId: string, type: string, imageUrl: string) {
+    if (!KIT_TYPES.some((k) => k.value === type) || !imageUrl.trim()) return null;
+    return prisma.seasonKit.upsert({
+      where: { seasonId_type: { seasonId, type } },
+      create: { seasonId, type, imageUrl: imageUrl.trim() },
+      update: { imageUrl: imageUrl.trim() },
+    });
+  },
+
+  /** Remove só este tipo de kit — nunca a temporada, nunca os outros kits dela (§1.7). */
+  async removeKit(seasonId: string, type: string) {
+    await prisma.seasonKit.deleteMany({ where: { seasonId, type } });
   },
 
   /**

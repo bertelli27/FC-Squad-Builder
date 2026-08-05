@@ -184,7 +184,7 @@ export function ManagementCompetitionsClient({
                               )}
                               <div className="min-w-0 flex-1">
                                 <div className="font-heading truncate text-sm font-bold">
-                                  🏆 {competition.name}
+                                  {competition.name}
                                 </div>
                                 {(!competition.logoUrl || !competition.trophyImageUrl) && (
                                   <div className="text-muted-foreground text-xs">

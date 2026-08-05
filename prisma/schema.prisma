@@ -183,10 +183,39 @@ model Season {
   // "esta temporada foi campeã de tal edição", sem a Season precisar saber
   // nada além de permitir onDelete: SetNull.
   championEntries CompetitionChampion[]
+  // Minikits (etapa 9 parte 3) — uniformes pertencem à TEMPORADA, não ao
+  // clube: Coritiba 2019 e Coritiba 2026 têm conjuntos de kits totalmente
+  // independentes. Ver SeasonKit abaixo.
+  kits SeasonKit[]
 
   @@unique([squadId, startYear])
   @@index([squadId])
   @@index([coachId])
+}
+
+// Um uniforme (minikit, estilo EA FC/FIFA) de uma temporada específica —
+// no máximo 5 por temporada (home/away/third/fourth/goalkeeper, ver
+// lib/kits.ts), nenhum criado automaticamente: o usuário cadastra só os
+// tipos que quiser, na ordem/combinação que quiser. `type` guarda um dos
+// valores de KIT_TYPES (lib/kits.ts) — não é um enum do banco pra manter
+// o mesmo padrão já usado em Competition.kind/scope (string livre validada
+// na camada de serviço/API, não no schema). `imageUrl` reaproveita a MESMA
+// infraestrutura de upload (Vercel Blob via /api/upload) já usada por
+// CachedPlayer.photoUrl/Squad.logoUrl/Competition.logoUrl — nenhum storage
+// novo. onDelete: Cascade porque um kit não tem sentido sem a temporada
+// dona dele (mesmo princípio de SquadPlayer/SeasonTitle/Transfer).
+model SeasonKit {
+  id       String @id @default(cuid())
+  seasonId String
+  season   Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  type     String
+  imageUrl String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([seasonId, type])
+  @@index([seasonId])
 }
 
 // Um técnico (§ nova etapa) — existe uma vez só, reaproveitável por
