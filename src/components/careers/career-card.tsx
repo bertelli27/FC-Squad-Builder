@@ -14,7 +14,7 @@ export interface CareerCardData {
   id: string;
   name: string;
   photoUrl: string | null;
-  stintCount: number;
+  seasonCount: number;
 }
 
 export function CareerCard({ career }: { career: CareerCardData }) {
@@ -72,7 +72,7 @@ export function CareerCard({ career }: { career: CareerCardData }) {
         <CardContent className="flex items-center gap-1 pb-4 text-sm">
           <span className="text-muted-foreground flex items-center gap-1">
             <History className="size-3.5" />
-            {career.stintCount} {career.stintCount === 1 ? "passagem" : "passagens"}
+            {career.seasonCount} {career.seasonCount === 1 ? "temporada" : "temporadas"}
           </span>
         </CardContent>
       </Card>

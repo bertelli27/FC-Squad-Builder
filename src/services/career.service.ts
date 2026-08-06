@@ -109,11 +109,23 @@ async function nextOrder(careerId: string): Promise<number> {
 }
 
 export const careerService = {
+  /**
+   * CORREÇÃO — mesmo princípio da visão geral (career-workspace.tsx,
+   * seasonsByYear): "temporadas" é o número de ANOS distintos, não de
+   * CareerStints. Um jogador com clube + seleção no mesmo ano tinha
+   * `_count.stints` contando 2 em vez de 1. Calculado aqui (não com
+   * `_count`, que só sabe contar linhas) buscando só `startYear` de cada
+   * stint e reduzindo a um Set — nenhum CareerStint é alterado.
+   */
   async listCareers() {
-    return prisma.playerCareer.findMany({
+    const careers = await prisma.playerCareer.findMany({
       orderBy: { updatedAt: "desc" },
-      include: { cachedPlayer: true, _count: { select: { stints: true } } },
+      include: { cachedPlayer: true, stints: { select: { startYear: true } } },
     });
+    return careers.map((career) => ({
+      ...career,
+      seasonCount: new Set(career.stints.map((s) => s.startYear)).size,
+    }));
   },
 
   getCareer: getCareerById,

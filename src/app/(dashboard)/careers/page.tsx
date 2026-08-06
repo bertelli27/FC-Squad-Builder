@@ -45,7 +45,7 @@ export default async function CareersPage() {
                 id: career.id,
                 name: career.cachedPlayer?.name ?? career.name,
                 photoUrl: career.cachedPlayer?.photoUrl ?? career.photoUrl,
-                stintCount: career._count.stints,
+                seasonCount: career.seasonCount,
               }}
             />
           ))}
