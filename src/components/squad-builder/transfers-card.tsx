@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRightLeftIcon, ArrowDownCircle, ArrowUpCircle, ChartNoAxesColumnIcon, XIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/season";
-import { TRANSFER_WINDOW_LABEL } from "@/lib/transfer-window";
 import { SignPlayerDialog } from "./sign-player-dialog";
 import { EditTransferDialog } from "./edit-transfer-dialog";
 import { PlayerProfileDialog, type KnownPlayerInfo } from "../player-card/player-profile-dialog";
@@ -67,14 +67,25 @@ export function TransfersCard({
     setTransfers(initialTransfers);
   }
 
-  const ins = transfers.filter((t) => t.type === "in");
-  const outs = transfers.filter((t) => t.type === "out");
-
+  // Saldo é sempre da temporada inteira, nunca só da aba aberta — filtrar
+  // por janela é uma forma de navegar a lista, não de recalcular quanto o
+  // clube gastou/vendeu de verdade.
   const { spent, earned, balance } = useMemo(() => {
-    const spent = ins.reduce((sum, t) => sum + (t.value ?? 0), 0);
-    const earned = outs.reduce((sum, t) => sum + (t.value ?? 0), 0);
+    const spent = transfers.filter((t) => t.type === "in").reduce((sum, t) => sum + (t.value ?? 0), 0);
+    const earned = transfers.filter((t) => t.type === "out").reduce((sum, t) => sum + (t.value ?? 0), 0);
     return { spent, earned, balance: earned - spent };
-  }, [ins, outs]);
+  }, [transfers]);
+
+  // Abas por janela (§transferWindow) — "não informada" cobre tanto quem
+  // nunca teve a janela preenchida quanto transferências de antes desse
+  // campo existir, então nada fica escondido.
+  const byWindow = useMemo(() => {
+    const buckets: Record<"start" | "mid" | "none", TransferVM[]> = { start: [], mid: [], none: [] };
+    for (const t of transfers) {
+      buckets[t.transferWindow === "start" || t.transferWindow === "mid" ? t.transferWindow : "none"].push(t);
+    }
+    return buckets;
+  }, [transfers]);
 
   function handleUpdated(transferId: string, patch: Partial<TransferVM>) {
     setTransfers((prev) => prev.map((t) => (t.id === transferId ? { ...t, ...patch } : t)));
@@ -113,40 +124,57 @@ export function TransfersCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-5 py-4">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <h3 className="font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
-                <ArrowDownCircle className="size-4 text-emerald-600 dark:text-emerald-400" />
-                Entradas ({ins.length})
-              </h3>
-              <SignPlayerDialog seasonId={seasonId} onSigned={handleSigned} />
-            </div>
-            <TransferList
-              seasonId={seasonId}
-              ageReference={ageReference}
-              transfers={ins}
-              emptyLabel="Nenhuma contratação registrada."
-              onRemove={handleRemove}
-              onUpdated={handleUpdated}
-            />
-          </div>
+        <Tabs defaultValue="start">
+          <TabsList>
+            <TabsTrigger value="start">Início da temporada ({byWindow.start.length})</TabsTrigger>
+            <TabsTrigger value="mid">Meio da temporada ({byWindow.mid.length})</TabsTrigger>
+            <TabsTrigger value="none">Não informada ({byWindow.none.length})</TabsTrigger>
+          </TabsList>
 
-          <div className="flex flex-col gap-2">
-            <h3 className="font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
-              <ArrowUpCircle className="size-4 text-rose-600 dark:text-rose-400" />
-              Saídas ({outs.length})
-            </h3>
-            <TransferList
-              seasonId={seasonId}
-              ageReference={ageReference}
-              transfers={outs}
-              emptyLabel="Nenhuma venda registrada. Transfira um jogador pelo perfil dele no elenco."
-              onRemove={handleRemove}
-              onUpdated={handleUpdated}
-            />
-          </div>
-        </div>
+          {(["start", "mid", "none"] as const).map((window) => {
+            const windowTransfers = byWindow[window];
+            const ins = windowTransfers.filter((t) => t.type === "in");
+            const outs = windowTransfers.filter((t) => t.type === "out");
+            return (
+              <TabsContent key={window} value={window}>
+                <div className="grid grid-cols-1 gap-5 pt-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+                        <ArrowDownCircle className="size-4 text-emerald-600 dark:text-emerald-400" />
+                        Entradas ({ins.length})
+                      </h3>
+                      <SignPlayerDialog seasonId={seasonId} onSigned={handleSigned} />
+                    </div>
+                    <TransferList
+                      seasonId={seasonId}
+                      ageReference={ageReference}
+                      transfers={ins}
+                      emptyLabel="Nenhuma contratação registrada."
+                      onRemove={handleRemove}
+                      onUpdated={handleUpdated}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <h3 className="font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+                      <ArrowUpCircle className="size-4 text-rose-600 dark:text-rose-400" />
+                      Saídas ({outs.length})
+                    </h3>
+                    <TransferList
+                      seasonId={seasonId}
+                      ageReference={ageReference}
+                      transfers={outs}
+                      emptyLabel="Nenhuma venda registrada. Transfira um jogador pelo perfil dele no elenco."
+                      onRemove={handleRemove}
+                      onUpdated={handleUpdated}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            );
+          })}
+        </Tabs>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t pt-3 text-sm">
           <span className="text-muted-foreground">
@@ -196,9 +224,7 @@ function TransferList({
   ) : (
     <ul className="flex flex-col gap-1">
       {transfers.map((t) => {
-        const meta = [t.dealType && DEAL_TYPE_LABEL[t.dealType], t.transferWindow && TRANSFER_WINDOW_LABEL[t.transferWindow]]
-          .filter(Boolean)
-          .join(" · ");
+        const meta = t.dealType && DEAL_TYPE_LABEL[t.dealType];
         return (
           <li
             key={t.id}
