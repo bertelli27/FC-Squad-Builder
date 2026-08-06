@@ -121,6 +121,15 @@ model Squad {
 
   tags Tag[] @relation("SquadTags")
 
+  // Dashboard personalizável (etapa 9 complementar, §2) — posição do
+  // elenco dentro do grupo (categoria) quando o usuário arrasta pra
+  // reordenar. null = ordem automática (updatedAt desc, comportamento de
+  // sempre). Um valor só global (não por categoria): como cada grupo já
+  // filtra seus próprios elencos antes de ordenar, a ordem relativa dentro
+  // de cada grupo sai correta de qualquer forma — não precisa de uma
+  // chave composta por categoria.
+  dashboardOrder Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -413,6 +422,12 @@ model Category {
   id        String   @id @default(cuid())
   name      String   @unique
   createdAt DateTime @default(now())
+  // Dashboard personalizável (etapa 9 complementar, §1) — posição do grupo
+  // quando o usuário arrasta pra reordenar. null = ordem automática
+  // (alfabética, comportamento de sempre) — só passa a ter um valor
+  // quando o usuário efetivamente arrasta algo pela primeira vez.
+  // "Restaurar ordem automática" volta isso pra null em massa.
+  order Int?
 
   squads Squad[]
 }
@@ -464,6 +479,20 @@ model SquadPlayer {
   // mesmo slot" no campo tático.
   xOffset Float?
   yOffset Float?
+
+  // CORREÇÃO (etapa 9 complementar, §10-14) — transferir/vender um
+  // jogador (season.service.ts#transferPlayerOut) apagava esta linha por
+  // completo, o que cascateava e destruía também PlayerCompetitionStats
+  // (onDelete: Cascade abaixo) — o histórico daquela passagem sumia pra
+  // sempre no exato momento em que o jogador saía do clube, inclusive
+  // afetando retroativamente o total mostrado na carreira dele (que lê
+  // esses dados ao vivo — ver career.service.ts#decorateLinkedStints).
+  // Agora a saída só marca isDeparted: true (nunca mais aparece no
+  // elenco ativo — banco/campo/observados/extras — mas a linha e as
+  // estatísticas continuam existindo pro histórico do clube e pra
+  // carreira). `false` pra toda linha já existente antes desta etapa,
+  // sem precisar de nenhum backfill.
+  isDeparted Boolean @default(false)
 
   competitionStats PlayerCompetitionStats[]
 

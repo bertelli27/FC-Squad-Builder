@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ChartNoAxesColumnIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +20,24 @@ const DEAL_TYPES = [
   { value: "loan", label: "Empréstimo" },
 ];
 
+interface StatsTotal {
+  appearances: number;
+  goals: number;
+  assists: number;
+}
+
 /**
  * §2-§7: "Transferir jogador" — a real saída, not just a text entry. Only
  * ever mounted for a player who's actually in this season's roster
  * (squadPlayerId is required upstream in player-profile-dialog.tsx).
+ *
+ * Etapa 9 complementar (§10-12) — mostra, antes de confirmar, um resumo
+ * somente-leitura das estatísticas dele NESTA temporada ("antes da
+ * saída") — sempre calculado ao vivo a partir de PlayerCompetitionStats
+ * (mesmo endpoint que PlayerStatsSection já usa), nunca um valor
+ * digitado à parte. A saída em si não apaga nada disso (ver
+ * season.service.ts#transferPlayerOut) — isto é só a confirmação visual
+ * de que o histórico continua ali antes de sair.
  */
 export function TransferPlayerForm({
   seasonId,
@@ -39,6 +54,31 @@ export function TransferPlayerForm({
   const [counterpartClub, setCounterpartClub] = useState("");
   const [value, setValue] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statsTotal, setStatsTotal] = useState<StatsTotal | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/seasons/${seasonId}/players/${squadPlayerId}/stats`)
+      .then((res) => (res.ok ? res.json() : { stats: [] }))
+      .then((data) => {
+        if (cancelled) return;
+        const total = (data.stats ?? []).reduce(
+          (acc: StatsTotal, s: StatsTotal) => ({
+            appearances: acc.appearances + s.appearances,
+            goals: acc.goals + s.goals,
+            assists: acc.assists + s.assists,
+          }),
+          { appearances: 0, goals: 0, assists: 0 },
+        );
+        setStatsTotal(total);
+      })
+      .catch(() => {
+        if (!cancelled) setStatsTotal({ appearances: 0, goals: 0, assists: 0 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [seasonId, squadPlayerId]);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -68,6 +108,23 @@ export function TransferPlayerForm({
       <p className="text-muted-foreground text-sm">
         O jogador sai do elenco desta temporada e a movimentação é registrada automaticamente em transferências.
       </p>
+
+      {statsTotal && (statsTotal.appearances > 0 || statsTotal.goals > 0 || statsTotal.assists > 0) && (
+        <div className="bg-muted/40 flex flex-col gap-1.5 rounded-lg border p-3">
+          <span className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+            <ChartNoAxesColumnIcon className="size-3.5" />
+            Estatísticas nesta temporada (antes da saída)
+          </span>
+          <div className="flex gap-5">
+            <Stat label="Jogos" value={statsTotal.appearances} />
+            <Stat label="Gols" value={statsTotal.goals} />
+            <Stat label="Assistências" value={statsTotal.assists} />
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Continuam registradas normalmente depois da saída — a transferência não apaga o histórico.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="transfer-out-type">Tipo</Label>
@@ -110,5 +167,14 @@ export function TransferPlayerForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <span className="font-heading text-lg font-bold">{value}</span>
+      <span className="text-muted-foreground text-[10px]">{label}</span>
+    </div>
   );
 }

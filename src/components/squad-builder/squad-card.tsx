@@ -31,6 +31,8 @@ export interface SquadCardData {
   categoryId: string | null;
   categoryName: string | null;
   tags: { id: string; name: string }[];
+  /** Dashboard personalizável (etapa 9 complementar, §4) — usado só para reordenar de volta ao padrão ("updatedAt desc") quando o usuário restaura a ordem automática. */
+  updatedAt: Date;
 }
 
 export function SquadCard({

@@ -67,6 +67,7 @@ export default async function HomePage() {
               categoryId: squad.categoryId,
               categoryName: squad.category?.name ?? null,
               tags: squad.tags,
+              updatedAt: squad.updatedAt,
             };
           })}
           categories={categories}

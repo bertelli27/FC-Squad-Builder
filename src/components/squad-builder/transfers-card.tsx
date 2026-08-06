@@ -9,6 +9,7 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/season";
 import { SignPlayerDialog } from "./sign-player-dialog";
+import { EditTransferDialog } from "./edit-transfer-dialog";
 import type { SquadPlayerVM } from "./squad-editor";
 
 export interface TransferVM {
@@ -60,6 +61,10 @@ export function TransfersCard({
     return { spent, earned, balance: earned - spent };
   }, [ins, outs]);
 
+  function handleUpdated(transferId: string, patch: Partial<TransferVM>) {
+    setTransfers((prev) => prev.map((t) => (t.id === transferId ? { ...t, ...patch } : t)));
+  }
+
   async function handleRemove(transfer: TransferVM) {
     const ok = await confirm({
       title: `Remover ${transfer.playerName} das transferências?`,
@@ -102,7 +107,13 @@ export function TransfersCard({
               </h3>
               <SignPlayerDialog seasonId={seasonId} onSigned={handleSigned} />
             </div>
-            <TransferList transfers={ins} emptyLabel="Nenhuma contratação registrada." onRemove={handleRemove} />
+            <TransferList
+              seasonId={seasonId}
+              transfers={ins}
+              emptyLabel="Nenhuma contratação registrada."
+              onRemove={handleRemove}
+              onUpdated={handleUpdated}
+            />
           </div>
 
           <div className="flex flex-col gap-2">
@@ -111,9 +122,11 @@ export function TransfersCard({
               Saídas ({outs.length})
             </h3>
             <TransferList
+              seasonId={seasonId}
               transfers={outs}
               emptyLabel="Nenhuma venda registrada. Transfira um jogador pelo perfil dele no elenco."
               onRemove={handleRemove}
+              onUpdated={handleUpdated}
             />
           </div>
         </div>
@@ -147,13 +160,17 @@ export function TransfersCard({
 }
 
 function TransferList({
+  seasonId,
   transfers,
   emptyLabel,
   onRemove,
+  onUpdated,
 }: {
+  seasonId: string;
   transfers: TransferVM[];
   emptyLabel: string;
   onRemove: (transfer: TransferVM) => void;
+  onUpdated: (transferId: string, patch: Partial<TransferVM>) => void;
 }) {
   return transfers.length === 0 ? (
     <p className="text-muted-foreground text-xs">{emptyLabel}</p>
@@ -180,6 +197,7 @@ function TransferList({
             )}
           </div>
           {t.value != null && <span className="shrink-0 text-xs font-medium">{formatMoney(t.value)}</span>}
+          <EditTransferDialog seasonId={seasonId} transfer={t} onUpdated={(patch) => onUpdated(t.id, patch)} />
           <button
             type="button"
             onClick={() => onRemove(t)}

@@ -46,9 +46,17 @@ export const squadService = {
    * most recent season (for the formation/player-count shown on the card)
    * — no need for full rosters here, that's what getSquad/getSeason are for.
    */
+  /**
+   * Dashboard personalizável (etapa 9 complementar, §2/§3/§4) —
+   * `dashboardOrder` null (nunca arrastado, ou depois de "Restaurar ordem
+   * automática") cai pro final, ordenado por updatedAt desc entre si (o
+   * comportamento de sempre); um elenco arrastado ganha um
+   * `dashboardOrder` e passa a vir antes de qualquer um ainda
+   * não-arrastado dentro do mesmo grupo.
+   */
   async listSquads() {
     return prisma.squad.findMany({
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ dashboardOrder: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }],
       include: {
         category: true,
         tags: true,
@@ -56,10 +64,20 @@ export const squadService = {
         seasons: {
           orderBy: { startYear: "desc" },
           take: 1,
-          include: { _count: { select: { players: { where: { isWatchlist: false, isExtra: false } } } } },
+          include: { _count: { select: { players: { where: { isWatchlist: false, isExtra: false, isDeparted: false } } } } },
         },
       },
     });
+  },
+
+  /** Grava a ordem exibida (índice da lista) em cada elenco — a lista inteira (de um grupo, ou geral) é reenviada a cada drag. */
+  async reorderSquads(orderedIds: string[]) {
+    await prisma.$transaction(orderedIds.map((id, index) => prisma.squad.update({ where: { id }, data: { dashboardOrder: index } })));
+  },
+
+  /** "Restaurar ordem automática" (§4) — volta pro updatedAt desc, sem apagar elenco nenhum. */
+  async resetDashboardOrder() {
+    await prisma.squad.updateMany({ data: { dashboardOrder: null } });
   },
 
   /**
@@ -103,7 +121,7 @@ export const squadService = {
           orderBy: { startYear: "desc" },
           include: {
             coach: true,
-            _count: { select: { players: { where: { isWatchlist: false, isExtra: false } } } },
+            _count: { select: { players: { where: { isWatchlist: false, isExtra: false, isDeparted: false } } } },
           },
         },
       },
@@ -239,6 +257,7 @@ export const squadService = {
             isStarter: p.isStarter,
             isWatchlist: p.isWatchlist,
             isExtra: p.isExtra,
+            isDeparted: p.isDeparted,
             positionSlot: p.positionSlot,
             order: p.order,
           })),

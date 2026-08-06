@@ -12,6 +12,7 @@ export interface SquadExportPlayer {
   isStarter: boolean;
   isWatchlist: boolean;
   isExtra: boolean;
+  isDeparted: boolean;
   positionSlot: string | null;
   order: number;
   player: {
@@ -105,6 +106,7 @@ interface SeasonPlayerRow {
   isStarter: boolean;
   isWatchlist: boolean;
   isExtra: boolean;
+  isDeparted: boolean;
   positionSlot: string | null;
   order: number;
   cachedPlayer: {
@@ -180,6 +182,7 @@ function toExportEntry(
           isStarter: p.isStarter,
           isWatchlist: p.isWatchlist,
           isExtra: p.isExtra,
+          isDeparted: p.isDeparted,
           positionSlot: p.positionSlot,
           order: p.order,
           player: {
@@ -228,6 +231,7 @@ function parsePlayers(raw: unknown): SquadExportPlayer[] {
       isStarter: p.isStarter !== false,
       isWatchlist: p.isWatchlist === true,
       isExtra: p.isExtra === true,
+      isDeparted: p.isDeparted === true,
       positionSlot: str(p.positionSlot),
       order: num(p.order) ?? 0,
       player: {
@@ -522,6 +526,7 @@ export const squadTransferService = {
               isStarter: p.isStarter,
               isWatchlist: p.isWatchlist,
               isExtra: p.isExtra,
+              isDeparted: p.isDeparted,
               positionSlot: p.positionSlot,
               order: p.order,
             },

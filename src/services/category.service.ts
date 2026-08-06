@@ -8,8 +8,27 @@ import { prisma } from "@/lib/prisma";
  * squads there automatically (see schema.prisma's comment on Squad).
  */
 export const categoryService = {
+  /**
+   * Dashboard personalizável (etapa 9 complementar, §1/§3/§4) — `order`
+   * null (nunca arrastado, ou depois de "Restaurar ordem automática")
+   * cai pro final, ordenado alfabeticamente entre si (o comportamento de
+   * sempre); uma vez que o usuário arrasta um grupo, ele ganha um
+   * `order` e passa a vir antes de qualquer grupo ainda não-arrastado.
+   */
   async listCategories() {
-    return prisma.category.findMany({ orderBy: { name: "asc" } });
+    return prisma.category.findMany({
+      orderBy: [{ order: { sort: "asc", nulls: "last" } }, { name: "asc" }],
+    });
+  },
+
+  /** Grava a ordem exibida (índice da lista) em cada categoria — a lista inteira é reenviada a cada drag, então não precisa de diff/posições fracionárias. */
+  async reorderCategories(orderedIds: string[]) {
+    await prisma.$transaction(orderedIds.map((id, index) => prisma.category.update({ where: { id }, data: { order: index } })));
+  },
+
+  /** "Restaurar ordem automática" (§4) — volta pro alfabético, sem apagar categoria nenhuma. */
+  async resetOrder() {
+    await prisma.category.updateMany({ data: { order: null } });
   },
 
   async createCategory(name: string) {

@@ -2,7 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Star, Search } from "lucide-react";
+import { Star, Search, RotateCcw } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -15,6 +24,8 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { SquadCard, type SquadCardData } from "./squad-card";
+import { SortableSquadCard } from "./sortable-squad-card";
+import { SortableGroupHeader } from "./sortable-group-header";
 import { ManageCategoriesDialog } from "./manage-categories-dialog";
 import type { CategoryOption } from "./category-select";
 
@@ -39,13 +50,33 @@ export function SquadListClient({
   // Owned as local state (not just read from props) so a favorite toggle
   // updates the filters/sort immediately without a full page reload —
   // the PATCH still happens, just in the background (see handleToggleFavorite).
+  // Also doubles as the source of truth for drag-and-drop order (§1-§3):
+  // array order IS the display order, so reordering is just re-arranging
+  // this state — no separate "order" state to keep in sync.
   const [squads, setSquads] = useState(initialSquads);
+  const [categoryList, setCategoryList] = useState(categories);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [favoritesFirst, setFavoritesFirst] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [tagSearch, setTagSearch] = useState("");
   const [query, setQuery] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  // Dragging reorders the "default, nothing narrowing the list" view only
+  // (§ scoping decision) — any filter/search/single-category/favorites-only
+  // view changes which squads are visible or in what order, which makes
+  // "persist this drag as the new order" ambiguous, so drag is disabled
+  // (falls back to the plain, non-sortable grid further down) whenever one
+  // of these is active.
+  const canReorder =
+    categoryFilter === ALL_CATEGORIES &&
+    !query.trim() &&
+    selectedTagIds.length === 0 &&
+    !onlyFavorites &&
+    !favoritesFirst;
 
   function handleToggleFavorite(id: string, isFavorite: boolean) {
     setSquads((prev) => prev.map((s) => (s.id === id ? { ...s, isFavorite } : s)));
@@ -60,6 +91,67 @@ export function SquadListClient({
       setSquads((prev) => prev.map((s) => (s.id === id ? { ...s, isFavorite: !isFavorite } : s)));
       toast.error("Não foi possível favoritar o elenco.");
     });
+  }
+
+  // Reads current state directly (not the functional-updater form) and
+  // fires the PATCH after the state update, not inside it — React Strict
+  // Mode double-invokes functional updaters to surface impure side effects,
+  // and a fetch() living inside one fired the request twice per drag (one
+  // call landing as net::ERR_ABORTED). handleDragEnd is recreated fresh on
+  // every render and only ever called synchronously from the drag's own
+  // pointerup, so there's no staleness risk in reading `categoryList`/
+  // `squads` directly here.
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const type = (active.data.current as { type?: "group" | "squad" } | undefined)?.type;
+
+    if (type === "group") {
+      const oldIndex = categoryList.findIndex((c) => c.id === active.id);
+      const newIndex = categoryList.findIndex((c) => c.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
+      const next = arrayMove(categoryList, oldIndex, newIndex);
+      setCategoryList(next);
+      fetch("/api/categories/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds: next.map((c) => c.id) }),
+      }).catch(() => toast.error("Não foi possível salvar a ordem dos grupos."));
+      return;
+    }
+
+    if (type === "squad") {
+      const groupKey = (active.data.current as { groupKey: string }).groupKey;
+      const groupIds = squads.filter((s) => (s.categoryId ?? NO_CATEGORY) === groupKey).map((s) => s.id);
+      const oldIndex = groupIds.indexOf(active.id as string);
+      const newIndex = groupIds.indexOf(over.id as string);
+      if (oldIndex === -1 || newIndex === -1) return;
+      const newGroupIds = arrayMove(groupIds, oldIndex, newIndex);
+
+      const byId = new Map(squads.map((s) => [s.id, s]));
+      let i = 0;
+      const next = squads.map((s) => ((s.categoryId ?? NO_CATEGORY) === groupKey ? byId.get(newGroupIds[i++])! : s));
+      setSquads(next);
+
+      fetch("/api/squads/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds: newGroupIds }),
+      }).catch(() => toast.error("Não foi possível salvar a ordem dos elencos."));
+    }
+  }
+
+  async function handleResetOrder() {
+    setResetting(true);
+    const res = await fetch("/api/dashboard/reset-order", { method: "POST" });
+    setResetting(false);
+    if (!res.ok) {
+      toast.error("Não foi possível restaurar a ordem automática.");
+      return;
+    }
+    setCategoryList((prev) => [...prev].sort((a, b) => a.name.localeCompare(b.name)));
+    setSquads((prev) => [...prev].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+    toast.success("Ordem automática restaurada.");
   }
 
   function sortIfNeeded(list: SquadCardData[]) {
@@ -99,11 +191,13 @@ export function SquadListClient({
 
   // Grouped by category only in the "all categories" view — picking one
   // specific category (or "Outros") already narrows it down, so a flat
-  // list reads better than a single lonely group heading.
+  // list reads better than a single lonely group heading. Ordered by
+  // `categoryList` (the draggable local order), not the raw `categories`
+  // prop, so a drag reorder is reflected immediately.
   const groups = useMemo(() => {
     if (categoryFilter !== ALL_CATEGORIES) return null;
 
-    const byId = new Map(categories.map((c) => [c.id, c.name]));
+    const byId = new Map(categoryList.map((c) => [c.id, c.name]));
     const buckets = new Map<string, SquadCardData[]>();
     for (const squad of filtered) {
       const key = squad.categoryId ?? NO_CATEGORY;
@@ -112,7 +206,7 @@ export function SquadListClient({
     }
 
     const ordered: { key: string; label: string; squads: SquadCardData[] }[] = [];
-    for (const category of categories) {
+    for (const category of categoryList) {
       const bucket = buckets.get(category.id);
       if (bucket?.length) ordered.push({ key: category.id, label: byId.get(category.id)!, squads: bucket });
     }
@@ -121,7 +215,7 @@ export function SquadListClient({
       ordered.push({ key: NO_CATEGORY, label: UNCATEGORIZED_LABEL, squads: uncategorized });
     }
     return ordered;
-  }, [filtered, categoryFilter, categories]);
+  }, [filtered, categoryFilter, categoryList]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -161,13 +255,13 @@ export function SquadListClient({
               {(v: string) => {
                 if (v === ALL_CATEGORIES) return "Todas as categorias";
                 if (v === NO_CATEGORY) return UNCATEGORIZED_LABEL;
-                return categories.find((c) => c.id === v)?.name ?? v;
+                return categoryList.find((c) => c.id === v)?.name ?? v;
               }}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_CATEGORIES}>Todas as categorias</SelectItem>
-            {categories.map((c) => (
+            {categoryList.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
               </SelectItem>
@@ -177,6 +271,15 @@ export function SquadListClient({
         </Select>
 
         <ManageCategoriesDialog />
+
+        {/* §4 "Restaurar ordem automática" — só faz sentido oferecer
+            quando dá pra estar vendo/usando uma ordem personalizada. */}
+        {canReorder && (
+          <Button variant="ghost" size="sm" disabled={resetting} onClick={handleResetOrder}>
+            <RotateCcw className="size-3.5" />
+            Restaurar ordem automática
+          </Button>
+        )}
       </div>
 
       {tags.length > 0 && (
@@ -215,6 +318,36 @@ export function SquadListClient({
                 : "Nenhum elenco encontrado."}
           </p>
         </div>
+      ) : groups && canReorder ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={categoryList.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <div className="flex flex-col gap-6">
+              {groups.map((group) => (
+                <div key={group.key} className="flex flex-col gap-3">
+                  {group.key === NO_CATEGORY ? (
+                    <h2 className="font-heading text-muted-foreground text-sm font-semibold tracking-wide uppercase">
+                      {group.label} <span className="normal-case">({group.squads.length})</span>
+                    </h2>
+                  ) : (
+                    <SortableGroupHeader categoryId={group.key} label={group.label} count={group.squads.length} />
+                  )}
+                  <SortableContext items={group.squads.map((s) => s.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {group.squads.map((squad) => (
+                        <SortableSquadCard
+                          key={squad.id}
+                          squad={squad}
+                          groupKey={group.key}
+                          onToggleFavorite={handleToggleFavorite}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </div>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       ) : groups ? (
         <div className="flex flex-col gap-6">
           {groups.map((group) => (

@@ -80,7 +80,7 @@ async function resolveDestinationBucket(
   if (season?.squad.baseKind !== "nationalTeam") return { isWatchlist: false, isExtra: false };
 
   const officialCount = await prisma.squadPlayer.count({
-    where: { seasonId, isWatchlist: false, isExtra: false },
+    where: { seasonId, isWatchlist: false, isExtra: false, isDeparted: false },
   });
   return { isWatchlist: false, isExtra: officialCount >= NATIONAL_TEAM_SQUAD_SIZE };
 }
@@ -176,7 +176,10 @@ function getSeasonById(id: string) {
     include: {
       squad: true,
       coach: true,
-      players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
+      // isDeparted: false — elenco ativo apenas (§10-14); um jogador
+      // transferido/vendido não aparece mais aqui, mas a linha dele
+      // (com as estatísticas) continua existindo no banco.
+      players: { where: { isDeparted: false }, include: { cachedPlayer: true }, orderBy: { order: "asc" } },
       titles: { include: { competition: true }, orderBy: { createdAt: "asc" } },
       transfers: { orderBy: { order: "asc" } },
       kits: true,
@@ -190,7 +193,7 @@ export const seasonService = {
     return prisma.season.findMany({
       where: { squadId },
       orderBy: { startYear: "desc" },
-      include: { _count: { select: { players: { where: { isWatchlist: false, isExtra: false } } } } },
+      include: { _count: { select: { players: { where: { isWatchlist: false, isExtra: false, isDeparted: false } } } } },
     });
   },
 
@@ -272,7 +275,10 @@ export const seasonService = {
     if (input.duplicateFromSeasonId) {
       const source = await prisma.season.findUnique({
         where: { id: input.duplicateFromSeasonId, squadId },
-        include: { players: true },
+        // isDeparted: false — duplicar uma temporada carrega o elenco
+        // ATUAL adiante; um jogador que já saiu daquela temporada não
+        // deve reaparecer como se ainda estivesse lá na nova.
+        include: { players: { where: { isDeparted: false } } },
       });
       if (!source) return { error: "source-not-found" };
 
@@ -503,12 +509,84 @@ export const seasonService = {
   },
 
   /**
+   * §8/§9 etapa 9 complementar — até agora uma transferência só podia ser
+   * excluída. Edita só os campos "de superfície" (clube contrapartida,
+   * valor, tipo do negócio) — deliberadamente NÃO deixa trocar o jogador
+   * nem a temporada: `cachedPlayerId`/`seasonId` são o que amarra esta
+   * linha ao SquadPlayer/vínculo de carreira reais (§14 "não perder...
+   * vínculo Clube ↔ Carreira"), e mudar qualquer um dos dois deixaria essa
+   * amarração inconsistente sem reconstruir a passagem inteira — fora do
+   * que foi pedido ("editar", não "mover pra outro jogador/temporada").
+   * `playerName` também não é editável aqui pelo mesmo motivo: pra
+   * qualquer transferência criada pelo fluxo atual (signPlayer/
+   * transferPlayerOut) ela é só um espelho do nome do CachedPlayer.
+   *
+   * Espelha em CareerTransfer quando existir (mesmo vínculo 1:1 via
+   * sourceTransferId que mirrorTransferOnCareer já cria) — assim editar
+   * o valor/clube no Modo Clubes não deixa a Carreira com um valor antigo
+   * pra sempre.
+   */
+  async updateTransfer(
+    seasonId: string,
+    transferId: string,
+    patch: { counterpartClub?: string | null; value?: number | null; dealType?: "permanent" | "loan" },
+  ): Promise<{ transfer: Awaited<ReturnType<typeof prisma.transfer.update>> } | { error: "not-found" | "missing-club" }> {
+    const existing = await prisma.transfer.findUnique({ where: { id: transferId, seasonId } });
+    if (!existing) return { error: "not-found" };
+
+    // Uma "saída" sempre precisa de um clube de destino — mesma regra de
+    // transferPlayerOut (§missing-club), só validada aqui na edição.
+    // Uma "entrada" pode ficar sem clube de origem (contratação de
+    // agente livre), então só "out" é obrigatório.
+    const nextCounterpartClub = patch.counterpartClub !== undefined ? patch.counterpartClub?.trim() || null : undefined;
+    if (existing.type === "out" && nextCounterpartClub !== undefined && !nextCounterpartClub) {
+      return { error: "missing-club" };
+    }
+
+    const transfer = await prisma.transfer.update({
+      where: { id: transferId },
+      data: {
+        ...(nextCounterpartClub !== undefined && { counterpartClub: nextCounterpartClub }),
+        ...(patch.value !== undefined && { value: patch.value }),
+        ...(patch.dealType !== undefined && { dealType: patch.dealType }),
+      },
+    });
+
+    await prisma.careerTransfer.updateMany({
+      where: { sourceTransferId: transferId },
+      data: {
+        ...(patch.value !== undefined && { value: patch.value }),
+        // "out" já foi validado acima como nunca vazio quando enviado —
+        // o "!" aqui só documenta essa garantia pro TS (toClubName não é
+        // opcional no schema, diferente de fromClubName).
+        ...(nextCounterpartClub !== undefined &&
+          (transfer.type === "in" ? { fromClubName: nextCounterpartClub } : { toClubName: nextCounterpartClub! })),
+      },
+    });
+
+    return { transfer };
+  },
+
+  /**
    * §2-§7: a real "saída" — a player picked from the season's own roster
    * (must already be a SquadPlayer here, §33's "transferência de jogador
    * que não pertence ao elenco"), removed from it, with a Transfer("out")
    * recorded in the same action. `dealType` is orthogonal to §18's "livre":
    * a free transfer is just `value: null` on a "permanent" deal, no
    * separate type needed.
+   *
+   * CORREÇÃO (etapa 9 complementar, §10-14) — isto costumava fazer
+   * `prisma.squadPlayer.delete(...)`, que cascateava (onDelete: Cascade)
+   * e apagava também PlayerCompetitionStats: o histórico daquela
+   * passagem no clube sumia pra sempre no exato momento da venda, e como
+   * career.service.ts#decorateLinkedStints lê essas estatísticas AO VIVO
+   * pra decorar a carreira, o total da carreira também caía
+   * retroativamente. Agora só marca `isDeparted: true` (nunca mais
+   * aparece no elenco ativo — getSeasonById já filtra — mas a linha e as
+   * estatísticas continuam intactas pro histórico do clube/rankings e
+   * pra carreira). Também limpa os campos de posicionamento (o jogador
+   * não ocupa mais slot nenhum), mas preserva shirtNumber/isCaptain como
+   * registro de como ele jogava antes de sair.
    */
   async transferPlayerOut(
     seasonId: string,
@@ -519,7 +597,7 @@ export const seasonService = {
     if (!counterpartClub) return { error: "missing-club" };
 
     const squadPlayer = await prisma.squadPlayer.findUnique({
-      where: { id: squadPlayerId, seasonId },
+      where: { id: squadPlayerId, seasonId, isDeparted: false },
       include: { cachedPlayer: true, season: { include: { squad: true } } },
     });
     if (!squadPlayer) return { error: "not-in-squad" };
@@ -540,12 +618,15 @@ export const seasonService = {
       },
     });
 
-    // Delete after creating the Transfer — the Transfer only needs
-    // cachedPlayerId (not the SquadPlayer row itself), so order here
-    // doesn't matter for that, but doing it in this sequence means a
-    // failure while creating the Transfer never leaves the roster missing
-    // a player with nothing recorded.
-    await prisma.squadPlayer.delete({ where: { id: squadPlayerId } });
+    // Soft-delete after creating the Transfer — same ordering rationale
+    // as before (a failure creating the Transfer never leaves the roster
+    // missing a player with nothing recorded), just no longer a real
+    // delete: leaves the row (and its PlayerCompetitionStats/history)
+    // intact, just out of the active roster.
+    await prisma.squadPlayer.update({
+      where: { id: squadPlayerId },
+      data: { isDeparted: true, isStarter: false, isWatchlist: false, isExtra: false, positionSlot: null, xOffset: null, yOffset: null },
+    });
 
     await mirrorTransferOnCareer(transfer.id, squadPlayer.cachedPlayerId, {
       fromClubName: squadPlayer.season.squad.name,
@@ -621,7 +702,10 @@ export const seasonService = {
     const existing = await prisma.squadPlayer.findUnique({
       where: { seasonId_cachedPlayerId: { seasonId, cachedPlayerId } },
     });
-    if (existing) return { error: "already-in-squad" };
+    // §10-14 — se ele já saiu desta temporada (isDeparted), contratá-lo
+    // de novo reativa a mesma linha (mesmo raciocínio de
+    // addPlayerToSeason acima) em vez de bloquear com "already-in-squad".
+    if (existing && !existing.isDeparted) return { error: "already-in-squad" };
 
     const [{ _max: playerMax }, bucket, { _max: transferMax }] = await Promise.all([
       prisma.squadPlayer.aggregate({ where: { seasonId }, _max: { order: true } }),
@@ -629,17 +713,23 @@ export const seasonService = {
       prisma.transfer.aggregate({ where: { seasonId }, _max: { order: true } }),
     ]);
 
-    const squadPlayer = await prisma.squadPlayer.create({
-      data: {
-        seasonId,
-        cachedPlayerId,
-        isStarter: false,
-        ...bucket,
-        shirtNumber: input.shirtNumber,
-        order: (playerMax.order ?? -1) + 1,
-      },
-      include: { cachedPlayer: true },
-    });
+    const squadPlayer = existing
+      ? await prisma.squadPlayer.update({
+          where: { id: existing.id },
+          data: { isDeparted: false, isStarter: false, ...bucket, shirtNumber: input.shirtNumber, order: (playerMax.order ?? -1) + 1 },
+          include: { cachedPlayer: true },
+        })
+      : await prisma.squadPlayer.create({
+          data: {
+            seasonId,
+            cachedPlayerId,
+            isStarter: false,
+            ...bucket,
+            shirtNumber: input.shirtNumber,
+            order: (playerMax.order ?? -1) + 1,
+          },
+          include: { cachedPlayer: true },
+        });
 
     const dealType = input.dealType === "loan" ? "loan" : "permanent";
     const counterpartClub = input.counterpartClub?.trim() || null;
@@ -681,7 +771,7 @@ export const seasonService = {
   async changeFormation(seasonId: string, formation: string) {
     const season = await prisma.season.findUnique({
       where: { id: seasonId },
-      include: { players: { include: { cachedPlayer: true } } },
+      include: { players: { where: { isDeparted: false }, include: { cachedPlayer: true } } },
     });
     if (!season) return null;
 
@@ -797,23 +887,34 @@ export const seasonService = {
       where: { seasonId_cachedPlayerId: { seasonId, cachedPlayerId: cached.id } },
       include: { cachedPlayer: true },
     });
-    if (existing) return existing;
+    // §10-14 — um jogador que JÁ saiu desta temporada (isDeparted) e é
+    // adicionado de novo (ex: voltou de empréstimo) reativa a MESMA linha
+    // em vez de tentar criar uma segunda (a unique constraint
+    // [seasonId, cachedPlayerId] nem deixaria) — reaproveita o histórico
+    // já acumulado dela em vez de perder tudo e começar do zero.
+    if (existing && !existing.isDeparted) return existing;
 
     const [{ _max }, bucket] = await Promise.all([
       prisma.squadPlayer.aggregate({ where: { seasonId }, _max: { order: true } }),
       resolveDestinationBucket(seasonId, destination),
     ]);
 
-    const squadPlayer = await prisma.squadPlayer.create({
-      data: {
-        seasonId,
-        cachedPlayerId: cached.id,
-        isStarter: false,
-        ...bucket,
-        order: (_max.order ?? -1) + 1,
-      },
-      include: { cachedPlayer: true },
-    });
+    const squadPlayer = existing
+      ? await prisma.squadPlayer.update({
+          where: { id: existing.id },
+          data: { isDeparted: false, isStarter: false, ...bucket, order: (_max.order ?? -1) + 1 },
+          include: { cachedPlayer: true },
+        })
+      : await prisma.squadPlayer.create({
+          data: {
+            seasonId,
+            cachedPlayerId: cached.id,
+            isStarter: false,
+            ...bucket,
+            order: (_max.order ?? -1) + 1,
+          },
+          include: { cachedPlayer: true },
+        });
 
     // CORREÇÃO: reflete essa entrada no elenco na carreira do jogador,
     // se ele tiver uma — ver comentário em ensureCareerStintForSeason.
