@@ -295,6 +295,28 @@ export function CareerWorkspace({
                         </Link>
                       );
                     })}
+                    {/* Taças conquistadas nesse ano — todas as passagens do
+                        ano somadas (normalmente uma só, mas um ano com
+                        clube+seleção soma as duas), pra saber de relance em
+                        qual ano cada título veio, sem abrir a passagem. */}
+                    {yearStints
+                      .flatMap((stint) => stint.titles)
+                      .map((title) => (
+                        <span key={title.id} title={title.competition.name} className="shrink-0">
+                          {title.competition.trophyImageUrl ? (
+                            <Image
+                              src={title.competition.trophyImageUrl}
+                              alt={title.competition.name}
+                              width={24}
+                              height={24}
+                              className="size-6 object-contain"
+                              unoptimized
+                            />
+                          ) : (
+                            <TrophyIcon className="text-muted-foreground size-6" strokeWidth={1.25} />
+                          )}
+                        </span>
+                      ))}
                   </div>
                 </div>
               ))}
