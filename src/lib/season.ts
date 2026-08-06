@@ -27,8 +27,14 @@ export function matchesPlayed(perf: { wins: number; draws: number; losses: numbe
   return perf.wins + perf.draws + perf.losses;
 }
 
-/** "€2.500.000" / "-€500.000" — pt-BR grouping, no decimals (transfer values are always whole units in the examples). */
+/**
+ * "R$ 10.000.000,00" / "-R$ 500.000,00" — formatação monetária brasileira
+ * (etapa 9 parte 4, §6): pt-BR, símbolo R$, separador de milhar "." e
+ * decimal ",". Todo valor de transferência (Transfer.value/
+ * CareerTransfer.value) passa por aqui — nunca formatado ad-hoc em cada
+ * componente.
+ */
 export function formatMoney(value: number): string {
   const sign = value < 0 ? "-" : "";
-  return `${sign}€${Math.abs(value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+  return `${sign}${Math.abs(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`;
 }

@@ -7,6 +7,7 @@ import Image from "next/image";
 import { TrophyIcon, ShieldIcon, XIcon, ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberField as CompactNumberField } from "@/components/ui/number-field";
 import {
   Select,
   SelectContent,
@@ -99,9 +100,8 @@ function UnlinkedClubStats({
   stint: CareerStintVM;
   onStintUpdated: (updater: (prev: CareerStintVM) => CareerStintVM) => void;
 }) {
-  function saveField(field: "appearances" | "goals" | "assists", raw: string) {
-    const value = raw === "" ? 0 : Number(raw);
-    if (Number.isNaN(value) || value < 0) return;
+  function saveField(field: "appearances" | "goals" | "assists", raw: number | null) {
+    const value = raw ?? 0;
     onStintUpdated((prev) => ({ ...prev, [field]: value }));
     fetch(`/api/careers/${careerId}/stints/${stint.id}`, {
       method: "PATCH",
@@ -150,9 +150,8 @@ function UnlinkedNationalStats({
     { appearances: 0, goals: 0, assists: 0 },
   );
 
-  function saveField(statsId: string, field: "appearances" | "goals" | "assists", raw: string) {
-    const value = raw === "" ? 0 : Number(raw);
-    if (Number.isNaN(value) || value < 0) return;
+  function saveField(statsId: string, field: "appearances" | "goals" | "assists", raw: number | null) {
+    const value = raw ?? 0;
     onStintUpdated((prev) => ({
       ...prev,
       competitionStats: prev.competitionStats.map((s) => (s.id === statsId ? { ...s, [field]: value } : s)),
@@ -258,25 +257,25 @@ function UnlinkedNationalStats({
                   )}
                   <span className="truncate">{s.competition.name}</span>
                 </span>
-                <Input
-                  type="number"
+                <CompactNumberField
                   min={0}
                   value={s.appearances}
-                  onChange={(e) => saveField(s.id, "appearances", e.target.value)}
+                  onChange={(v) => saveField(s.id, "appearances", v)}
+                  aria-label={`Jogos em ${s.competition.name}`}
                   className="h-7 px-1 text-center text-xs"
                 />
-                <Input
-                  type="number"
+                <CompactNumberField
                   min={0}
                   value={s.goals}
-                  onChange={(e) => saveField(s.id, "goals", e.target.value)}
+                  onChange={(v) => saveField(s.id, "goals", v)}
+                  aria-label={`Gols em ${s.competition.name}`}
                   className="h-7 px-1 text-center text-xs"
                 />
-                <Input
-                  type="number"
+                <CompactNumberField
                   min={0}
                   value={s.assists}
-                  onChange={(e) => saveField(s.id, "assists", e.target.value)}
+                  onChange={(v) => saveField(s.id, "assists", v)}
+                  aria-label={`Assistências em ${s.competition.name}`}
                   className="h-7 px-1 text-center text-xs"
                 />
                 <button

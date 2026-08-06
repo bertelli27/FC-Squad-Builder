@@ -15,6 +15,7 @@ import { SquadNotes } from "@/components/squad-builder/squad-notes";
 import { PerformanceCard } from "@/components/squad-builder/performance-card";
 import { SeasonTitlesCard } from "@/components/squad-builder/season-titles-card";
 import { SeasonKitsCard } from "@/components/squad-builder/season-kits-card";
+import { SeasonCompetitionsCard } from "@/components/squad-builder/season-competitions-card";
 import { TransfersCard } from "@/components/squad-builder/transfers-card";
 import { formatSeasonLabel } from "@/lib/season";
 import { Card, CardContent } from "@/components/ui/card";
@@ -94,6 +95,14 @@ export default async function SeasonPage({
 
       <SeasonKitsCard seasonId={season.id} kits={season.kits} />
 
+      <SeasonCompetitionsCard
+        seasonId={season.id}
+        competitions={season.competitions.map((sc) => ({
+          id: sc.id,
+          competition: { id: sc.competition.id, name: sc.competition.name, logoUrl: sc.competition.logoUrl },
+        }))}
+      />
+
       <SquadEditor
         key={season.formation}
         seasonId={season.id}
@@ -119,6 +128,8 @@ export default async function SeasonPage({
           isWatchlist: sp.isWatchlist,
           isExtra: sp.isExtra,
           positionSlot: sp.positionSlot,
+          xOffset: sp.xOffset,
+          yOffset: sp.yOffset,
           externalLink: sp.cachedPlayer.externalLink,
           careerId: careerIdByPlayer.get(sp.cachedPlayer.id) ?? null,
         }))}

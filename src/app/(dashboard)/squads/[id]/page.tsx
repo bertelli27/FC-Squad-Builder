@@ -13,8 +13,8 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
   const [squad, palmares, historicalStats, topTransfers] = await Promise.all([
     squadService.getSquad(id),
     squadService.getPalmares(id),
-    squadService.getHistoricalStats(id),
-    squadService.getTopTransfers(id),
+    squadService.getHistoricalStats(id, 3),
+    squadService.getTopTransfers(id, 3),
   ]);
   if (!squad) notFound();
 
@@ -44,6 +44,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
       <PalmaresCard entries={palmares} />
 
       <HistoryCard
+        squadId={squad.id}
         topScorers={historicalStats.topScorers}
         topAssists={historicalStats.topAssists}
         mostAppearances={historicalStats.mostAppearances}

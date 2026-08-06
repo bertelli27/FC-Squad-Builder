@@ -316,7 +316,7 @@ export const squadService = {
    * sem nunca ter vindo de uma duplicação, é tratado como pessoas
    * diferentes — consistente com como o resto do app já funciona.
    */
-  async getHistoricalStats(squadId: string, limit = 5) {
+  async getHistoricalStats(squadId: string, limit?: number) {
     const rows = await prisma.playerCompetitionStats.findMany({
       where: { squadPlayer: { season: { squadId } } },
       include: { squadPlayer: { include: { cachedPlayer: true } } },
@@ -341,11 +341,13 @@ export const squadService = {
     }
 
     const all = [...byPlayer.values()];
-    const topN = (key: "appearances" | "goals" | "assists") =>
-      all
-        .filter((p) => p[key] > 0)
-        .sort((a, b) => b[key] - a[key])
-        .slice(0, limit);
+    // Etapa 9 parte 4 (§8.1/§8.4): `limit` indefinido = sem corte (página
+    // completa) — a visão geral principal passa 3, nunca limitando o que
+    // fica armazenado, só quantos entram na resposta.
+    const topN = (key: "appearances" | "goals" | "assists") => {
+      const sorted = all.filter((p) => p[key] > 0).sort((a, b) => b[key] - a[key]);
+      return limit === undefined ? sorted : sorted.slice(0, limit);
+    };
 
     return {
       topScorers: topN("goals"),
@@ -354,8 +356,8 @@ export const squadService = {
     };
   },
 
-  /** §7/§8: maiores compras e vendas do clube, considerando transferências de todas as temporadas. */
-  async getTopTransfers(squadId: string, limit = 5) {
+  /** §7/§8: maiores compras e vendas do clube, considerando transferências de todas as temporadas. `limit` indefinido = todos os registros (§8.3). */
+  async getTopTransfers(squadId: string, limit?: number) {
     const [topBuys, topSales] = await Promise.all([
       prisma.transfer.findMany({
         where: { season: { squadId }, type: "in", value: { not: null } },

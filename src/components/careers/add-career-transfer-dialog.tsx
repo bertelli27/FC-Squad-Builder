@@ -6,6 +6,7 @@ import { ArrowRightLeftIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { CareerTransferVM } from "./types";
 
@@ -27,14 +28,14 @@ export function AddCareerTransferDialog({
 }) {
   const [fromClubName, setFromClubName] = useState(defaultFromClubName ?? "");
   const [toClubName, setToClubName] = useState("");
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState<number | null>(null);
   const [year, setYear] = useState(defaultYear ?? new Date().getFullYear());
   const [saving, setSaving] = useState(false);
 
   function reset() {
     setFromClubName(defaultFromClubName ?? "");
     setToClubName("");
-    setValue("");
+    setValue(null);
     setYear(defaultYear ?? new Date().getFullYear());
   }
 
@@ -52,7 +53,7 @@ export function AddCareerTransferDialog({
       body: JSON.stringify({
         fromClubName: fromClubName || undefined,
         toClubName,
-        value: value ? Number(value) : undefined,
+        value: value ?? undefined,
         year,
       }),
     })
@@ -109,21 +110,7 @@ export function AddCareerTransferDialog({
             </div>
             <div className="flex flex-1 flex-col gap-1.5">
               <Label htmlFor="career-transfer-value">Valor</Label>
-              <div className="relative">
-                <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
-                  €
-                </span>
-                <Input
-                  id="career-transfer-value"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className="pl-7"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+              <CurrencyInput id="career-transfer-value" value={value} onChange={setValue} />
             </div>
           </div>
 

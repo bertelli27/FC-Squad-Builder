@@ -28,7 +28,17 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     );
   }
 
-  const stats = await playerStatsService.addCompetitionStats(playerId, { competitionId, competitionName });
+  function nonNegativeIntField(value: unknown): number | undefined {
+    return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+  }
+
+  const stats = await playerStatsService.addCompetitionStats(playerId, {
+    competitionId,
+    competitionName,
+    appearances: nonNegativeIntField(body?.appearances),
+    goals: nonNegativeIntField(body?.goals),
+    assists: nonNegativeIntField(body?.assists),
+  });
   if (!stats) return NextResponse.json({ error: "Could not resolve competition" }, { status: 400 });
 
   return NextResponse.json({ stats }, { status: 201 });

@@ -6,10 +6,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { TrophyIcon, XIcon, ShieldIcon, ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { NumberField as SharedNumberField } from "@/components/ui/number-field";
 import { formatSeasonLabel } from "@/lib/season";
 import { ageAtSeason } from "@/lib/player-age";
 import { cn } from "@/lib/utils";
@@ -47,9 +47,8 @@ export function ClubStintCard({
     };
   }, []);
 
-  function saveField(field: "appearances" | "goals" | "assists", raw: string) {
-    const value = raw === "" ? 0 : Number(raw);
-    if (Number.isNaN(value) || value < 0) return;
+  function saveField(field: "appearances" | "goals" | "assists", raw: number | null) {
+    const value = raw ?? 0;
     onUpdated({ [field]: value });
     fetch(`/api/careers/${careerId}/stints/${stint.id}`, {
       method: "PATCH",
@@ -231,15 +230,14 @@ export function NumberField({
 }: {
   label: string;
   value: number;
-  onChange: (value: string) => void;
+  onChange: (value: number | null) => void;
 }) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <Input
-        type="number"
+      <SharedNumberField
         min={0}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         className={cn("font-heading h-10 w-16 text-center text-lg font-bold")}
         aria-label={label}
       />

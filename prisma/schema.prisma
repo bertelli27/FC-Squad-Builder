@@ -187,10 +187,38 @@ model Season {
   // clube: Coritiba 2019 e Coritiba 2026 têm conjuntos de kits totalmente
   // independentes. Ver SeasonKit abaixo.
   kits SeasonKit[]
+  // Competições disputadas (etapa 9 parte 4, §1) — lista própria da
+  // temporada, nunca do clube. Ver SeasonCompetition abaixo.
+  competitions SeasonCompetition[]
 
   @@unique([squadId, startYear])
   @@index([squadId])
   @@index([coachId])
+}
+
+// Etapa 9 parte 4 (§1) — "competições disputadas nesta temporada": ao
+// adicionar uma Competition aqui, ela passa a aparecer automaticamente nas
+// estatísticas de todo jogador do elenco desta temporada (ver
+// PlayerStatsSection), sem precisar cadastrar jogador por jogador. Uma
+// linha aqui é só uma "declaração de participação" — NÃO cria
+// PlayerCompetitionStats nenhuma sozinha (essas só nascem quando um valor
+// de fato é digitado pra um jogador, ver player-stats.service.ts), então
+// remover uma competição da temporada nunca apaga estatística já
+// preenchida (o jogador que já tinha dados continua com eles, mesmo que a
+// competição saia dessa lista). Nunca copiada ao duplicar temporada — cada
+// temporada declara as suas do zero, mesmo espírito de SeasonKit.
+model SeasonCompetition {
+  id            String      @id @default(cuid())
+  seasonId      String
+  season        Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id])
+  order         Int         @default(0)
+  createdAt     DateTime    @default(now())
+
+  @@unique([seasonId, competitionId])
+  @@index([seasonId])
+  @@index([competitionId])
 }
 
 // Um uniforme (minikit, estilo EA FC/FIFA) de uma temporada específica —
@@ -280,6 +308,7 @@ model Competition {
   careerTitles     CareerTitle[]
   careerStintStats CareerStintCompetitionStats[]
   champions        CompetitionChampion[]
+  seasonCompetitions SeasonCompetition[]
 }
 
 // Histórico de campeões de UMA edição/ano de uma competição (etapa 9) —
@@ -420,6 +449,21 @@ model SquadPlayer {
   isExtra        Boolean      @default(false)
   positionSlot   String? // posição na formação, ex: "LW", "CB1"
   order          Int          @default(0)
+  // Etapa 9 parte 4 (§4) — ajuste fino de posição dentro/ao redor do slot
+  // da formação: um deslocamento em pontos percentuais do campo (mesma
+  // escala de FormationSlot.x/y em lib/formations.ts), somado por cima da
+  // coordenada padrão do slot na hora de desenhar. null = usa a posição
+  // padrão do slot exatamente (comportamento de sempre, nenhuma mudança
+  // visual pra quem nunca arrastou). positionSlot continua sendo a fonte
+  // de verdade pra TUDO que já depende da identidade do slot (titular/
+  // reserva, troca ao arrastar entre slots, contagem de 26 convocados
+  // etc.) — isso só afeta onde dentro da vizinhança do slot o chip é
+  // desenhado. Resetado (null) sempre que o jogador entra num slot novo
+  // (troca de posição, saiu do banco/observados/extras, ou a formação
+  // mudou) — só é preenchido pelo ajuste fino "soltar de volta perto do
+  // mesmo slot" no campo tático.
+  xOffset Float?
+  yOffset Float?
 
   competitionStats PlayerCompetitionStats[]
 

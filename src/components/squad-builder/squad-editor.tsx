@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -26,6 +26,7 @@ import { PlayerProfileDialog } from "@/components/player-card/player-profile-dia
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { NumberField } from "@/components/ui/number-field";
 import { RosterTable } from "./roster-table";
 import { AddPlayerDialog } from "./add-player-dialog";
 import { WatchlistPanel } from "./watchlist-panel";
@@ -50,6 +51,9 @@ export interface SquadPlayerVM {
   isWatchlist: boolean;
   isExtra: boolean;
   positionSlot?: string | null;
+  /** §4 etapa 9-4 — ajuste fino de posição no campo (delta em % sobre o slot padrão da formação); null = usa a posição padrão do slot. */
+  xOffset?: number | null;
+  yOffset?: number | null;
   externalLink?: string | null;
   /** §26 etapa 8 — set when this player has a linked PlayerCareer, to show "Ver carreira" in the profile. */
   careerId?: string | null;
@@ -78,6 +82,13 @@ const collisionDetection: CollisionDetection = (args) => {
   if (pointerCollisions.length > 0) return pointerCollisions;
   return closestCenter(args);
 };
+
+/** How close to the pitch edge a chip's center is allowed to get, in percent — keeps it from clipping out when nudged (§4.2). */
+const PITCH_EDGE_MARGIN = 6;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
 function buildInitialState(players: SquadPlayerVM[], formation: string): EditorState {
   const formationSlots = getFormationSlots(formation);
@@ -154,6 +165,9 @@ export function SquadEditor({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [activePlayer, setActivePlayer] = useState<SquadPlayerVM | null>(null);
+  // §4.2 — measured at drag-end to convert the drag's pixel delta into a
+  // percent-of-pitch offset (same 0-100 scale as FormationSlot.x/y).
+  const pitchRef = useRef<HTMLDivElement>(null);
 
   function findPlayer(id: string): SquadPlayerVM | null {
     for (const key of Object.keys(state.slots)) {
@@ -184,6 +198,8 @@ export function SquadEditor({
                 isWatchlist: false,
                 isExtra: false,
                 shirtNumber: p.shirtNumber ?? null,
+                xOffset: p.xOffset ?? null,
+                yOffset: p.yOffset ?? null,
                 order: i,
               },
             ]
@@ -196,6 +212,8 @@ export function SquadEditor({
         isWatchlist: false,
         isExtra: false,
         shirtNumber: p.shirtNumber ?? null,
+        xOffset: null,
+        yOffset: null,
         order: formationSlots.length + i,
       })),
       ...next.watchlist.map((p, i) => ({
@@ -205,6 +223,8 @@ export function SquadEditor({
         isWatchlist: true,
         isExtra: false,
         shirtNumber: p.shirtNumber ?? null,
+        xOffset: null,
+        yOffset: null,
         order: formationSlots.length + next.bench.length + i,
       })),
       ...next.extras.map((p, i) => ({
@@ -214,6 +234,8 @@ export function SquadEditor({
         isWatchlist: false,
         isExtra: true,
         shirtNumber: p.shirtNumber ?? null,
+        xOffset: null,
+        yOffset: null,
         order: formationSlots.length + next.bench.length + next.watchlist.length + i,
       })),
     ];
@@ -271,31 +293,53 @@ export function SquadEditor({
       extras = [...extras, draggedPlayer];
     } else if (overId.startsWith("slot:")) {
       const targetSlotKey = overId.slice("slot:".length);
-      if (targetSlotKey === fromSlotKey) return;
-      const displaced = slots[targetSlotKey];
-      // Calling up a scouted/extra player makes them inherit the shirt
-      // number of whoever they're replacing, instead of keeping their own.
-      const incoming =
-        displaced && (fromWatchlist || fromExtras)
-          ? { ...draggedPlayer, shirtNumber: displaced.shirtNumber }
-          : draggedPlayer;
 
-      slots[targetSlotKey] = incoming;
-      if (fromSlotKey) {
-        // Swap within the pitch: the displaced starter takes the dragged
-        // player's old slot.
-        slots[fromSlotKey] = displaced ?? null;
-      } else if (fromWatchlist) {
-        // The "call up a scouted player" swap: whoever was starting there
-        // becomes the observado, not a bench reserve.
-        watchlist = watchlist.filter((p) => p.id !== activeId);
-        if (displaced) watchlist = [...watchlist, displaced];
-      } else if (fromExtras) {
-        extras = extras.filter((p) => p.id !== activeId);
-        if (displaced) extras = [...extras, displaced];
+      if (targetSlotKey === fromSlotKey) {
+        // §4.2 — picked up and dropped back near the SAME slot instead of
+        // a different one: a free nudge, not a no-op. Converts the drag's
+        // pixel delta into a percent-of-pitch offset on top of whatever
+        // offset the player already had, clamped to stay on the pitch.
+        if (!fromSlotKey) return;
+        const rect = pitchRef.current?.getBoundingClientRect();
+        const slotDef = formationSlots.find((s) => s.slot === fromSlotKey);
+        if (!rect || !slotDef || (event.delta.x === 0 && event.delta.y === 0)) return;
+
+        const baseX = slotDef.x + (draggedPlayer.xOffset ?? 0);
+        const baseY = slotDef.y + (draggedPlayer.yOffset ?? 0);
+        const nextX = clamp(baseX + (event.delta.x / rect.width) * 100, PITCH_EDGE_MARGIN, 100 - PITCH_EDGE_MARGIN);
+        const nextY = clamp(baseY + (event.delta.y / rect.height) * 100, PITCH_EDGE_MARGIN, 100 - PITCH_EDGE_MARGIN);
+        slots[fromSlotKey] = { ...draggedPlayer, xOffset: nextX - slotDef.x, yOffset: nextY - slotDef.y };
       } else {
-        bench = bench.filter((p) => p.id !== activeId);
-        if (displaced) bench = [...bench, displaced];
+        const displaced = slots[targetSlotKey];
+        // Calling up a scouted/extra player makes them inherit the shirt
+        // number of whoever they're replacing, instead of keeping their own.
+        // Either way, entering a DIFFERENT slot always starts fresh at that
+        // slot's default position (§4.4) — a fine-tuned offset computed for
+        // one slot wouldn't mean anything transplanted onto another.
+        const incoming = {
+          ...draggedPlayer,
+          shirtNumber: displaced && (fromWatchlist || fromExtras) ? displaced.shirtNumber : draggedPlayer.shirtNumber,
+          xOffset: null,
+          yOffset: null,
+        };
+
+        slots[targetSlotKey] = incoming;
+        if (fromSlotKey) {
+          // Swap within the pitch: the displaced starter takes the dragged
+          // player's old slot (also fresh, same reasoning).
+          slots[fromSlotKey] = displaced ? { ...displaced, xOffset: null, yOffset: null } : null;
+        } else if (fromWatchlist) {
+          // The "call up a scouted player" swap: whoever was starting there
+          // becomes the observado, not a bench reserve.
+          watchlist = watchlist.filter((p) => p.id !== activeId);
+          if (displaced) watchlist = [...watchlist, displaced];
+        } else if (fromExtras) {
+          extras = extras.filter((p) => p.id !== activeId);
+          if (displaced) extras = [...extras, displaced];
+        } else {
+          bench = bench.filter((p) => p.id !== activeId);
+          if (displaced) bench = [...bench, displaced];
+        }
       }
     } else if (overId.startsWith("benchPlayer:")) {
       const targetPlayerId = overId.slice("benchPlayer:".length);
@@ -357,11 +401,7 @@ export function SquadEditor({
     });
   }
 
-  async function handleNumberChange(playerId: string, value: string) {
-    const shirtNumber = value === "" ? null : Number(value);
-    if (shirtNumber !== null && (Number.isNaN(shirtNumber) || shirtNumber < 1 || shirtNumber > 99)) {
-      return;
-    }
+  async function handleNumberChange(playerId: string, shirtNumber: number | null) {
     updatePlayerLocal(playerId, { shirtNumber });
     const res = await fetch(`/api/seasons/${seasonId}/players/${playerId}`, {
       method: "PATCH",
@@ -498,6 +538,7 @@ export function SquadEditor({
           </CardHeader>
           <CardContent className="flex justify-center py-4">
             <div
+              ref={pitchRef}
               className="relative aspect-[2/3] w-full max-w-md overflow-hidden rounded-xl shadow-lg ring-1 ring-black/10"
               style={{
                 // Mown-grass stripes instead of a flat gradient — the pitch
@@ -674,7 +715,7 @@ function DroppableSlot({
   seasonId: string;
   duplicateNumbers: Set<number>;
   ageReference?: { startYear: number; calendar: string };
-  onNumberChange: (id: string, value: string) => void;
+  onNumberChange: (id: string, value: number | null) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
@@ -682,11 +723,16 @@ function DroppableSlot({
   onDeleted: (id: string, playerName: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `slot:${slotKey}` });
+  // §4.2 — the droppable hit zone moves together with the chip when
+  // nudged, so its drop target always tracks where the player is actually
+  // drawn; other slots are unaffected since each keeps its own x/y.
+  const effectiveX = x + (player?.xOffset ?? 0);
+  const effectiveY = y + (player?.yOffset ?? 0);
 
   return (
     <div
       ref={setNodeRef}
-      style={{ left: `${x}%`, top: `${y}%` }}
+      style={{ left: `${effectiveX}%`, top: `${effectiveY}%` }}
       className="absolute -translate-x-1/2 -translate-y-1/2"
     >
       {player ? (
@@ -749,7 +795,7 @@ function PlayerChip({
   seasonId: string;
   isDuplicateNumber: boolean;
   ageReference?: { startYear: number; calendar: string };
-  onNumberChange: (id: string, value: string) => void;
+  onNumberChange: (id: string, value: number | null) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
@@ -761,17 +807,15 @@ function PlayerChip({
   });
 
   const numberInput = (
-    <input
-      type="number"
+    <NumberField
       min={1}
       max={99}
-      value={player.shirtNumber ?? ""}
-      onChange={(e) => onNumberChange(player.id, e.target.value)}
+      value={player.shirtNumber ?? null}
+      onChange={(value) => onNumberChange(player.id, value)}
       onPointerDown={(e) => e.stopPropagation()}
       placeholder="#"
-      autoComplete="off"
       className={cn(
-        "bg-background/90 text-foreground font-heading w-10 shrink-0 rounded-md py-0.5 text-center text-lg font-bold outline-none",
+        "bg-background/90 text-foreground font-heading h-auto w-10 shrink-0 border-0 py-0.5 text-center text-lg font-bold outline-none",
         isDuplicateNumber && "ring-2 ring-destructive",
       )}
     />

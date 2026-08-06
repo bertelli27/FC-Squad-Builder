@@ -137,4 +137,33 @@
   a {
     color: inherit;
   }
+  /* Etapa 9 parte 4 (§5.1) — scrollbars nativas do SO/navegador ficavam
+     quase invisíveis contra o fundo escuro em áreas com overflow (banco de
+     reservas, diálogos longos etc.), deixando o corte de conteúdo sem
+     nenhuma affordance visual de "isso rola". Um estilo fino e discreto,
+     nas mesmas cores do tema (claro/escuro), em vez do padrão do
+     navegador — sem mudar nenhuma estrutura/layout, só torna o scroll já
+     existente perceptível.
+     `scrollbar-color` cobre Firefox; as regras `::-webkit-scrollbar*`
+     cobrem Chromium/Safari (o motor usado pelo app em produção). */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
 }

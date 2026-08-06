@@ -7,6 +7,7 @@ import Link from "next/link";
 import { TrophyIcon, XIcon, ShieldIcon, ChartNoAxesColumnIcon, ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberField } from "@/components/ui/number-field";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -111,9 +112,8 @@ export function NationalTeamStintCard({
     if (!res.ok) toast.error("Não foi possível remover o título.");
   }
 
-  function saveStatField(statsId: string, field: "appearances" | "goals" | "assists", raw: string) {
-    const value = raw === "" ? 0 : Number(raw);
-    if (Number.isNaN(value) || value < 0) return;
+  function saveStatField(statsId: string, field: "appearances" | "goals" | "assists", raw: number | null) {
+    const value = raw ?? 0;
     onStatsChanged(statsId, { [field]: value });
     fetch(`/api/careers/${careerId}/stints/${stint.id}/competition-stats/${statsId}`, {
       method: "PATCH",
@@ -239,25 +239,25 @@ export function NationalTeamStintCard({
                         )}
                         <span className="truncate">{s.competition.name}</span>
                       </span>
-                      <Input
-                        type="number"
+                      <NumberField
                         min={0}
                         value={s.appearances}
-                        onChange={(e) => saveStatField(s.id, "appearances", e.target.value)}
+                        onChange={(v) => saveStatField(s.id, "appearances", v)}
+                        aria-label={`Jogos em ${s.competition.name}`}
                         className="h-7 px-1 text-center text-xs"
                       />
-                      <Input
-                        type="number"
+                      <NumberField
                         min={0}
                         value={s.goals}
-                        onChange={(e) => saveStatField(s.id, "goals", e.target.value)}
+                        onChange={(v) => saveStatField(s.id, "goals", v)}
+                        aria-label={`Gols em ${s.competition.name}`}
                         className="h-7 px-1 text-center text-xs"
                       />
-                      <Input
-                        type="number"
+                      <NumberField
                         min={0}
                         value={s.assists}
-                        onChange={(e) => saveStatField(s.id, "assists", e.target.value)}
+                        onChange={(v) => saveStatField(s.id, "assists", v)}
+                        aria-label={`Assistências em ${s.competition.name}`}
                         className="h-7 px-1 text-center text-xs"
                       />
                       <button

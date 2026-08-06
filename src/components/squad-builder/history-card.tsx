@@ -1,4 +1,5 @@
-import { Trophy, Footprints, Users, TrendingUp, TrendingDown } from "lucide-react";
+import Link from "next/link";
+import { Trophy, Footprints, Users, TrendingUp, TrendingDown, ChevronRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { formatSeasonLabel, formatMoney } from "@/lib/season";
@@ -19,13 +20,17 @@ interface TransferRankEntry {
 }
 
 /**
- * §7/§8: histórico acumulado do clube — sempre derivado de
- * PlayerCompetitionStats/Transfer de todas as temporadas
+ * §7/§8 etapa 3, §8 etapa 9-4: histórico acumulado do clube — sempre
+ * derivado de PlayerCompetitionStats/Transfer de todas as temporadas
  * (squadService.getHistoricalStats/getTopTransfers), nunca digitado à
  * parte. Só aparece na visão geral do clube; uma temporada específica
- * mostra os dados dela sozinha (§9).
+ * mostra os dados dela sozinha (§9). Mostra só o TOP 3 de cada ranking
+ * (§8.1) — a página completa (§8.2/§8.3) fica em /squads/[id]/history,
+ * consultando os MESMOS dados sem limite (§8.4: nada é apagado, só a
+ * visualização aqui é cortada).
  */
 export function HistoryCard({
+  squadId,
   topScorers,
   topAssists,
   mostAppearances,
@@ -33,6 +38,7 @@ export function HistoryCard({
   topSales,
   seasonCalendar,
 }: {
+  squadId: string;
   topScorers: PlayerRankEntry[];
   topAssists: PlayerRankEntry[];
   mostAppearances: PlayerRankEntry[];
@@ -50,11 +56,18 @@ export function HistoryCard({
 
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="border-b py-3 [.border-b]:pb-3">
+      <CardHeader className="flex-row items-center justify-between border-b py-3 [.border-b]:pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Trophy className="text-primary size-4" />
           Histórico do clube
         </CardTitle>
+        <Link
+          href={`/squads/${squadId}/history`}
+          className="text-primary flex items-center gap-0.5 text-sm underline-offset-2 hover:underline"
+        >
+          Ver completo
+          <ChevronRight className="size-3.5" />
+        </Link>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-5 py-4 sm:grid-cols-2 lg:grid-cols-3">
         <PlayerRankList

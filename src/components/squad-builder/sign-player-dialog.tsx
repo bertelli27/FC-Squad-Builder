@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUrlInput } from "@/components/ui/image-url-input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { CountrySelect } from "@/components/ui/country-select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -109,7 +110,7 @@ export function SignPlayerDialog({
 
   const [counterpartClub, setCounterpartClub] = useState("");
   const [dealType, setDealType] = useState("permanent");
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState<number | null>(null);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -177,7 +178,7 @@ export function SignPlayerDialog({
     setExternalLink("");
     setCounterpartClub("");
     setDealType("permanent");
-    setValue("");
+    setValue(null);
     setQuery("");
     setResults([]);
     setExternalResults(null);
@@ -191,7 +192,7 @@ export function SignPlayerDialog({
         ...body,
         counterpartClub: counterpartClub || undefined,
         dealType,
-        value: value ? Number(value) : undefined,
+        value: value ?? undefined,
       }),
     })
       .then((res) => (res.ok ? res.json() : res.json().then((data) => Promise.reject(data))))
@@ -284,21 +285,7 @@ export function SignPlayerDialog({
             </div>
             <div className="flex flex-1 flex-col gap-1.5">
               <Label htmlFor="sign-value">Valor {dealType === "loan" && "(se houver)"}</Label>
-              <div className="relative">
-                <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
-                  €
-                </span>
-                <Input
-                  id="sign-value"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  className="pl-7"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+              <CurrencyInput id="sign-value" value={value} onChange={setValue} />
             </div>
           </div>
         </div>

@@ -9,6 +9,7 @@ import { ratingStyle } from "@/lib/rating-tier";
 import { PlayerProfileDialog } from "@/components/player-card/player-profile-dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { OverallBadge } from "@/components/player-card/overall-badge";
+import { NumberField } from "@/components/ui/number-field";
 import type { SquadPlayerVM } from "./squad-editor";
 
 /**
@@ -45,7 +46,7 @@ export function PlayerRowContent({
 }
 
 interface RosterHandlers {
-  onNumberChange: (id: string, value: string) => void;
+  onNumberChange: (id: string, value: number | null) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
@@ -271,16 +272,14 @@ function RosterRow({
         <OverallBadge overall={player.overall} />
       </td>
       <td className="px-1">
-        <input
-          type="number"
+        <NumberField
           min={1}
           max={99}
-          value={player.shirtNumber ?? ""}
-          onChange={(e) => onNumberChange(player.id, e.target.value)}
+          value={player.shirtNumber ?? null}
+          onChange={(value) => onNumberChange(player.id, value)}
           placeholder="#"
-          autoComplete="off"
           className={cn(
-            "bg-background text-foreground font-heading w-full rounded border-0 text-center text-sm font-bold outline-none",
+            "bg-background text-foreground font-heading h-auto w-full rounded border-0 px-1 text-center text-sm font-bold outline-none",
             isDuplicateNumber && "ring-2 ring-destructive",
           )}
         />

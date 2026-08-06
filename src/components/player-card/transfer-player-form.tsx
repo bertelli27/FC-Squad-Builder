@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import {
   Select,
   SelectContent,
@@ -36,7 +37,7 @@ export function TransferPlayerForm({
 }) {
   const [dealType, setDealType] = useState("permanent");
   const [counterpartClub, setCounterpartClub] = useState("");
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   function handleSubmit(event: React.FormEvent) {
@@ -53,7 +54,7 @@ export function TransferPlayerForm({
       body: JSON.stringify({
         dealType,
         counterpartClub,
-        value: value ? Number(value) : undefined,
+        value: value ?? undefined,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -97,21 +98,7 @@ export function TransferPlayerForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="transfer-out-value">Valor {dealType === "loan" && "(se houver)"}</Label>
-        <div className="relative">
-          <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
-            €
-          </span>
-          <Input
-            id="transfer-out-value"
-            type="number"
-            min={0}
-            step="0.01"
-            className="pl-7"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="0"
-          />
-        </div>
+        <CurrencyInput id="transfer-out-value" value={value} onChange={setValue} />
       </div>
 
       <div className="flex gap-2">

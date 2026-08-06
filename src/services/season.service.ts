@@ -180,6 +180,7 @@ function getSeasonById(id: string) {
       titles: { include: { competition: true }, orderBy: { createdAt: "asc" } },
       transfers: { orderBy: { order: "asc" } },
       kits: true,
+      competitions: { include: { competition: true }, orderBy: { order: "asc" } },
     },
   });
 }
@@ -411,6 +412,68 @@ export const seasonService = {
     await prisma.seasonKit.deleteMany({ where: { seasonId, type } });
   },
 
+  // ── Competições da temporada (etapa 9 parte 4, §1) ────────────────────
+
+  async listSeasonCompetitions(seasonId: string) {
+    return prisma.seasonCompetition.findMany({
+      where: { seasonId },
+      include: { competition: true },
+      orderBy: { order: "asc" },
+    });
+  },
+
+  /**
+   * Declara que esta temporada disputou tal competição — resolvendo por id
+   * ou por nome (criando se novo), mesmo padrão de addTitle. Idempotente:
+   * a unique constraint rejeitaria um insert duplicado, então só retorna a
+   * linha existente em vez de erro. NÃO cria PlayerCompetitionStats pra
+   * ninguém — isso só acontece quando um valor é de fato digitado (ver
+   * player-stats.service.ts), então esta lista é só "o que apareceu como
+   * opção pros jogadores", nunca um gatilho de dados em massa.
+   */
+  async addSeasonCompetition(
+    seasonId: string,
+    input: { competitionId?: string; competitionName?: string },
+  ) {
+    let competitionId = input.competitionId;
+    if (!competitionId) {
+      if (!input.competitionName?.trim()) return null;
+      const competition = await competitionService.findOrCreateCompetition(input.competitionName);
+      competitionId = competition.id;
+    }
+
+    const existing = await prisma.seasonCompetition.findUnique({
+      where: { seasonId_competitionId: { seasonId, competitionId } },
+      include: { competition: true },
+    });
+    if (existing) return existing;
+
+    const { _max } = await prisma.seasonCompetition.aggregate({ where: { seasonId }, _max: { order: true } });
+    // Mesma proteção contra corrida do check-then-create de playerStatsService.addCompetitionStats — improvável aqui (um submit por vez), mas barato de manter consistente.
+    return prisma.seasonCompetition
+      .create({
+        data: { seasonId, competitionId, order: (_max.order ?? -1) + 1 },
+        include: { competition: true },
+      })
+      .catch(() =>
+        prisma.seasonCompetition.findUnique({
+          where: { seasonId_competitionId: { seasonId, competitionId } },
+          include: { competition: true },
+        }),
+      );
+  },
+
+  /**
+   * Tira a competição da lista da temporada — nunca apaga
+   * PlayerCompetitionStats já preenchida por algum jogador pra ela (§1.2:
+   * "declarar" e "ter dado" são coisas independentes; um jogador que já
+   * tinha números aqui continua com eles, só some da lista de "clique pra
+   * preencher" de quem ainda não tinha).
+   */
+  async removeSeasonCompetition(seasonId: string, seasonCompetitionId: string) {
+    await prisma.seasonCompetition.delete({ where: { id: seasonCompetitionId, seasonId } });
+  },
+
   /**
    * Legacy free-text entry — kept only so pre-etapa-7 transfers (created
    * before a transfer was linked to a real CachedPlayer) keep working.
@@ -639,7 +702,16 @@ export const seasonService = {
         const original = byCachedPlayerId.get(a.cachedPlayerId)!;
         return prisma.squadPlayer.update({
           where: { id: original.id },
-          data: { positionSlot: a.positionSlot, isStarter: a.isStarter, order: a.order },
+          // §4 — troca de formação recalcula os slots do zero; um ajuste
+          // fino de posição salvo pra formação ANTERIOR não faz sentido na
+          // nova (coordenadas de slot diferentes), então reseta pro padrão.
+          data: {
+            positionSlot: a.positionSlot,
+            isStarter: a.isStarter,
+            order: a.order,
+            xOffset: null,
+            yOffset: null,
+          },
         });
       }),
     ]);
@@ -664,6 +736,8 @@ export const seasonService = {
       isWatchlist: boolean;
       isExtra: boolean;
       shirtNumber: number | null;
+      xOffset?: number | null;
+      yOffset?: number | null;
       order: number;
     }[],
   ) {
@@ -677,6 +751,8 @@ export const seasonService = {
             isWatchlist: u.isWatchlist,
             isExtra: u.isExtra,
             shirtNumber: u.shirtNumber,
+            xOffset: u.xOffset ?? null,
+            yOffset: u.yOffset ?? null,
             order: u.order,
           },
         }),

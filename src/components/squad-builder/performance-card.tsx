@@ -4,8 +4,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { BarChart3 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberField } from "@/components/ui/number-field";
 import { matchesPlayed } from "@/lib/season";
 
 /**
@@ -41,9 +41,8 @@ export function PerformanceCard({
     });
   }
 
-  function handleChange(field: "wins" | "draws" | "losses", raw: string) {
-    const value = raw === "" ? 0 : Number(raw);
-    if (Number.isNaN(value) || value < 0) return;
+  function handleChange(field: "wins" | "draws" | "losses", raw: number | null) {
+    const value = raw ?? 0;
 
     if (field === "wins") setWins(value);
     else if (field === "draws") setDraws(value);
@@ -61,9 +60,9 @@ export function PerformanceCard({
       </CardHeader>
       <CardContent className="flex flex-wrap items-end gap-4 py-4">
         <Stat label="Partidas" value={matchesPlayed({ wins, draws, losses })} />
-        <NumberField label="Vitórias" value={wins} onChange={(v) => handleChange("wins", v)} />
-        <NumberField label="Empates" value={draws} onChange={(v) => handleChange("draws", v)} />
-        <NumberField label="Derrotas" value={losses} onChange={(v) => handleChange("losses", v)} />
+        <PerformanceField label="Vitórias" value={wins} onChange={(v) => handleChange("wins", v)} />
+        <PerformanceField label="Empates" value={draws} onChange={(v) => handleChange("draws", v)} />
+        <PerformanceField label="Derrotas" value={losses} onChange={(v) => handleChange("losses", v)} />
       </CardContent>
     </Card>
   );
@@ -78,26 +77,25 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function NumberField({
+function PerformanceField({
   label,
   value,
   onChange,
 }: {
   label: string;
   value: number;
-  onChange: (value: string) => void;
+  onChange: (value: number | null) => void;
 }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <Label htmlFor={`perf-${label}`} className="sr-only">
         {label}
       </Label>
-      <Input
+      <NumberField
         id={`perf-${label}`}
-        type="number"
         min={0}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         className="font-heading h-10 w-16 text-center text-lg font-bold"
       />
       <span className="text-muted-foreground text-xs">{label}</span>

@@ -25,7 +25,13 @@ export const playerStatsService = {
    */
   async addCompetitionStats(
     squadPlayerId: string,
-    input: { competitionId?: string; competitionName?: string },
+    input: {
+      competitionId?: string;
+      competitionName?: string;
+      appearances?: number;
+      goals?: number;
+      assists?: number;
+    },
   ) {
     let competitionId = input.competitionId;
     if (!competitionId) {
@@ -40,10 +46,33 @@ export const playerStatsService = {
     });
     if (existing) return existing;
 
-    return prisma.playerCompetitionStats.create({
-      data: { squadPlayerId, competitionId },
-      include: { competition: true },
-    });
+    // §1.3 etapa 9-4 — quando a competição já aparece automaticamente pra
+    // este jogador (SeasonCompetition da temporada), a linha real só nasce
+    // no primeiro valor digitado: já cria com esse valor em vez de um
+    // create+update separado. O check-then-create acima não é atômico —
+    // duas requisições quase simultâneas (o dialog de estatísticas
+    // consegue disparar isso a partir de mais de um campo) podem ambas
+    // passar pelo `existing` como null e uma delas esbarrar na unique
+    // constraint aqui; nesse caso a outra já criou a linha, então só
+    // busca e devolve ela em vez de estourar erro — mesmo espírito de
+    // "idempotente" que o comentário acima já promete.
+    return prisma.playerCompetitionStats
+      .create({
+        data: {
+          squadPlayerId,
+          competitionId,
+          appearances: input.appearances ?? 0,
+          goals: input.goals ?? 0,
+          assists: input.assists ?? 0,
+        },
+        include: { competition: true },
+      })
+      .catch(() =>
+        prisma.playerCompetitionStats.findUnique({
+          where: { squadPlayerId_competitionId: { squadPlayerId, competitionId } },
+          include: { competition: true },
+        }),
+      );
   },
 
   async updateStats(
