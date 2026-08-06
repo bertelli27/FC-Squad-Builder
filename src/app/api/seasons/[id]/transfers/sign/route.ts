@@ -49,6 +49,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const counterpartClub = typeof body.counterpartClub === "string" ? body.counterpartClub : undefined;
   const value = typeof body.value === "number" && Number.isFinite(body.value) && body.value >= 0 ? body.value : undefined;
   const dealType = body.dealType === "loan" ? "loan" : "permanent";
+  const transferWindow = body.transferWindow === "start" || body.transferWindow === "mid" ? body.transferWindow : undefined;
 
   const result = await seasonService.signPlayer(id, {
     playerRef,
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     counterpartClub,
     value,
     dealType,
+    transferWindow,
   });
 
   if ("error" in result) {

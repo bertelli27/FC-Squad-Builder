@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TRANSFER_WINDOWS, type TransferWindow } from "@/lib/transfer-window";
 
 const DEAL_TYPES = [
   { value: "permanent", label: "Venda" },
@@ -51,6 +52,7 @@ export function TransferPlayerForm({
   onTransferred: (counterpartClub: string) => void;
 }) {
   const [dealType, setDealType] = useState("permanent");
+  const [transferWindow, setTransferWindow] = useState<TransferWindow | "">("");
   const [counterpartClub, setCounterpartClub] = useState("");
   const [value, setValue] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -95,6 +97,7 @@ export function TransferPlayerForm({
         dealType,
         counterpartClub,
         value: value ?? undefined,
+        transferWindow: transferWindow || undefined,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -136,6 +139,24 @@ export function TransferPlayerForm({
             {DEAL_TYPES.map((d) => (
               <SelectItem key={d.value} value={d.value}>
                 {d.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="transfer-out-window">Quando na temporada (opcional)</Label>
+        <Select value={transferWindow} onValueChange={(v) => setTransferWindow((v as TransferWindow) ?? "")}>
+          <SelectTrigger id="transfer-out-window">
+            <SelectValue placeholder="Não informado">
+              {(v: string) => TRANSFER_WINDOWS.find((w) => w.value === v)?.label ?? v}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {TRANSFER_WINDOWS.map((w) => (
+              <SelectItem key={w.value} value={w.value}>
+                {w.label}
               </SelectItem>
             ))}
           </SelectContent>

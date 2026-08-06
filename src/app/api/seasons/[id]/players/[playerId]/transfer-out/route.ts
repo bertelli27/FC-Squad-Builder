@@ -19,8 +19,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const counterpartClub = typeof body?.counterpartClub === "string" ? body.counterpartClub : "";
   const value = typeof body?.value === "number" && Number.isFinite(body.value) && body.value >= 0 ? body.value : undefined;
   const dealType = body?.dealType === "loan" ? "loan" : "permanent";
+  const transferWindow = body?.transferWindow === "start" || body?.transferWindow === "mid" ? body.transferWindow : undefined;
 
-  const result = await seasonService.transferPlayerOut(id, playerId, { counterpartClub, value, dealType });
+  const result = await seasonService.transferPlayerOut(id, playerId, { counterpartClub, value, dealType, transferWindow });
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: ERROR_STATUS[result.error] ?? 400 });
   }

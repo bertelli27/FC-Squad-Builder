@@ -3,13 +3,15 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowRightLeftIcon, ArrowDownCircle, ArrowUpCircle, XIcon } from "lucide-react";
+import { ArrowRightLeftIcon, ArrowDownCircle, ArrowUpCircle, ChartNoAxesColumnIcon, XIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/season";
+import { TRANSFER_WINDOW_LABEL } from "@/lib/transfer-window";
 import { SignPlayerDialog } from "./sign-player-dialog";
 import { EditTransferDialog } from "./edit-transfer-dialog";
+import { PlayerProfileDialog, type KnownPlayerInfo } from "../player-card/player-profile-dialog";
 import type { SquadPlayerVM } from "./squad-editor";
 
 export interface TransferVM {
@@ -19,6 +21,16 @@ export interface TransferVM {
   counterpartClub: string | null;
   value: number | null;
   dealType?: string; // "permanent" | "loan" — undefined on pre-etapa-7 rows
+  transferWindow?: string | null; // "start" | "mid" | null — não informado
+  /**
+   * Só presente quando o jogador desta transferência está atualmente
+   * isDeparted (saiu do elenco ativo desta temporada, independente de esta
+   * linha ser a entrada ou a saída dele) — dá acesso ao perfil/estatísticas
+   * dele mesmo depois de sumir do campo/banco (§"estatísticas depois da
+   * saída"). null quando o jogador segue ativo no elenco (acessível
+   * normalmente pelo campo/banco).
+   */
+  departedPlayer?: (KnownPlayerInfo & { squadPlayerId: string }) | null;
 }
 
 const DEAL_TYPE_LABEL: Record<string, string> = { permanent: "", loan: "Empréstimo" };
@@ -33,9 +45,12 @@ const DEAL_TYPE_LABEL: Record<string, string> = { permanent: "", loan: "Emprést
  */
 export function TransfersCard({
   seasonId,
+  ageReference,
   transfers: initialTransfers,
 }: {
   seasonId: string;
+  /** Repassado só pro PlayerProfileDialog de um jogador que já saiu (idade calculada na temporada, mesmo padrão do elenco ativo). */
+  ageReference?: { startYear: number; calendar: string };
   transfers: TransferVM[];
 }) {
   const [transfers, setTransfers] = useState(initialTransfers);
@@ -109,6 +124,7 @@ export function TransfersCard({
             </div>
             <TransferList
               seasonId={seasonId}
+              ageReference={ageReference}
               transfers={ins}
               emptyLabel="Nenhuma contratação registrada."
               onRemove={handleRemove}
@@ -123,6 +139,7 @@ export function TransfersCard({
             </h3>
             <TransferList
               seasonId={seasonId}
+              ageReference={ageReference}
               transfers={outs}
               emptyLabel="Nenhuma venda registrada. Transfira um jogador pelo perfil dele no elenco."
               onRemove={handleRemove}
@@ -161,12 +178,14 @@ export function TransfersCard({
 
 function TransferList({
   seasonId,
+  ageReference,
   transfers,
   emptyLabel,
   onRemove,
   onUpdated,
 }: {
   seasonId: string;
+  ageReference?: { startYear: number; calendar: string };
   transfers: TransferVM[];
   emptyLabel: string;
   onRemove: (transfer: TransferVM) => void;
@@ -176,38 +195,51 @@ function TransferList({
     <p className="text-muted-foreground text-xs">{emptyLabel}</p>
   ) : (
     <ul className="flex flex-col gap-1">
-      {transfers.map((t) => (
-        <li
-          key={t.id}
-          className="hover:bg-accent/30 group/transfer flex items-center gap-2 rounded-md px-2 py-1 text-sm"
-        >
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-medium">
-              {t.playerName}
-              {t.dealType && DEAL_TYPE_LABEL[t.dealType] && (
-                <span className="text-muted-foreground ml-1.5 text-xs font-normal">
-                  ({DEAL_TYPE_LABEL[t.dealType]})
-                </span>
+      {transfers.map((t) => {
+        const meta = [t.dealType && DEAL_TYPE_LABEL[t.dealType], t.transferWindow && TRANSFER_WINDOW_LABEL[t.transferWindow]]
+          .filter(Boolean)
+          .join(" · ");
+        return (
+          <li
+            key={t.id}
+            className="hover:bg-accent/30 group/transfer flex items-center gap-2 rounded-md px-2 py-1 text-sm"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">
+                {t.playerName}
+                {meta && <span className="text-muted-foreground ml-1.5 text-xs font-normal">({meta})</span>}
+              </div>
+              {t.counterpartClub && (
+                <div className="text-muted-foreground truncate text-xs">
+                  {t.type === "in" ? `${t.counterpartClub} → aqui` : `aqui → ${t.counterpartClub}`}
+                </div>
               )}
             </div>
-            {t.counterpartClub && (
-              <div className="text-muted-foreground truncate text-xs">
-                {t.type === "in" ? `${t.counterpartClub} → aqui` : `aqui → ${t.counterpartClub}`}
-              </div>
+            {t.value != null && <span className="shrink-0 text-xs font-medium">{formatMoney(t.value)}</span>}
+            {t.departedPlayer && (
+              <PlayerProfileDialog
+                seasonId={seasonId}
+                squadPlayerId={t.departedPlayer.squadPlayerId}
+                player={t.departedPlayer}
+                ageReference={ageReference}
+                aria-label={`Ver estatísticas de ${t.playerName}`}
+                className="text-muted-foreground hover:text-foreground shrink-0 opacity-0 transition-opacity group-hover/transfer:opacity-100"
+              >
+                <ChartNoAxesColumnIcon className="size-3.5" />
+              </PlayerProfileDialog>
             )}
-          </div>
-          {t.value != null && <span className="shrink-0 text-xs font-medium">{formatMoney(t.value)}</span>}
-          <EditTransferDialog seasonId={seasonId} transfer={t} onUpdated={(patch) => onUpdated(t.id, patch)} />
-          <button
-            type="button"
-            onClick={() => onRemove(t)}
-            aria-label={`Remover ${t.playerName}`}
-            className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 transition-opacity group-hover/transfer:opacity-100"
-          >
-            <XIcon className="size-3.5" />
-          </button>
-        </li>
-      ))}
+            <EditTransferDialog seasonId={seasonId} transfer={t} onUpdated={(patch) => onUpdated(t.id, patch)} />
+            <button
+              type="button"
+              onClick={() => onRemove(t)}
+              aria-label={`Remover ${t.playerName}`}
+              className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 transition-opacity group-hover/transfer:opacity-100"
+            >
+              <XIcon className="size-3.5" />
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }

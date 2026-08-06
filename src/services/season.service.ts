@@ -200,6 +200,20 @@ export const seasonService = {
   getSeason: getSeasonById,
 
   /**
+   * Jogadores que já saíram desta temporada (isDeparted) — invisíveis em
+   * `getSeasonById`'s `season.players` de propósito (elenco ativo), mas a
+   * linha (e as estatísticas) continuam existindo. Usado só pela
+   * Transferências card pra oferecer um jeito de reabrir o perfil/
+   * estatísticas de alguém que já saiu (§"estatísticas depois da saída").
+   */
+  async listDepartedPlayers(seasonId: string) {
+    return prisma.squadPlayer.findMany({
+      where: { seasonId, isDeparted: true },
+      include: { cachedPlayer: true },
+    });
+  },
+
+  /**
    * The season created alongside a brand-new club (§squad.service.ts
    * createSquad) — optionally auto-loading a real club/national team's
    * roster and assigning a starting XI, same greedy logic `changeFormation`
@@ -529,7 +543,12 @@ export const seasonService = {
   async updateTransfer(
     seasonId: string,
     transferId: string,
-    patch: { counterpartClub?: string | null; value?: number | null; dealType?: "permanent" | "loan" },
+    patch: {
+      counterpartClub?: string | null;
+      value?: number | null;
+      dealType?: "permanent" | "loan";
+      transferWindow?: "start" | "mid" | null;
+    },
   ): Promise<{ transfer: Awaited<ReturnType<typeof prisma.transfer.update>> } | { error: "not-found" | "missing-club" }> {
     const existing = await prisma.transfer.findUnique({ where: { id: transferId, seasonId } });
     if (!existing) return { error: "not-found" };
@@ -549,6 +568,7 @@ export const seasonService = {
         ...(nextCounterpartClub !== undefined && { counterpartClub: nextCounterpartClub }),
         ...(patch.value !== undefined && { value: patch.value }),
         ...(patch.dealType !== undefined && { dealType: patch.dealType }),
+        ...(patch.transferWindow !== undefined && { transferWindow: patch.transferWindow }),
       },
     });
 
@@ -591,7 +611,12 @@ export const seasonService = {
   async transferPlayerOut(
     seasonId: string,
     squadPlayerId: string,
-    input: { counterpartClub: string; value?: number | null; dealType?: "permanent" | "loan" },
+    input: {
+      counterpartClub: string;
+      value?: number | null;
+      dealType?: "permanent" | "loan";
+      transferWindow?: "start" | "mid";
+    },
   ): Promise<{ transfer: Awaited<ReturnType<typeof prisma.transfer.create>> } | { error: "not-in-squad" | "missing-club" }> {
     const counterpartClub = input.counterpartClub?.trim();
     if (!counterpartClub) return { error: "missing-club" };
@@ -613,6 +638,7 @@ export const seasonService = {
         counterpartClub,
         value: input.value ?? null,
         dealType,
+        transferWindow: input.transferWindow ?? null,
         cachedPlayerId: squadPlayer.cachedPlayerId,
         order: (_max.order ?? -1) + 1,
       },
@@ -665,6 +691,7 @@ export const seasonService = {
       counterpartClub?: string | null;
       value?: number | null;
       dealType?: "permanent" | "loan";
+      transferWindow?: "start" | "mid";
     },
   ): Promise<
     | { player: Awaited<ReturnType<typeof prisma.squadPlayer.create>>; transfer: Awaited<ReturnType<typeof prisma.transfer.create>> }
@@ -741,6 +768,7 @@ export const seasonService = {
         counterpartClub,
         value: input.value ?? null,
         dealType,
+        transferWindow: input.transferWindow ?? null,
         cachedPlayerId,
         order: (transferMax.order ?? -1) + 1,
       },

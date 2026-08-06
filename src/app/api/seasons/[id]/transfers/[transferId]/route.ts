@@ -9,7 +9,13 @@ function optionalStringField(value: unknown): string | null | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/** Etapa 9 complementar (§8/§9) — edita clube contrapartida/valor/tipo de uma transferência já registrada. */
+function transferWindowField(value: unknown): "start" | "mid" | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return value === "start" || value === "mid" ? value : undefined;
+}
+
+/** Etapa 9 complementar (§8/§9) — edita clube contrapartida/valor/tipo/janela de uma transferência já registrada. */
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { id, transferId } = await params;
   const body = await request.json().catch(() => null);
@@ -18,8 +24,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const counterpartClub = optionalStringField(body.counterpartClub);
   const value = body.value === null ? null : typeof body.value === "number" ? body.value : undefined;
   const dealType = body.dealType === "loan" || body.dealType === "permanent" ? body.dealType : undefined;
+  const transferWindow = transferWindowField(body.transferWindow);
 
-  const result = await seasonService.updateTransfer(id, transferId, { counterpartClub, value, dealType });
+  const result = await seasonService.updateTransfer(id, transferId, { counterpartClub, value, dealType, transferWindow });
   if ("error" in result) {
     const status = result.error === "not-found" ? 404 : 400;
     const message = result.error === "not-found" ? "Transfer not found" : "'counterpartClub' is required for an 'out' transfer";

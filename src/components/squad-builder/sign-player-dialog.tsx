@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { OverallBadge } from "@/components/player-card/overall-badge";
 import { POSITIONS, MAX_SECONDARY_POSITIONS } from "@/lib/positions";
+import { TRANSFER_WINDOWS, type TransferWindow } from "@/lib/transfer-window";
 import { PlayerRowContent } from "./roster-table";
 import type { SquadPlayerVM } from "./squad-editor";
 import type { TransferVM } from "./transfers-card";
@@ -110,6 +111,7 @@ export function SignPlayerDialog({
 
   const [counterpartClub, setCounterpartClub] = useState("");
   const [dealType, setDealType] = useState("permanent");
+  const [transferWindow, setTransferWindow] = useState<TransferWindow | "">("");
   const [value, setValue] = useState<number | null>(null);
 
   const [query, setQuery] = useState("");
@@ -178,6 +180,7 @@ export function SignPlayerDialog({
     setExternalLink("");
     setCounterpartClub("");
     setDealType("permanent");
+    setTransferWindow("");
     setValue(null);
     setQuery("");
     setResults([]);
@@ -193,6 +196,7 @@ export function SignPlayerDialog({
         counterpartClub: counterpartClub || undefined,
         dealType,
         value: value ?? undefined,
+        transferWindow: transferWindow || undefined,
       }),
     })
       .then((res) => (res.ok ? res.json() : res.json().then((data) => Promise.reject(data))))
@@ -287,6 +291,23 @@ export function SignPlayerDialog({
               <Label htmlFor="sign-value">Valor {dealType === "loan" && "(se houver)"}</Label>
               <CurrencyInput id="sign-value" value={value} onChange={setValue} />
             </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="sign-window">Quando na temporada (opcional)</Label>
+            <Select value={transferWindow} onValueChange={(v) => setTransferWindow((v as TransferWindow) ?? "")}>
+              <SelectTrigger id="sign-window">
+                <SelectValue placeholder="Não informado">
+                  {(v: string) => TRANSFER_WINDOWS.find((w) => w.value === v)?.label ?? v}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {TRANSFER_WINDOWS.map((w) => (
+                  <SelectItem key={w.value} value={w.value}>
+                    {w.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

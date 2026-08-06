@@ -408,6 +408,10 @@ model Transfer {
   cachedPlayerId String?
   cachedPlayer   CachedPlayer? @relation(fields: [cachedPlayerId], references: [id])
   dealType       String        @default("permanent") // "permanent" | "loan" — livre/gratuita é só um "permanent" com value = null (§18)
+  // "start" | "mid" | null — em que ponto da temporada a movimentação
+  // aconteceu; null = não informado (todas as transferências existentes
+  // antes desse campo, e continua opcional pra quem não quiser preencher).
+  transferWindow String?
 
   // Espelho opcional em CareerTransfer (ver comentário lá) — 1:1, criado
   // automaticamente quando o jogador tem carreira vinculada ao mesmo

@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TRANSFER_WINDOWS, type TransferWindow } from "@/lib/transfer-window";
 import type { TransferVM } from "./transfers-card";
 
 const DEAL_TYPES_IN = [
@@ -25,6 +26,12 @@ const DEAL_TYPES_OUT = [
   { value: "permanent", label: "Venda" },
   { value: "loan", label: "Empréstimo" },
 ];
+
+// Base UI's SelectItem precisa de um value não-vazio — diferente dos forms
+// de criar (onde "" simplesmente nunca foi escolhido, mostrando o
+// placeholder), aqui o campo pode já vir preenchido de uma edição anterior,
+// então precisa de uma opção clicável pra voltar a "".
+const CLEAR_WINDOW_VALUE = "__none__";
 
 /**
  * Etapa 9 complementar (§8/§9) — até agora uma transferência só podia ser
@@ -45,6 +52,7 @@ export function EditTransferDialog({
   const [open, setOpen] = useState(false);
   const [counterpartClub, setCounterpartClub] = useState(transfer.counterpartClub ?? "");
   const [dealType, setDealType] = useState(transfer.dealType ?? "permanent");
+  const [transferWindow, setTransferWindow] = useState<TransferWindow | "">((transfer.transferWindow as TransferWindow) ?? "");
   const [value, setValue] = useState<number | null>(transfer.value);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +62,7 @@ export function EditTransferDialog({
   function handleOpen() {
     setCounterpartClub(transfer.counterpartClub ?? "");
     setDealType(transfer.dealType ?? "permanent");
+    setTransferWindow((transfer.transferWindow as TransferWindow) ?? "");
     setValue(transfer.value);
     setOpen(true);
   }
@@ -73,11 +82,12 @@ export function EditTransferDialog({
         counterpartClub: counterpartClub.trim() || null,
         dealType,
         value,
+        transferWindow: transferWindow || null,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then(() => {
-        onUpdated({ counterpartClub: counterpartClub.trim() || null, dealType, value });
+        onUpdated({ counterpartClub: counterpartClub.trim() || null, dealType, value, transferWindow: transferWindow || null });
         toast.success("Transferência atualizada.");
         setOpen(false);
       })
@@ -132,6 +142,28 @@ export function EditTransferDialog({
               <Label htmlFor="edit-transfer-value">Valor {dealType === "loan" && "(se houver)"}</Label>
               <CurrencyInput id="edit-transfer-value" value={value} onChange={setValue} />
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-transfer-window">Quando na temporada (opcional)</Label>
+            <Select
+              value={transferWindow || CLEAR_WINDOW_VALUE}
+              onValueChange={(v) => setTransferWindow(v === CLEAR_WINDOW_VALUE ? "" : ((v as TransferWindow) ?? ""))}
+            >
+              <SelectTrigger id="edit-transfer-window">
+                <SelectValue placeholder="Não informado">
+                  {(v: string) => TRANSFER_WINDOWS.find((w) => w.value === v)?.label ?? "Não informado"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={CLEAR_WINDOW_VALUE}>Não informado</SelectItem>
+                {TRANSFER_WINDOWS.map((w) => (
+                  <SelectItem key={w.value} value={w.value}>
+                    {w.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Button type="submit" disabled={saving} className="w-fit">

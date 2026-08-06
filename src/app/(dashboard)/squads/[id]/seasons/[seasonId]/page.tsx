@@ -32,10 +32,22 @@ export default async function SeasonPage({
   ]);
   if (!squad || !season || season.squadId !== squad.id) notFound();
 
-  // §26: "Ver carreira" from a player's profile, when they have one.
-  const careerIdByPlayer = await careerService.findCareerIdsByCachedPlayerIds(
-    season.players.map((sp) => sp.cachedPlayer.id),
-  );
+  // Etapa "transferWindow" — jogadores que já saíram (isDeparted) somem do
+  // elenco ativo (SquadEditor), então a Transferências card precisa da sua
+  // própria via de acesso ao perfil/estatísticas deles: buscados à parte
+  // (getSeasonById's `season.players` já vem filtrado isDeparted: false, de
+  // propósito, pra representar só o elenco atual) e casados por
+  // cachedPlayerId com cada linha de Transfer abaixo.
+  const departedPlayers = await seasonService.listDepartedPlayers(season.id);
+  const departedByCachedPlayerId = new Map(departedPlayers.map((sp) => [sp.cachedPlayerId, sp]));
+
+  // §26: "Ver carreira" from a player's profile, when they have one —
+  // inclui os jogadores que já saíram, pra o link continuar disponível no
+  // perfil deles também.
+  const careerIdByPlayer = await careerService.findCareerIdsByCachedPlayerIds([
+    ...season.players.map((sp) => sp.cachedPlayer.id),
+    ...departedPlayers.map((sp) => sp.cachedPlayerId),
+  ]);
 
   return (
     <ClubThemeScope clubId={squad.id} primaryColor={squad.primaryColor} className="flex flex-col gap-6">
@@ -137,14 +149,37 @@ export default async function SeasonPage({
 
       <TransfersCard
         seasonId={season.id}
-        transfers={season.transfers.map((t) => ({
-          id: t.id,
-          type: t.type,
-          playerName: t.playerName,
-          counterpartClub: t.counterpartClub,
-          value: t.value,
-          dealType: t.dealType,
-        }))}
+        ageReference={{ startYear: season.startYear, calendar: squad.seasonCalendar }}
+        transfers={season.transfers.map((t) => {
+          const departed = t.cachedPlayerId ? departedByCachedPlayerId.get(t.cachedPlayerId) : undefined;
+          return {
+            id: t.id,
+            type: t.type,
+            playerName: t.playerName,
+            counterpartClub: t.counterpartClub,
+            value: t.value,
+            dealType: t.dealType,
+            transferWindow: t.transferWindow,
+            departedPlayer: departed
+              ? {
+                  squadPlayerId: departed.id,
+                  cachedPlayerId: departed.cachedPlayer.id,
+                  source: departed.cachedPlayer.source,
+                  name: departed.cachedPlayer.name,
+                  photoUrl: departed.cachedPlayer.photoUrl,
+                  position: departed.cachedPlayer.position,
+                  secondaryPositions: departed.cachedPlayer.secondaryPositions,
+                  nationality: departed.cachedPlayer.nationality,
+                  dateOfBirth: departed.cachedPlayer.dateOfBirth?.toISOString() ?? null,
+                  club: departed.cachedPlayer.club,
+                  overall: departed.cachedPlayer.overall,
+                  potential: departed.cachedPlayer.potential,
+                  externalLink: departed.cachedPlayer.externalLink,
+                  careerId: careerIdByPlayer.get(departed.cachedPlayer.id) ?? null,
+                }
+              : null,
+          };
+        })}
       />
 
       <SquadNotes squadId={squad.id} seasonId={season.id} notes={season.notes} />
