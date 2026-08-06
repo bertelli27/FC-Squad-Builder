@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
-import { CalendarPlus, ArrowRightLeftIcon, TrophyIcon, XIcon, ShieldHalfIcon } from "lucide-react";
+import Link from "next/link";
+import { CalendarPlus, ArrowRightLeftIcon, TrophyIcon, XIcon, ShieldHalfIcon, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -77,6 +78,24 @@ export function CareerWorkspace({
       ),
     [filteredStints],
   );
+
+  // CORREÇÃO — uma temporada da carreira é o ANO, não a CareerStint: um
+  // jogador pode ter uma passagem de clube E uma de seleção no mesmo ano
+  // (ex: Coritiba 2019 + Brasil 2019), e isso sempre foi contado como 2
+  // temporadas em vez de 1. CareerStint continua existindo uma por
+  // passagem (nada é fundido/apagado) — isso só agrupa pra contagem/
+  // apresentação, por `startYear`. Ver §21/§22 da correção.
+  const seasonsByYear = useMemo(() => {
+    const byYear = new Map<number, CareerStintVM[]>();
+    for (const stint of filteredStints) {
+      const list = byYear.get(stint.startYear) ?? [];
+      list.push(stint);
+      byYear.set(stint.startYear, list);
+    }
+    return [...byYear.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([year, yearStints]) => ({ year, stints: yearStints.slice().sort((a, b) => a.order - b.order) }));
+  }, [filteredStints]);
 
   // §13/§14: titles grouped by team (separated) or flattened across every
   // team (combined) — both always derived from filteredStints, so they
@@ -206,7 +225,7 @@ export function CareerWorkspace({
                 <Stat label="Jogos" value={totals.appearances} />
                 <Stat label="Gols" value={totals.goals} />
                 <Stat label="Assistências" value={totals.assists} />
-                <Stat label="Temporadas" value={filteredStints.length} />
+                <Stat label="Temporadas" value={seasonsByYear.length} />
               </div>
 
               {filter === ALL_TEAMS && (
@@ -233,6 +252,52 @@ export function CareerWorkspace({
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="gap-0 py-0">
+            <CardHeader className="border-b py-3 [.border-b]:pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarIcon className="text-primary size-4" />
+                Temporadas ({seasonsByYear.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className={seasonsByYear.length === 0 ? "py-4" : "flex flex-col divide-y py-0"}>
+              {seasonsByYear.length === 0 && <p className="text-muted-foreground text-sm">Nenhuma temporada registrada.</p>}
+              {seasonsByYear.map(({ year, stints: yearStints }) => (
+                <div key={year} className="flex flex-wrap items-center gap-3 py-3">
+                  <span className="font-heading w-14 shrink-0 text-lg font-bold">{year}</span>
+                  <div className="flex flex-1 flex-wrap gap-2">
+                    {yearStints.map((stint) => {
+                      const t = stintTotals(stint);
+                      return (
+                        <Link
+                          key={stint.id}
+                          href={`/careers/${careerId}/stints/${stint.id}`}
+                          className="bg-muted/40 hover:bg-accent/60 flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm transition-colors"
+                        >
+                          {stint.clubLogoUrl ? (
+                            <Image
+                              src={stint.clubLogoUrl}
+                              alt=""
+                              width={20}
+                              height={20}
+                              className="size-5 shrink-0 object-contain"
+                              unoptimized
+                            />
+                          ) : (
+                            <ShieldHalfIcon className="text-muted-foreground size-5 shrink-0" strokeWidth={1.25} />
+                          )}
+                          <span className="font-medium">{stint.clubName}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {t.appearances}J {t.goals}G {t.assists}A
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
