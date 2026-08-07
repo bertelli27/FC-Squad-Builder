@@ -3,7 +3,9 @@ import { playerProfileService } from "@/services/player-profile.service";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { OverallBadge } from "@/components/player-card/overall-badge";
 import { PlayerProfileTabs } from "@/components/player-card/player-profile-tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { ProfileHeader } from "@/components/ui/profile-header";
+import { CountryFlag } from "@/components/ui/country-flag";
+import { ageToday } from "@/lib/player-age";
 
 export const dynamic = "force-dynamic";
 
@@ -21,26 +23,27 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
     playerProfileService.getTitles(cachedPlayerId),
   ]);
 
+  const age = player.dateOfBirth ? ageToday(player.dateOfBirth) : null;
+
   return (
     <div className="flex flex-col gap-6">
-      <Card className="gap-0 py-0">
-        <CardContent className="flex items-center gap-4 py-4">
-          <PlayerAvatar src={player.photoUrl} name={player.name} size="lg" />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <h1 className="font-heading text-2xl font-bold tracking-tight">{player.name}</h1>
-            <span className="text-muted-foreground text-sm">
-              {[player.position, player.nationality].filter(Boolean).join(" · ")}
-            </span>
-          </div>
-          <OverallBadge overall={player.overall} className="h-8 px-3 text-lg" />
-        </CardContent>
-      </Card>
+      <ProfileHeader
+        avatar={<PlayerAvatar src={player.photoUrl} name={player.name} size="lg" />}
+        title={player.name}
+        facts={[
+          player.position,
+          player.nationality && (
+            <>
+              <CountryFlag nationality={player.nationality} /> {player.nationality}
+            </>
+          ),
+          age != null && `${age} anos`,
+        ]}
+        action={<OverallBadge overall={player.overall} className="h-8 px-3 text-lg" />}
+      />
 
       <PlayerProfileTabs
         overview={{
-          nationality: player.nationality,
-          position: player.position,
-          dateOfBirth: player.dateOfBirth,
           heightCm: player.heightCm,
           weightKg: player.weightKg,
           preferredFoot: player.preferredFoot,

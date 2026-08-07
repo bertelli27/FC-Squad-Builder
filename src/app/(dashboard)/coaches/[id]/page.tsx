@@ -6,6 +6,7 @@ import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ProfileHeader } from "@/components/ui/profile-header";
 import { formatSeasonLabel } from "@/lib/season";
 
 export const dynamic = "force-dynamic";
@@ -18,24 +19,22 @@ export default async function CoachProfilePage({ params }: { params: Promise<{ i
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="gap-0 py-0">
-        <CardContent className="flex items-center gap-4 py-4">
-          <PlayerAvatar src={coach.photoUrl} name={coach.name} size="lg" />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <h1 className="font-heading text-2xl font-bold tracking-tight">{coach.name}</h1>
-            {coach.externalLink && (
-              <a
-                href={coach.externalLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary w-fit text-sm underline underline-offset-2"
-              >
-                Ver mais →
-              </a>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <ProfileHeader
+        avatar={<PlayerAvatar src={coach.photoUrl} name={coach.name} size="lg" />}
+        title={coach.name}
+        action={
+          coach.externalLink && (
+            <a
+              href={coach.externalLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary text-sm underline underline-offset-2"
+            >
+              Ver mais →
+            </a>
+          )
+        }
+      />
 
       <Card className="gap-0 py-0">
         <CardHeader className="border-b py-3 [.border-b]:pb-3">

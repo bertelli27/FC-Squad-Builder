@@ -182,6 +182,8 @@ export default async function SeasonPage({
       <TransfersCard
         seasonId={season.id}
         ageReference={{ startYear: season.startYear, calendar: squad.seasonCalendar }}
+        squadName={squad.name}
+        squadLogoUrl={squad.logoUrl}
         transfers={season.transfers.map((t) => {
           const departed = t.cachedPlayerId ? departedByCachedPlayerId.get(t.cachedPlayerId) : undefined;
           return {
@@ -189,6 +191,8 @@ export default async function SeasonPage({
             type: t.type,
             playerName: t.playerName,
             counterpartClub: t.counterpartClub,
+            counterpartSquadId: t.counterpartSquadId,
+            counterpartSquad: t.counterpartSquad,
             value: t.value,
             dealType: t.dealType,
             transferWindow: t.transferWindow,

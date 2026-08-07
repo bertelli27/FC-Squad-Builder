@@ -4,7 +4,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ClubDestinationPicker, type DestinationValue } from "./club-destination-picker";
 import { TRANSFER_WINDOWS, type TransferWindow } from "@/lib/transfer-window";
 import type { TransferVM } from "./transfers-card";
 
@@ -50,7 +50,11 @@ export function EditTransferDialog({
   onUpdated: (patch: Partial<TransferVM>) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [counterpartClub, setCounterpartClub] = useState(transfer.counterpartClub ?? "");
+  const [destination, setDestination] = useState<DestinationValue>({
+    squadId: transfer.counterpartSquadId ?? null,
+    name: transfer.counterpartClub ?? "",
+    logoUrl: transfer.counterpartSquad?.logoUrl ?? null,
+  });
   const [dealType, setDealType] = useState(transfer.dealType ?? "permanent");
   const [transferWindow, setTransferWindow] = useState<TransferWindow | "">((transfer.transferWindow as TransferWindow) ?? "");
   const [value, setValue] = useState<number | null>(transfer.value);
@@ -60,7 +64,11 @@ export function EditTransferDialog({
   const clubLabel = transfer.type === "in" ? "Clube de origem" : "Clube de destino";
 
   function handleOpen() {
-    setCounterpartClub(transfer.counterpartClub ?? "");
+    setDestination({
+      squadId: transfer.counterpartSquadId ?? null,
+      name: transfer.counterpartClub ?? "",
+      logoUrl: transfer.counterpartSquad?.logoUrl ?? null,
+    });
     setDealType(transfer.dealType ?? "permanent");
     setTransferWindow((transfer.transferWindow as TransferWindow) ?? "");
     setValue(transfer.value);
@@ -69,7 +77,7 @@ export function EditTransferDialog({
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (transfer.type === "out" && !counterpartClub.trim()) {
+    if (transfer.type === "out" && !destination.name.trim()) {
       toast.error("Informe o clube de destino.");
       return;
     }
@@ -79,7 +87,8 @@ export function EditTransferDialog({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        counterpartClub: counterpartClub.trim() || null,
+        counterpartClub: destination.name.trim() || null,
+        counterpartSquadId: destination.squadId,
         dealType,
         value,
         transferWindow: transferWindow || null,
@@ -87,7 +96,13 @@ export function EditTransferDialog({
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then(() => {
-        onUpdated({ counterpartClub: counterpartClub.trim() || null, dealType, value, transferWindow: transferWindow || null });
+        onUpdated({
+          counterpartClub: destination.name.trim() || null,
+          counterpartSquadId: destination.squadId,
+          dealType,
+          value,
+          transferWindow: transferWindow || null,
+        });
         toast.success("Transferência atualizada.");
         setOpen(false);
       })
@@ -111,16 +126,12 @@ export function EditTransferDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-transfer-club">{clubLabel}</Label>
-            <Input
-              id="edit-transfer-club"
-              value={counterpartClub}
-              onChange={(e) => setCounterpartClub(e.target.value)}
-              placeholder={transfer.type === "in" ? "Opcional" : undefined}
-              required={transfer.type === "out"}
-            />
-          </div>
+          <ClubDestinationPicker
+            label={clubLabel}
+            value={destination}
+            onChange={setDestination}
+            required={transfer.type === "out"}
+          />
 
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">

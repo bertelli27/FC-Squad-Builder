@@ -47,6 +47,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   const shirtNumber = typeof body.shirtNumber === "number" ? body.shirtNumber : undefined;
   const counterpartClub = typeof body.counterpartClub === "string" ? body.counterpartClub : undefined;
+  const counterpartSquadId = typeof body.counterpartSquadId === "string" ? body.counterpartSquadId : undefined;
   const value = typeof body.value === "number" && Number.isFinite(body.value) && body.value >= 0 ? body.value : undefined;
   const dealType = body.dealType === "loan" ? "loan" : "permanent";
   const transferWindow = body.transferWindow === "start" || body.transferWindow === "mid" ? body.transferWindow : undefined;
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     newPlayer,
     shirtNumber,
     counterpartClub,
+    counterpartSquadId,
     value,
     dealType,
     transferWindow,

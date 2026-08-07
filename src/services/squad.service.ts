@@ -167,33 +167,6 @@ export const squadService = {
     });
   },
 
-  /**
-   * Etapa 10.2 — todo `cachedPlayerId` que já passou por algum `SquadPlayer`
-   * deste clube (não só os "atuais", que é o que listCurrentPlayers já
-   * cobre) — alimenta a aba "Jogadores" (histórico) do perfil.
-   */
-  async listAllPlayers(squadId: string) {
-    const rows = await prisma.squadPlayer.findMany({
-      where: { season: { squadId } },
-      select: {
-        cachedPlayerId: true,
-        cachedPlayer: { select: { id: true, name: true, photoUrl: true, position: true, nationality: true, overall: true } },
-        season: { select: { startYear: true } },
-      },
-    });
-
-    const byPlayer = new Map<string, { cachedPlayer: (typeof rows)[number]["cachedPlayer"]; years: Set<number> }>();
-    for (const row of rows) {
-      const entry = byPlayer.get(row.cachedPlayerId) ?? { cachedPlayer: row.cachedPlayer, years: new Set<number>() };
-      entry.years.add(row.season.startYear);
-      byPlayer.set(row.cachedPlayerId, entry);
-    }
-
-    return [...byPlayer.values()]
-      .map((entry) => ({ ...entry.cachedPlayer, years: [...entry.years].sort((a, b) => b - a) }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  },
-
   /** Etapa 10.2 — técnicos distintos que já passaram pelo clube (via Season.coachId), com os anos de cada um. Alimenta a aba "Técnicos". */
   async listCoachesUsed(squadId: string) {
     const seasons = await prisma.season.findMany({
@@ -211,37 +184,6 @@ export const squadService = {
     }
 
     return [...byCoach.values()];
-  },
-
-  /** Etapa 10.2 — toda transferência do clube, cronológica, sem o corte "top 3" de getTopTransfers. Alimenta a aba "Transferências". */
-  async listAllTransfers(squadId: string) {
-    return prisma.transfer.findMany({
-      where: { season: { squadId } },
-      include: {
-        season: { select: { startYear: true } },
-        cachedPlayer: { select: { id: true, name: true, photoUrl: true } },
-      },
-      orderBy: [{ season: { startYear: "desc" } }, { order: "asc" }],
-    });
-  },
-
-  /** Etapa 10.2 — competições distintas via SeasonCompetition, com os anos disputados. Alimenta a aba "Competições" (clube). */
-  async listCompetitionsPlayed(squadId: string) {
-    const rows = await prisma.seasonCompetition.findMany({
-      where: { season: { squadId } },
-      select: { competition: true, season: { select: { startYear: true } } },
-    });
-
-    const byCompetition = new Map<string, { competition: (typeof rows)[number]["competition"]; years: number[] }>();
-    for (const row of rows) {
-      const entry = byCompetition.get(row.competition.id) ?? { competition: row.competition, years: [] };
-      entry.years.push(row.season.startYear);
-      byCompetition.set(row.competition.id, entry);
-    }
-
-    return [...byCompetition.values()]
-      .map((entry) => ({ ...entry, years: entry.years.sort((a, b) => b - a) }))
-      .sort((a, b) => a.competition.name.localeCompare(b.competition.name));
   },
 
   /**
@@ -273,6 +215,26 @@ export const squadService = {
     }
 
     return [...byCompetition.values()];
+  },
+
+  /**
+   * Etapa 10.3 (§16/§17) — criação rápida de clube pelo
+   * ClubDestinationPicker (transferência), diferente de `createSquad`:
+   * cria SÓ o `Squad`, sem nenhuma Season — a arquitetura já suporta um
+   * clube com zero temporadas (§7 etapa 10.1), então isso não é um estado
+   * inválido novo. O usuário completa o resto (fundação, estádio, primeira
+   * temporada real...) depois, no próprio perfil do clube, sem duplicar
+   * nada.
+   */
+  async createBareSquad(input: { name: string; country?: string | null; logoUrl?: string | null }) {
+    return prisma.squad.create({
+      data: {
+        name: input.name.trim(),
+        baseKind: "club",
+        country: input.country || null,
+        logoUrl: input.logoUrl || null,
+      },
+    });
   },
 
   /**

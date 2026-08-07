@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ChartNoAxesColumnIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import {
@@ -14,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ClubDestinationPicker, type DestinationValue } from "@/components/squad-builder/club-destination-picker";
 import { TRANSFER_WINDOWS, type TransferWindow } from "@/lib/transfer-window";
 
 const DEAL_TYPES = [
@@ -53,7 +53,7 @@ export function TransferPlayerForm({
 }) {
   const [dealType, setDealType] = useState("permanent");
   const [transferWindow, setTransferWindow] = useState<TransferWindow | "">("");
-  const [counterpartClub, setCounterpartClub] = useState("");
+  const [destination, setDestination] = useState<DestinationValue>({ squadId: null, name: "" });
   const [value, setValue] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [statsTotal, setStatsTotal] = useState<StatsTotal | null>(null);
@@ -84,7 +84,7 @@ export function TransferPlayerForm({
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!counterpartClub.trim()) {
+    if (!destination.name.trim()) {
       toast.error("Informe o clube de destino.");
       return;
     }
@@ -95,13 +95,14 @@ export function TransferPlayerForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         dealType,
-        counterpartClub,
+        counterpartClub: destination.name,
+        counterpartSquadId: destination.squadId ?? undefined,
         value: value ?? undefined,
         transferWindow: transferWindow || undefined,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then(() => onTransferred(counterpartClub.trim()))
+      .then(() => onTransferred(destination.name.trim()))
       .catch(() => toast.error("Não foi possível transferir o jogador."))
       .finally(() => setSaving(false));
   }
@@ -163,16 +164,7 @@ export function TransferPlayerForm({
         </Select>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="transfer-out-club">Clube de destino</Label>
-        <Input
-          id="transfer-out-club"
-          value={counterpartClub}
-          onChange={(e) => setCounterpartClub(e.target.value)}
-          required
-          autoFocus
-        />
-      </div>
+      <ClubDestinationPicker label="Clube de destino" value={destination} onChange={setDestination} required />
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="transfer-out-value">Valor {dealType === "loan" && "(se houver)"}</Label>

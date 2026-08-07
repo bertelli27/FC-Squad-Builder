@@ -3,12 +3,9 @@
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatSeasonLabel } from "@/lib/season";
-import { SquadOverviewTab, type SquadOverviewData } from "./squad-overview-tab";
+import { SquadOverviewTab } from "./squad-overview-tab";
 import { SeasonsSection, type SeasonCardData } from "./seasons-section";
-import { ClubPlayersTab, type HistoricalPlayerData } from "./club-players-tab";
 import { ClubCoachesTab, type CoachUsedData } from "./club-coaches-tab";
-import { ClubTransfersTab, type ClubTransferData } from "./club-transfers-tab";
-import { ClubCompetitionsTab, type CompetitionPlayedData } from "./club-competitions-tab";
 import { NationalTeamCompetitionsTab, type ConvocationNodeData } from "./national-team-competitions-tab";
 import { PalmaresCard, type PalmaresEntry } from "./palmares-card";
 import { FullHistoryView } from "./full-history-view";
@@ -33,19 +30,21 @@ interface TransferRankEntry {
  * Etapa 10.2 — orquestrador de abas do perfil de clube/seleção. Não busca
  * nada sozinho — tudo já vem pronto da página (Promise.all), mesmo padrão
  * de competition-detail-tabs.tsx (useState local, sem sync de URL).
+ *
+ * Etapa 10.3 (§5/§6): as abas "Jogadores"/"Transferências"/"Competições"
+ * (clube) saíram — essa informação continua acessível dentro de cada
+ * Temporada, só deixou de duplicar como aba própria do clube. A árvore
+ * de convocações da seleção ("Competições") continua, é a navegação
+ * primária dela.
  */
 export function SquadProfileTabs({
   squadId,
   baseKind,
   seasonCalendar,
-  overview,
   seasons,
   palmares,
   currentPlayers,
-  allPlayers,
   coachesUsed,
-  allTransfers,
-  competitionsPlayed,
   convocationTree,
   historicalStats,
   topTransfers,
@@ -53,14 +52,10 @@ export function SquadProfileTabs({
   squadId: string;
   baseKind: string | null;
   seasonCalendar: string;
-  overview: SquadOverviewData;
   seasons: SeasonCardData[];
   palmares: PalmaresEntry[];
   currentPlayers: CurrentPlayerData[];
-  allPlayers: HistoricalPlayerData[];
   coachesUsed: CoachUsedData[];
-  allTransfers: ClubTransferData[];
-  competitionsPlayed: CompetitionPlayedData[];
   convocationTree: ConvocationNodeData[];
   historicalStats: { topScorers: PlayerRankEntry[]; topAssists: PlayerRankEntry[]; mostAppearances: PlayerRankEntry[] };
   topTransfers: { topBuys: TransferRankEntry[]; topSales: TransferRankEntry[] };
@@ -78,10 +73,7 @@ export function SquadProfileTabs({
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           {isNationalTeam && <TabsTrigger value="competitions">Competições</TabsTrigger>}
           <TabsTrigger value="seasons">{isNationalTeam ? "Convocações" : "Temporadas"}</TabsTrigger>
-          <TabsTrigger value="players">Jogadores</TabsTrigger>
           <TabsTrigger value="coaches">Técnicos</TabsTrigger>
-          {!isNationalTeam && <TabsTrigger value="transfers">Transferências</TabsTrigger>}
-          {!isNationalTeam && <TabsTrigger value="competitions">Competições</TabsTrigger>}
           {!isNationalTeam && <TabsTrigger value="titles">Títulos</TabsTrigger>}
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
@@ -89,22 +81,18 @@ export function SquadProfileTabs({
 
       {tab === "overview" && (
         <SquadOverviewTab
-          squad={overview}
-          currentPlayersCount={currentPlayers.length}
-          totalPlayersCount={allPlayers.length}
-          seasonsCount={seasons.length}
+          isNationalTeam={isNationalTeam}
           titlesCount={titlesCount}
+          seasonsCount={seasons.length}
           lastCoachName={lastSeason?.coachName ?? null}
           lastSeasonLabel={lastSeason ? formatSeasonLabel(lastSeason.startYear, seasonCalendar) : null}
+          currentPlayers={currentPlayers}
         />
       )}
 
-      {tab === "competitions" &&
-        (isNationalTeam ? (
-          <NationalTeamCompetitionsTab squadId={squadId} tree={convocationTree} seasonCalendar={seasonCalendar} />
-        ) : (
-          <ClubCompetitionsTab competitions={competitionsPlayed} />
-        ))}
+      {tab === "competitions" && isNationalTeam && (
+        <NationalTeamCompetitionsTab squadId={squadId} tree={convocationTree} seasonCalendar={seasonCalendar} />
+      )}
 
       {tab === "seasons" && (
         <SeasonsSection
@@ -115,13 +103,7 @@ export function SquadProfileTabs({
         />
       )}
 
-      {tab === "players" && <ClubPlayersTab currentPlayers={currentPlayers} allPlayers={allPlayers} />}
-
       {tab === "coaches" && <ClubCoachesTab coaches={coachesUsed} />}
-
-      {tab === "transfers" && !isNationalTeam && (
-        <ClubTransfersTab transfers={allTransfers} seasonCalendar={seasonCalendar} />
-      )}
 
       {tab === "titles" && !isNationalTeam && <PalmaresCard entries={palmares} />}
 

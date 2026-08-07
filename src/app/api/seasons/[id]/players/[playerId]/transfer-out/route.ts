@@ -17,11 +17,18 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const body = await request.json().catch(() => null);
 
   const counterpartClub = typeof body?.counterpartClub === "string" ? body.counterpartClub : "";
+  const counterpartSquadId = typeof body?.counterpartSquadId === "string" ? body.counterpartSquadId : undefined;
   const value = typeof body?.value === "number" && Number.isFinite(body.value) && body.value >= 0 ? body.value : undefined;
   const dealType = body?.dealType === "loan" ? "loan" : "permanent";
   const transferWindow = body?.transferWindow === "start" || body?.transferWindow === "mid" ? body.transferWindow : undefined;
 
-  const result = await seasonService.transferPlayerOut(id, playerId, { counterpartClub, value, dealType, transferWindow });
+  const result = await seasonService.transferPlayerOut(id, playerId, {
+    counterpartClub,
+    counterpartSquadId,
+    value,
+    dealType,
+    transferWindow,
+  });
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: ERROR_STATUS[result.error] ?? 400 });
   }

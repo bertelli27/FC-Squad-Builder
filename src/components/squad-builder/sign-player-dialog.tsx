@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OverallBadge } from "@/components/player-card/overall-badge";
+import { ClubDestinationPicker, type DestinationValue } from "./club-destination-picker";
 import { POSITIONS, MAX_SECONDARY_POSITIONS } from "@/lib/positions";
 import { TRANSFER_WINDOWS, type TransferWindow } from "@/lib/transfer-window";
 import { PlayerRowContent } from "./roster-table";
@@ -111,7 +112,7 @@ export function SignPlayerDialog({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"search" | "create">("search");
 
-  const [counterpartClub, setCounterpartClub] = useState("");
+  const [destination, setDestination] = useState<DestinationValue>({ squadId: null, name: "" });
   const [dealType, setDealType] = useState("permanent");
   const [transferWindow, setTransferWindow] = useState<TransferWindow | "">("");
   const [value, setValue] = useState<number | null>(null);
@@ -180,7 +181,7 @@ export function SignPlayerDialog({
     setShirtNumber("");
     setPhotoUrl("");
     setExternalLink("");
-    setCounterpartClub("");
+    setDestination({ squadId: null, name: "" });
     setDealType("permanent");
     setTransferWindow("");
     setValue(null);
@@ -195,7 +196,8 @@ export function SignPlayerDialog({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...body,
-        counterpartClub: counterpartClub || undefined,
+        counterpartClub: destination.name || undefined,
+        counterpartSquadId: destination.squadId ?? undefined,
         dealType,
         value: value ?? undefined,
         transferWindow: transferWindow || undefined,
@@ -264,15 +266,7 @@ export function SignPlayerDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-3 border-b pb-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="sign-club">Clube de origem</Label>
-            <Input
-              id="sign-club"
-              value={counterpartClub}
-              onChange={(e) => setCounterpartClub(e.target.value)}
-              placeholder="Opcional"
-            />
-          </div>
+          <ClubDestinationPicker label="Clube de origem" value={destination} onChange={setDestination} />
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">
               <Label htmlFor="sign-type">Tipo</Label>

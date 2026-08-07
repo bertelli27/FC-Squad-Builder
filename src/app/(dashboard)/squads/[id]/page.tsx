@@ -4,43 +4,43 @@ import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { EditSquadDialog } from "@/components/squad-builder/edit-squad-dialog";
 import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
 import { SquadProfileTabs } from "@/components/squad-builder/squad-profile-tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { ProfileHeader } from "@/components/ui/profile-header";
+import { CountryFlag } from "@/components/ui/country-flag";
+import { findCountry } from "@/lib/countries";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [
-    squad,
-    palmares,
-    historicalStats,
-    topTransfers,
-    currentPlayers,
-    allPlayers,
-    coachesUsed,
-    allTransfers,
-    competitionsPlayed,
-    convocationTree,
-  ] = await Promise.all([
-    squadService.getSquad(id),
-    squadService.getPalmares(id),
-    squadService.getHistoricalStats(id),
-    squadService.getTopTransfers(id),
-    squadService.listCurrentPlayers(id),
-    squadService.listAllPlayers(id),
-    squadService.listCoachesUsed(id),
-    squadService.listAllTransfers(id),
-    squadService.listCompetitionsPlayed(id),
-    squadService.listConvocationTree(id),
-  ]);
+  const [squad, palmares, historicalStats, topTransfers, currentPlayers, coachesUsed, convocationTree] =
+    await Promise.all([
+      squadService.getSquad(id),
+      squadService.getPalmares(id),
+      squadService.getHistoricalStats(id),
+      squadService.getTopTransfers(id),
+      squadService.listCurrentPlayers(id),
+      squadService.listCoachesUsed(id),
+      squadService.listConvocationTree(id),
+    ]);
   if (!squad) notFound();
+
+  const isNationalTeam = squad.baseKind === "nationalTeam";
 
   return (
     <ClubThemeScope clubId={squad.id} primaryColor={squad.primaryColor} className="flex flex-col gap-6">
-      <Card className="gap-0 py-0">
-        <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <ClubBadge src={squad.logoUrl} name={squad.name} size="lg" />
-            <h1 className="font-heading text-2xl font-bold tracking-tight">{squad.name}</h1>
-          </div>
+      <ProfileHeader
+        avatar={<ClubBadge src={squad.logoUrl} name={squad.name} size="lg" />}
+        title={squad.name}
+        facts={[
+          squad.country && (
+            <>
+              <CountryFlag nationality={squad.country} /> {findCountry(squad.country)?.label ?? squad.country}
+            </>
+          ),
+          squad.category?.name,
+          !isNationalTeam && squad.city,
+          isNationalTeam ? squad.confederation : squad.foundedYear && `Fundado em ${squad.foundedYear}`,
+          !isNationalTeam && squad.stadium,
+        ]}
+        action={
           <EditSquadDialog
             squad={{
               id: squad.id,
@@ -60,25 +60,13 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
               confederation: squad.confederation,
             }}
           />
-        </CardContent>
-      </Card>
+        }
+      />
 
       <SquadProfileTabs
         squadId={squad.id}
         baseKind={squad.baseKind}
         seasonCalendar={squad.seasonCalendar}
-        overview={{
-          fullName: squad.fullName,
-          country: squad.country,
-          city: squad.city,
-          foundedYear: squad.foundedYear,
-          stadium: squad.stadium,
-          colors: squad.colors,
-          confederation: squad.confederation,
-          category: squad.category,
-          baseKind: squad.baseKind,
-          seasonCalendar: squad.seasonCalendar,
-        }}
         seasons={squad.seasons.map((season) => ({
           id: season.id,
           startYear: season.startYear,
@@ -91,10 +79,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
         }))}
         palmares={palmares}
         currentPlayers={currentPlayers}
-        allPlayers={allPlayers}
         coachesUsed={coachesUsed}
-        allTransfers={allTransfers}
-        competitionsPlayed={competitionsPlayed}
         convocationTree={convocationTree}
         historicalStats={historicalStats}
         topTransfers={topTransfers}

@@ -171,6 +171,9 @@ model Squad {
   // "quem já jogou aqui numa temporada", é "quem está aqui agora" —
   // ver comentário em CachedPlayer.currentClubId.
   currentPlayers CachedPlayer[] @relation("SquadCurrentPlayers")
+  // Etapa 10.3 — transferências (de qualquer clube/temporada) que
+  // escolheram este Squad como clube de origem/destino real.
+  counterpartTransfers Transfer[] @relation("TransferCounterpartSquad")
 }
 
 // Uma fotografia independente do clube num período: elenco, técnico e
@@ -483,6 +486,16 @@ model Transfer {
   cachedPlayerId String?
   cachedPlayer   CachedPlayer? @relation(fields: [cachedPlayerId], references: [id])
   dealType       String        @default("permanent") // "permanent" | "loan" — livre/gratuita é só um "permanent" com value = null (§18)
+
+  // Etapa 10.3 — quando o clube de origem/destino é um Squad real
+  // (escolhido no ClubDestinationPicker, não digitado), essa é a
+  // referência viva. `counterpartClub` acima continua sendo preenchido
+  // sempre (snapshot legível do nome no momento, mesmo padrão de
+  // CareerStint.clubName/CompetitionChampion.standaloneName — nunca
+  // sincronizado ao vivo depois). Transferências antigas/manuais ficam
+  // com isso null e continuam funcionando só com o texto livre.
+  counterpartSquadId String?
+  counterpartSquad    Squad?  @relation("TransferCounterpartSquad", fields: [counterpartSquadId], references: [id], onDelete: SetNull)
   // "start" | "mid" | null — em que ponto da temporada a movimentação
   // aconteceu; null = não informado (todas as transferências existentes
   // antes desse campo, e continua opcional pra quem não quiser preencher).
@@ -495,6 +508,7 @@ model Transfer {
 
   @@index([seasonId])
   @@index([cachedPlayerId])
+  @@index([counterpartSquadId])
 }
 
 model Category {

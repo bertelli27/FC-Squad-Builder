@@ -22,11 +22,18 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
   const counterpartClub = optionalStringField(body.counterpartClub);
+  const counterpartSquadId = optionalStringField(body.counterpartSquadId);
   const value = body.value === null ? null : typeof body.value === "number" ? body.value : undefined;
   const dealType = body.dealType === "loan" || body.dealType === "permanent" ? body.dealType : undefined;
   const transferWindow = transferWindowField(body.transferWindow);
 
-  const result = await seasonService.updateTransfer(id, transferId, { counterpartClub, value, dealType, transferWindow });
+  const result = await seasonService.updateTransfer(id, transferId, {
+    counterpartClub,
+    counterpartSquadId,
+    value,
+    dealType,
+    transferWindow,
+  });
   if ("error" in result) {
     const status = result.error === "not-found" ? 404 : 400;
     const message = result.error === "not-found" ? "Transfer not found" : "'counterpartClub' is required for an 'out' transfer";

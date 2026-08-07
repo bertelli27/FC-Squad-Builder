@@ -185,7 +185,10 @@ function getSeasonById(id: string) {
       // (com as estatísticas) continua existindo no banco.
       players: { where: { isDeparted: false }, include: { cachedPlayer: true }, orderBy: { order: "asc" } },
       titles: { include: { competition: true }, orderBy: { createdAt: "asc" } },
-      transfers: { orderBy: { order: "asc" } },
+      transfers: {
+        orderBy: { order: "asc" },
+        include: { counterpartSquad: { select: { id: true, name: true, logoUrl: true } } },
+      },
       kits: true,
       competitions: { include: { competition: true }, orderBy: { order: "asc" } },
       // Etapa "escalações múltiplas" — todas as escalações salvas desta
@@ -632,6 +635,8 @@ export const seasonService = {
     transferId: string,
     patch: {
       counterpartClub?: string | null;
+      /** Etapa 10.3 (§24) — trocar/vincular/desvincular o Squad real (null = desvincula, vira só texto livre). */
+      counterpartSquadId?: string | null;
       value?: number | null;
       dealType?: "permanent" | "loan";
       transferWindow?: "start" | "mid" | null;
@@ -653,6 +658,7 @@ export const seasonService = {
       where: { id: transferId },
       data: {
         ...(nextCounterpartClub !== undefined && { counterpartClub: nextCounterpartClub }),
+        ...(patch.counterpartSquadId !== undefined && { counterpartSquadId: patch.counterpartSquadId }),
         ...(patch.value !== undefined && { value: patch.value }),
         ...(patch.dealType !== undefined && { dealType: patch.dealType }),
         ...(patch.transferWindow !== undefined && { transferWindow: patch.transferWindow }),
@@ -700,6 +706,8 @@ export const seasonService = {
     squadPlayerId: string,
     input: {
       counterpartClub: string;
+      /** Etapa 10.3 (§15/§17) — Squad real escolhido no ClubDestinationPicker, se houver. */
+      counterpartSquadId?: string | null;
       value?: number | null;
       dealType?: "permanent" | "loan";
       transferWindow?: "start" | "mid";
@@ -723,6 +731,7 @@ export const seasonService = {
         type: "out",
         playerName: squadPlayer.cachedPlayer.name,
         counterpartClub,
+        counterpartSquadId: input.counterpartSquadId ?? null,
         value: input.value ?? null,
         dealType,
         transferWindow: input.transferWindow ?? null,
@@ -730,6 +739,18 @@ export const seasonService = {
         order: (_max.order ?? -1) + 1,
       },
     });
+
+    // Etapa 10.3 (§18/§19) — só numa saída DEFINITIVA (permanent, não
+    // empréstimo) pra um clube real: o "clube atual" passa a ser o
+    // destino. Nunca reescreve SquadPlayer/CareerStint/estatísticas —
+    // só esse ponteiro, exatamente como o resto do histórico já
+    // preserva em toda troca de clube atual (etapa 10.1).
+    if (input.counterpartSquadId && dealType === "permanent") {
+      await prisma.cachedPlayer.update({
+        where: { id: squadPlayer.cachedPlayerId },
+        data: { currentClubId: input.counterpartSquadId },
+      });
+    }
 
     // Soft-delete after creating the Transfer — same ordering rationale
     // as before (a failure creating the Transfer never leaves the roster
@@ -784,6 +805,8 @@ export const seasonService = {
       };
       shirtNumber?: number;
       counterpartClub?: string | null;
+      /** Etapa 10.3 (§15/§17) — Squad real escolhido no ClubDestinationPicker, se houver. */
+      counterpartSquadId?: string | null;
       value?: number | null;
       dealType?: "permanent" | "loan";
       transferWindow?: "start" | "mid";
@@ -861,12 +884,22 @@ export const seasonService = {
         type: "in",
         playerName: squadPlayer.cachedPlayer.name,
         counterpartClub,
+        counterpartSquadId: input.counterpartSquadId ?? null,
         value: input.value ?? null,
         dealType,
         transferWindow: input.transferWindow ?? null,
         cachedPlayerId,
         order: (transferMax.order ?? -1) + 1,
       },
+    });
+
+    // Etapa 10.3 (§18, direção "entrada") — assinar um jogador pra este
+    // clube sempre atualiza o "clube atual" dele pra este Squad, contrato
+    // permanente ou empréstimo: de qualquer forma é onde ele está jogando
+    // agora. Não reescreve nenhum histórico, só o ponteiro.
+    await prisma.cachedPlayer.update({
+      where: { id: cachedPlayerId },
+      data: { currentClubId: season.squad.id },
     });
 
     await mirrorTransferOnCareer(transfer.id, cachedPlayerId, {

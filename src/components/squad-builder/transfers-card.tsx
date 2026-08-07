@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/season";
 import { SignPlayerDialog } from "./sign-player-dialog";
 import { EditTransferDialog } from "./edit-transfer-dialog";
+import { ClubBadge } from "./club-badge";
 import { PlayerProfileDialog, type KnownPlayerInfo } from "../player-card/player-profile-dialog";
 import type { SquadPlayerVM } from "./squad-editor";
 
@@ -20,6 +21,9 @@ export interface TransferVM {
   type: string; // "in" | "out"
   playerName: string;
   counterpartClub: string | null;
+  /** Etapa 10.3 (§15/§17) — Squad real vinculado, quando existir. */
+  counterpartSquadId?: string | null;
+  counterpartSquad?: { id: string; name: string; logoUrl: string | null } | null;
   value: number | null;
   dealType?: string; // "permanent" | "loan" — undefined on pre-etapa-7 rows
   transferWindow?: string | null; // "start" | "mid" | null — não informado
@@ -49,11 +53,16 @@ const DEAL_TYPE_LABEL: Record<string, string> = { permanent: "", loan: "Emprést
 export function TransfersCard({
   seasonId,
   ageReference,
+  squadName,
+  squadLogoUrl,
   transfers: initialTransfers,
 }: {
   seasonId: string;
   /** Repassado só pro PlayerProfileDialog de um jogador que já saiu (idade calculada na temporada, mesmo padrão do elenco ativo). */
   ageReference?: { startYear: number; calendar: string };
+  /** Etapa 10.3 (§23) — lado "aqui" do visual Clube A ➡ Clube B, já disponível na página (zero query nova). */
+  squadName: string;
+  squadLogoUrl: string | null;
   transfers: TransferVM[];
 }) {
   const [transfers, setTransfers] = useState(initialTransfers);
@@ -152,6 +161,8 @@ export function TransfersCard({
                     <TransferList
                       seasonId={seasonId}
                       ageReference={ageReference}
+                      squadName={squadName}
+                      squadLogoUrl={squadLogoUrl}
                       transfers={ins}
                       emptyLabel="Nenhuma contratação registrada."
                       onRemove={handleRemove}
@@ -167,6 +178,8 @@ export function TransfersCard({
                     <TransferList
                       seasonId={seasonId}
                       ageReference={ageReference}
+                      squadName={squadName}
+                      squadLogoUrl={squadLogoUrl}
                       transfers={outs}
                       emptyLabel="Nenhuma venda registrada. Transfira um jogador pelo perfil dele no elenco."
                       onRemove={handleRemove}
@@ -210,6 +223,8 @@ export function TransfersCard({
 function TransferList({
   seasonId,
   ageReference,
+  squadName,
+  squadLogoUrl,
   transfers,
   emptyLabel,
   onRemove,
@@ -217,6 +232,8 @@ function TransferList({
 }: {
   seasonId: string;
   ageReference?: { startYear: number; calendar: string };
+  squadName: string;
+  squadLogoUrl: string | null;
   transfers: TransferVM[];
   emptyLabel: string;
   onRemove: (transfer: TransferVM) => void;
@@ -228,6 +245,9 @@ function TransferList({
     <ul className="flex flex-col gap-1">
       {transfers.map((t) => {
         const meta = t.dealType && DEAL_TYPE_LABEL[t.dealType];
+        const here = { name: squadName, logoUrl: squadLogoUrl };
+        const there = { name: t.counterpartSquad?.name ?? t.counterpartClub, logoUrl: t.counterpartSquad?.logoUrl ?? null };
+        const [from, to] = t.type === "in" ? [there, here] : [here, there];
         return (
           <li
             key={t.id}
@@ -244,9 +264,21 @@ function TransferList({
                 )}
                 {meta && <span className="text-muted-foreground ml-1.5 text-xs font-normal">({meta})</span>}
               </div>
-              {t.counterpartClub && (
-                <div className="text-muted-foreground truncate text-xs">
-                  {t.type === "in" ? `${t.counterpartClub} → aqui` : `aqui → ${t.counterpartClub}`}
+              {(from.name || to.name) && (
+                <div className="text-muted-foreground flex items-center gap-1 truncate text-xs">
+                  {from.name && (
+                    <span className="flex items-center gap-1">
+                      <ClubBadge src={from.logoUrl} name={from.name} size="sm" />
+                      {from.name}
+                    </span>
+                  )}
+                  <span aria-hidden>➡</span>
+                  {to.name && (
+                    <span className="flex items-center gap-1">
+                      <ClubBadge src={to.logoUrl} name={to.name} size="sm" />
+                      {to.name}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
