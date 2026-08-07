@@ -26,8 +26,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   const duplicateFromSeasonId =
     typeof body?.duplicateFromSeasonId === "string" ? body.duplicateFromSeasonId : undefined;
+  const competitionId = typeof body?.competitionId === "string" ? body.competitionId : undefined;
 
-  const result = await seasonService.createSeason(id, { startYear, duplicateFromSeasonId });
+  const result = await seasonService.createSeason(id, { startYear, duplicateFromSeasonId, competitionId });
 
   if ("error" in result) {
     const message =

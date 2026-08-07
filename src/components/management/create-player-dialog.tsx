@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
-import { PlusIcon, UserRoundPlus, XIcon } from "lucide-react";
+import { PlusIcon, UserRoundPlus, XIcon, ShieldIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SquadPicker, type SquadOption } from "./squad-picker";
 import { POSITIONS, MAX_SECONDARY_POSITIONS } from "@/lib/positions";
 import type { EditablePlayer } from "@/components/player-card/edit-player-form";
 
@@ -37,6 +39,7 @@ export function CreatePlayerDialog({ onCreated }: { onCreated: (player: Editable
   const [potential, setPotential] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [externalLink, setExternalLink] = useState("");
+  const [currentClub, setCurrentClub] = useState<SquadOption | null>(null);
   const [saving, setSaving] = useState(false);
 
   const usedPositions = new Set([position, ...secondaryPositions].filter(Boolean));
@@ -51,6 +54,7 @@ export function CreatePlayerDialog({ onCreated }: { onCreated: (player: Editable
     setPotential("");
     setPhotoUrl("");
     setExternalLink("");
+    setCurrentClub(null);
   }
 
   function handleSubmit(event: React.FormEvent) {
@@ -78,6 +82,7 @@ export function CreatePlayerDialog({ onCreated }: { onCreated: (player: Editable
         potential: potential ? Number(potential) : undefined,
         photoUrl: photoUrl || undefined,
         externalLink: externalLink || undefined,
+        currentClubId: currentClub?.id || undefined,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -236,6 +241,30 @@ export function CreatePlayerDialog({ onCreated }: { onCreated: (player: Editable
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="create-player-photo">Foto</Label>
             <ImageUrlInput id="create-player-photo" value={photoUrl} onChange={setPhotoUrl} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Clube atual (opcional)</Label>
+            {currentClub ? (
+              <div className="bg-muted/40 flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm">
+                {currentClub.logoUrl ? (
+                  <Image src={currentClub.logoUrl} alt="" width={20} height={20} className="size-5 object-contain" unoptimized />
+                ) : (
+                  <ShieldIcon className="text-muted-foreground size-5" />
+                )}
+                <span className="flex-1 truncate">{currentClub.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentClub(null)}
+                  aria-label="Remover clube atual"
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <XIcon className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <SquadPicker onSelect={setCurrentClub} />
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

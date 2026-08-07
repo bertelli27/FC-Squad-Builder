@@ -10,6 +10,11 @@ import {
 } from "@/components/ui/select";
 import { formatSeasonLabel } from "@/lib/season";
 
+function seasonLabel(s: { startYear: number; competitionName: string | null }, seasonCalendar: string): string {
+  const base = formatSeasonLabel(s.startYear, seasonCalendar);
+  return s.competitionName ? `${base} — ${s.competitionName}` : base;
+}
+
 export function SeasonSwitcher({
   squadId,
   seasonCalendar,
@@ -18,7 +23,8 @@ export function SeasonSwitcher({
 }: {
   squadId: string;
   seasonCalendar: string;
-  seasons: { id: string; startYear: number }[];
+  /** competitionName distingue temporadas do mesmo ano (etapa 10.1, §7/§8 — só acontece com seleção). */
+  seasons: { id: string; startYear: number; competitionName: string | null }[];
   currentSeasonId: string;
 }) {
   const router = useRouter();
@@ -31,13 +37,18 @@ export function SeasonSwitcher({
 
   return (
     <Select value={currentSeasonId} onValueChange={handleChange}>
-      <SelectTrigger className="w-24" size="sm">
-        <SelectValue>{(v: string) => formatSeasonLabel(byId.get(v)?.startYear ?? 0, seasonCalendar)}</SelectValue>
+      <SelectTrigger className="w-auto max-w-40" size="sm">
+        <SelectValue>
+          {(v: string) => {
+            const s = byId.get(v);
+            return s ? seasonLabel(s, seasonCalendar) : "";
+          }}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {seasons.map((s) => (
           <SelectItem key={s.id} value={s.id}>
-            {formatSeasonLabel(s.startYear, seasonCalendar)}
+            {seasonLabel(s, seasonCalendar)}
           </SelectItem>
         ))}
       </SelectContent>

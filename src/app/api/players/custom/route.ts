@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
     overall: typeof body.overall === "number" ? body.overall : undefined,
     potential: typeof body.potential === "number" ? body.potential : undefined,
     externalLink: typeof body.externalLink === "string" ? body.externalLink : undefined,
+    currentClubId: typeof body.currentClubId === "string" ? body.currentClubId : undefined,
   });
 
   return NextResponse.json({ player }, { status: 201 });

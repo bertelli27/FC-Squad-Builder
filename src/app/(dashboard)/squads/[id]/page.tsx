@@ -6,15 +6,17 @@ import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
 import { SeasonsSection } from "@/components/squad-builder/seasons-section";
 import { PalmaresCard } from "@/components/squad-builder/palmares-card";
 import { HistoryCard } from "@/components/squad-builder/history-card";
+import { CurrentPlayersCard } from "@/components/squad-builder/current-players-card";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [squad, palmares, historicalStats, topTransfers] = await Promise.all([
+  const [squad, palmares, historicalStats, topTransfers, currentPlayers] = await Promise.all([
     squadService.getSquad(id),
     squadService.getPalmares(id),
     squadService.getHistoricalStats(id, 3),
     squadService.getTopTransfers(id, 3),
+    squadService.listCurrentPlayers(id),
   ]);
   if (!squad) notFound();
 
@@ -43,6 +45,8 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
 
       <PalmaresCard entries={palmares} />
 
+      <CurrentPlayersCard players={currentPlayers} />
+
       <HistoryCard
         squadId={squad.id}
         topScorers={historicalStats.topScorers}
@@ -56,12 +60,15 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
       <SeasonsSection
         squadId={squad.id}
         seasonCalendar={squad.seasonCalendar}
+        isNationalTeam={squad.baseKind === "nationalTeam"}
         seasons={squad.seasons.map((season) => ({
           id: season.id,
           startYear: season.startYear,
           formation: season.formation,
           coachName: season.coach?.name ?? null,
           playerCount: season._count.players,
+          competitionId: season.competitionId,
+          competitionName: season.competition?.name ?? null,
         }))}
       />
     </ClubThemeScope>

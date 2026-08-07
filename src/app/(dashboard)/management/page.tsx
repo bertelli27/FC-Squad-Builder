@@ -1,18 +1,21 @@
 import Link from "next/link";
-import { UserRoundIcon, TrophyIcon, UsersRoundIcon, ChevronRightIcon } from "lucide-react";
+import { UserRoundIcon, TrophyIcon, UsersRoundIcon, ChevronRightIcon, ShieldIcon, FlagIcon } from "lucide-react";
 import { playerDataService } from "@/services/player-data.service";
 import { competitionService } from "@/services/competition.service";
 import { coachService } from "@/services/coach.service";
+import { squadService } from "@/services/squad.service";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
 export default async function ManagementPage() {
-  const [players, competitions, coaches] = await Promise.all([
+  const [players, competitions, coaches, clubs, nationalTeams] = await Promise.all([
     playerDataService.listCustomPlayers(),
     competitionService.listCompetitions(),
     coachService.listCoaches(),
+    squadService.listForManagement("club"),
+    squadService.listForManagement("nationalTeam"),
   ]);
 
   return (
@@ -22,6 +25,22 @@ export default async function ManagementPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ManagementCard
+          href="/management/clubs"
+          icon={<ShieldIcon className="text-primary size-5" />}
+          title="Clubes"
+          description="Navegue pelos clubes já cadastrados"
+          count={`${clubs.length} ${clubs.length === 1 ? "clube" : "clubes"}`}
+          actionLabel="Ver clubes"
+        />
+        <ManagementCard
+          href="/management/national-teams"
+          icon={<FlagIcon className="text-primary size-5" />}
+          title="Seleções"
+          description="Navegue pelas seleções já cadastradas"
+          count={`${nationalTeams.length} ${nationalTeams.length === 1 ? "seleção" : "seleções"}`}
+          actionLabel="Ver seleções"
+        />
         <ManagementCard
           href="/management/players"
           icon={<UserRoundIcon className="text-primary size-5" />}

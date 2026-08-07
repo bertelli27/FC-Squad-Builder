@@ -40,6 +40,16 @@ model CachedPlayer {
   secondaryPositions String[]  @default([])
   manuallyEdited     Boolean   @default(false)
 
+  // Etapa 10.1 — clube atual do jogador (referência de verdade a um
+  // Squad, não mais só o texto livre em `club` acima). Independente do
+  // histórico de elencos/temporadas: um jogador pode ter um clube atual
+  // sem nunca ter aparecido em nenhum SquadPlayer (cadastro solto), e
+  // trocar de clube atual não apaga nem altera nenhuma passagem antiga —
+  // é só "onde ele está agora", nunca uma reescrita do histórico.
+  // SetNull: excluir o clube só limpa esta referência, nunca o jogador.
+  currentClubId String?
+  currentClub   Squad?  @relation("SquadCurrentPlayers", fields: [currentClubId], references: [id], onDelete: SetNull)
+
   rawData      Json // payload bruto, para reprocessar sem rechamar a API
   fetchedAt    DateTime @default(now())
   expiresAt    DateTime
@@ -52,6 +62,7 @@ model CachedPlayer {
   @@index([name])
   @@index([club])
   @@index([league])
+  @@index([currentClubId])
 }
 
 model CachedClub {
@@ -134,6 +145,11 @@ model Squad {
   updatedAt DateTime @updatedAt
 
   seasons Season[]
+  // Etapa 10.1 — jogadores cujo "clube atual" (CachedPlayer.currentClubId)
+  // aponta pra este Squad. Independente de `seasons`/`SquadPlayer`: não é
+  // "quem já jogou aqui numa temporada", é "quem está aqui agora" —
+  // ver comentário em CachedPlayer.currentClubId.
+  currentPlayers CachedPlayer[] @relation("SquadCurrentPlayers")
 }
 
 // Uma fotografia independente do clube num período: elenco, técnico e
@@ -150,6 +166,19 @@ model Season {
   // tanto pra ordenar cronologicamente quanto pra montar o rótulo exibido
   // (Squad.seasonCalendar decide o formato — ver lib/season.ts).
   startYear Int
+
+  // Etapa 10.1 (§7/§8) — pra seleção, uma "temporada" costuma ser na
+  // verdade UMA convocação, feita pra UM torneio específico (ex: "Brasil
+  // — Copa América 2019"), não um ano inteiro de calendário como no
+  // clube. Opcional (null = comportamento de sempre, é assim que toda
+  // temporada de clube fica, e como toda temporada de seleção já
+  // cadastrada antes desta etapa continua). Reaproveita o Competition já
+  // existente (mesmo model usado por SeasonCompetition/CareerTitle) — não
+  // é uma tabela nova. `startYear` continua existindo e valendo mesmo
+  // quando competitionId é preenchido (é o que ordena/rotula quando não
+  // há torneio selecionado, e o ano da edição quando há).
+  competitionId String?
+  competition   Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
 
   // Espelha o formation da SquadLineup "padrão" (a de menor `order` — ver
   // SquadLineup abaixo) desta temporada — usado só pelas telas que
@@ -208,9 +237,20 @@ model Season {
   // temporada, nunca do clube. Ver SeasonCompetition abaixo.
   competitions SeasonCompetition[]
 
-  @@unique([squadId, startYear])
+  // Etapa 10.1 — era @@unique([squadId, startYear]); a trava de "só uma
+  // temporada por ano" impedia uma seleção ter duas convocações no mesmo
+  // ano (ex: um torneio de meio de ano + amistosos). A unicidade "mesmo
+  // ano, mesmo clube, SEM torneio selecionado" (o caso de clube, que
+  // continua precisando de exatamente uma por ano) é garantida agora no
+  // serviço (season.service.ts#createSeason), não mais o banco — uma
+  // constraint SQL simples não consegue expressar "único só quando
+  // competitionId é null" sem um índice parcial, e a regra em si (só
+  // clube é 1-por-ano; seleção com torneio pode repetir o ano) depende de
+  // Squad.baseKind, que fica numa tabela diferente da constraint.
+  @@index([squadId, startYear])
   @@index([squadId])
   @@index([coachId])
+  @@index([competitionId])
 }
 
 // Etapa 9 parte 4 (§1) — "competições disputadas nesta temporada": ao
@@ -326,6 +366,12 @@ model Competition {
   careerStintStats CareerStintCompetitionStats[]
   champions        CompetitionChampion[]
   seasonCompetitions SeasonCompetition[]
+  // Etapa 10.1 — temporadas/convocações vinculadas a esta competição via
+  // Season.competitionId (ver comentário lá). Diferente de
+  // `seasonCompetitions` acima (que é "esta temporada disputou tal
+  // competição", N-pra-N): isto é "esta temporada FOI a convocação pra
+  // tal torneio", 1-pra-N, só relevante pra seleção.
+  seasonsAsConvocation Season[]
 }
 
 // Histórico de campeões de UMA edição/ano de uma competição (etapa 9) —

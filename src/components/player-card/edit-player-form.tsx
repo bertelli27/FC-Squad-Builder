@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
-import { PlusIcon, XIcon } from "lucide-react";
+import { PlusIcon, XIcon, ShieldIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SquadPicker, type SquadOption } from "@/components/management/squad-picker";
 import { POSITIONS, MAX_SECONDARY_POSITIONS } from "@/lib/positions";
 
 export interface EditablePlayer {
@@ -58,7 +60,28 @@ export function EditPlayerForm({
   const [overall, setOverall] = useState(player.overall != null ? String(player.overall) : "");
   const [potential, setPotential] = useState(player.potential != null ? String(player.potential) : "");
   const [externalLink, setExternalLink] = useState(player.externalLink ?? "");
+  const [currentClub, setCurrentClub] = useState<SquadOption | null>(null);
+  const [loadingCurrentClub, setLoadingCurrentClub] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Etapa 10.1 (§3) — buscado à parte (não vem em `player`) pra não ter
+  // que colocar esse campo no DTO genérico que todo caller de
+  // EditPlayerForm precisaria passar a montar.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/players/${player.cachedPlayerId}/current-club`)
+      .then((res) => (res.ok ? res.json() : { currentClub: null }))
+      .then((data) => {
+        if (!cancelled) setCurrentClub(data.currentClub);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingCurrentClub(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [player.cachedPlayerId]);
 
   function addSecondaryPosition() {
     if (secondaryPositions.length >= MAX_SECONDARY_POSITIONS) return;
@@ -95,6 +118,7 @@ export function EditPlayerForm({
       overall: overall === "" ? null : Number(overall),
       potential: potential === "" ? null : Number(potential),
       externalLink: externalLink || null,
+      currentClubId: currentClub?.id ?? null,
     };
     fetch(`/api/players/${player.cachedPlayerId}`, {
       method: "PATCH",
@@ -220,6 +244,32 @@ export function EditPlayerForm({
             onChange={(e) => setPotential(e.target.value)}
           />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Clube atual</Label>
+        {loadingCurrentClub ? (
+          <p className="text-muted-foreground text-xs">Carregando…</p>
+        ) : currentClub ? (
+          <div className="bg-muted/40 flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm">
+            {currentClub.logoUrl ? (
+              <Image src={currentClub.logoUrl} alt="" width={20} height={20} className="size-5 object-contain" unoptimized />
+            ) : (
+              <ShieldIcon className="text-muted-foreground size-5" />
+            )}
+            <span className="flex-1 truncate">{currentClub.name}</span>
+            <button
+              type="button"
+              onClick={() => setCurrentClub(null)}
+              aria-label="Remover clube atual"
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <XIcon className="size-4" />
+            </button>
+          </div>
+        ) : (
+          <SquadPicker onSelect={setCurrentClub} />
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">

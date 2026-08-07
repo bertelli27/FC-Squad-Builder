@@ -45,6 +45,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const overall = optionalIntField(body.overall);
   const potential = optionalIntField(body.potential);
   const externalLink = optionalStringField(body.externalLink);
+  const currentClubId = optionalStringField(body.currentClubId);
 
   let secondaryPositions: string[] | undefined;
   if (body.secondaryPositions !== undefined) {
@@ -71,6 +72,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     overall,
     potential,
     externalLink,
+    currentClubId,
   });
 
   if (!player) return NextResponse.json({ error: "Player not found" }, { status: 404 });

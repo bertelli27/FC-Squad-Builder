@@ -110,6 +110,43 @@ export const squadService = {
     return seasons;
   },
 
+  /** Etapa 10.1 (§3) — busca elencos (clube/seleção) pelo nome, pro SquadPicker (vincular "clube atual" a um jogador). Mesmo raciocínio de não filtrar por baseKind que searchSquadSeasons acima. */
+  async searchSquads(query?: string) {
+    return prisma.squad.findMany({
+      where: query?.trim() ? { name: { contains: query.trim(), mode: "insensitive" } } : undefined,
+      select: { id: true, name: true, logoUrl: true, baseKind: true },
+      orderBy: { name: "asc" },
+      take: 50,
+    });
+  },
+
+  /**
+   * Etapa 10.1 (§Parte 10) — listagem de clubes ou seleções pro
+   * Gerenciamento (navegação/consulta, não duplica a criação/edição, que
+   * continua só em Modo Clubes). `baseKind: null` conta como clube — um
+   * elenco "do zero" nunca é seleção, então não faz sentido escondê-lo
+   * da aba Clubes (mesmo raciocínio de searchSquadSeasons acima).
+   */
+  async listForManagement(kind: "club" | "nationalTeam") {
+    return prisma.squad.findMany({
+      where:
+        kind === "nationalTeam"
+          ? { baseKind: "nationalTeam" }
+          : // SQL "<> 'nationalTeam'" exclui linhas com baseKind NULL (a
+            // maioria dos clubes "do zero") — NULL não é considerado
+            // diferente de nada em SQL. Precisa dos dois lados explícitos.
+            { OR: [{ baseKind: null }, { baseKind: { not: "nationalTeam" } }] },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        category: { select: { name: true } },
+        _count: { select: { seasons: true, currentPlayers: true } },
+      },
+      orderBy: { name: "asc" },
+    });
+  },
+
   /** Club overview: identity + organizational metadata + the list of seasons (no player rosters — see seasonService.getSeason for that). */
   async getSquad(id: string) {
     return prisma.squad.findUnique({
@@ -121,6 +158,8 @@ export const squadService = {
           orderBy: { startYear: "desc" },
           include: {
             coach: true,
+            // Etapa 10.1 (§7/§8) — torneio da convocação, quando definido.
+            competition: true,
             _count: { select: { players: { where: { isWatchlist: false, isExtra: false, isDeparted: false } } } },
           },
         },
@@ -374,6 +413,22 @@ export const squadService = {
    * sem nunca ter vindo de uma duplicação, é tratado como pessoas
    * diferentes — consistente com como o resto do app já funciona.
    */
+  /**
+   * Etapa 10.1 (§3) — jogadores cujo "clube atual" (CachedPlayer.
+   * currentClubId) é este elenco. Independente de temporada/elenco: um
+   * jogador pode estar aqui sem nunca ter sido escalado em nenhuma
+   * temporada (cadastro solto vinculado ao clube), e vice-versa (um
+   * jogador com passagens antigas aqui pode já não ter mais este clube
+   * como atual).
+   */
+  async listCurrentPlayers(squadId: string) {
+    return prisma.cachedPlayer.findMany({
+      where: { currentClubId: squadId },
+      select: { id: true, name: true, photoUrl: true, position: true, nationality: true, overall: true },
+      orderBy: { name: "asc" },
+    });
+  },
+
   async getHistoricalStats(squadId: string, limit?: number) {
     const rows = await prisma.playerCompetitionStats.findMany({
       where: { squadPlayer: { season: { squadId } } },

@@ -137,9 +137,11 @@ export const playerDataService = {
     overall?: number;
     potential?: number;
     externalLink?: string;
+    /** Etapa 10.1 (§3) — clube atual, opcional; ver comentário em CachedPlayer.currentClubId no schema. */
+    currentClubId?: string;
   }) {
     const externalId = crypto.randomUUID();
-    return cacheRepository.upsertPlayer(CUSTOM_PLAYER_SOURCE, externalId, {
+    const player = await cacheRepository.upsertPlayer(CUSTOM_PLAYER_SOURCE, externalId, {
       name: input.name,
       position: input.position,
       secondaryPositions: input.secondaryPositions ?? [],
@@ -152,6 +154,16 @@ export const playerDataService = {
       rawData: { custom: true },
       expiresAt: new Date(Date.now() + CUSTOM_PLAYER_TTL_MS),
     });
+
+    // Feito à parte de upsertPlayer de propósito — esse helper é
+    // compartilhado com os providers externos (Kaggle/API-Football/
+    // TheSportsDB), que nunca têm um clube-atual pra mandar; misturar
+    // esse campo no tipo de entrada dele afetaria todo mundo que o chama.
+    if (input.currentClubId) {
+      await prisma.cachedPlayer.update({ where: { id: player.id }, data: { currentClubId: input.currentClubId } });
+    }
+
+    return player;
   },
 
   /**
@@ -255,6 +267,8 @@ export const playerDataService = {
       overall?: number | null;
       potential?: number | null;
       externalLink?: string | null;
+      /** Etapa 10.1 (§3) — null limpa (o jogador ficou sem clube atual), undefined não mexe. */
+      currentClubId?: string | null;
     },
   ): Promise<Player | null> {
     const secondaryPositions = patch.secondaryPositions
@@ -274,12 +288,22 @@ export const playerDataService = {
           ...(patch.overall !== undefined && { overall: patch.overall }),
           ...(patch.potential !== undefined && { potential: patch.potential }),
           ...(patch.externalLink !== undefined && { externalLink: patch.externalLink }),
+          ...(patch.currentClubId !== undefined && { currentClubId: patch.currentClubId }),
           manuallyEdited: true,
         },
       })
       .catch(() => null);
 
     return row ? cachedPlayerToDomain(row) : null;
+  },
+
+  /** Etapa 10.1 (§3) — clube atual do jogador, pro EditPlayerForm mostrar o valor já selecionado ao abrir. */
+  async getCurrentClub(cachedPlayerId: string) {
+    const player = await prisma.cachedPlayer.findUnique({
+      where: { id: cachedPlayerId },
+      select: { currentClub: { select: { id: true, name: true, logoUrl: true } } },
+    });
+    return player?.currentClub ?? null;
   },
 
   /**

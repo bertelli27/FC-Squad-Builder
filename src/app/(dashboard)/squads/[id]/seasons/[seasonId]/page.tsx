@@ -83,6 +83,7 @@ export default async function SeasonPage({
                 <h1 className="font-heading text-2xl font-bold tracking-tight">{squad.name}</h1>
                 <span className="text-muted-foreground text-sm">
                   Temporada {formatSeasonLabel(season.startYear, squad.seasonCalendar)}
+                  {season.competition && ` — ${season.competition.name}`}
                 </span>
               </div>
             </div>
@@ -90,7 +91,7 @@ export default async function SeasonPage({
               <SeasonSwitcher
                 squadId={squad.id}
                 seasonCalendar={squad.seasonCalendar}
-                seasons={squad.seasons.map((s) => ({ id: s.id, startYear: s.startYear }))}
+                seasons={squad.seasons.map((s) => ({ id: s.id, startYear: s.startYear, competitionName: s.competition?.name ?? null }))}
                 currentSeasonId={season.id}
               />
               <LineupSwitcher

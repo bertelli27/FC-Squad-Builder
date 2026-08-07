@@ -24,20 +24,26 @@ export interface SeasonCardData {
   formation: string;
   coachName: string | null;
   playerCount: number;
+  /** Etapa 10.1 (§7/§8) — torneio pra qual esta temporada é a convocação, quando definido. */
+  competitionId: string | null;
+  competitionName: string | null;
 }
 
 export function SeasonsSection({
   squadId,
   seasonCalendar,
+  isNationalTeam,
   seasons,
 }: {
   squadId: string;
   seasonCalendar: string;
+  /** Etapa 10.1 — só seleção ganha o seletor de torneio/convocação ao criar temporada. */
+  isNationalTeam: boolean;
   seasons: SeasonCardData[];
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateFrom, setDuplicateFrom] = useState<DuplicateFromSeason | null>(null);
-  const existingYears = seasons.map((s) => s.startYear);
+  const existingSeasons = seasons.map((s) => ({ startYear: s.startYear, competitionId: s.competitionId }));
 
   return (
     <div className="flex flex-col gap-3">
@@ -78,14 +84,16 @@ export function SeasonsSection({
         onOpenChange={setCreateOpen}
         squadId={squadId}
         seasonCalendar={seasonCalendar}
-        existingYears={existingYears}
+        isNationalTeam={isNationalTeam}
+        existingSeasons={existingSeasons}
       />
       <NewSeasonDialog
         open={duplicateFrom !== null}
         onOpenChange={(open) => !open && setDuplicateFrom(null)}
         squadId={squadId}
         seasonCalendar={seasonCalendar}
-        existingYears={existingYears}
+        isNationalTeam={isNationalTeam}
+        existingSeasons={existingSeasons}
         duplicateFrom={duplicateFrom}
       />
     </div>
@@ -139,6 +147,9 @@ function SeasonCard({
               className="static after:absolute after:inset-0 hover:underline"
             >
               {formatSeasonLabel(season.startYear, seasonCalendar)}
+              {season.competitionName && (
+                <span className="text-muted-foreground ml-1.5 text-sm font-normal">— {season.competitionName}</span>
+              )}
             </Link>
           </CardTitle>
           <CardAction className="relative z-10">

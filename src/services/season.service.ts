@@ -176,6 +176,10 @@ function getSeasonById(id: string) {
     include: {
       squad: true,
       coach: true,
+      // Etapa 10.1 (§7/§8) — torneio pra qual esta temporada é a
+      // convocação, quando definido (null pra clube e pra seleção sem
+      // torneio específico).
+      competition: true,
       // isDeparted: false — elenco ativo apenas (§10-14); um jogador
       // transferido/vendido não aparece mais aqui, mas a linha dele
       // (com as estatísticas) continua existindo no banco.
@@ -303,13 +307,20 @@ export const seasonService = {
    */
   async createSeason(
     squadId: string,
-    input: { startYear: number; duplicateFromSeasonId?: string },
+    input: { startYear: number; duplicateFromSeasonId?: string; competitionId?: string },
   ): Promise<
     | { season: NonNullable<Awaited<ReturnType<typeof getSeasonById>>> }
     | { error: "duplicate-year" | "source-not-found" }
   > {
-    const clash = await prisma.season.findUnique({
-      where: { squadId_startYear: { squadId, startYear: input.startYear } },
+    // Etapa 10.1 (§7/§8) — clube continua "só uma temporada por ano"
+    // (competitionId nunca vem preenchido pra clube, então esta checagem
+    // sozinha já reproduz a trava de sempre pra eles); seleção pode
+    // repetir o ano quando é pra um torneio diferente — só barra a
+    // combinação EXATA (mesmo ano + mesmo torneio, ou mesmo ano + nenhum
+    // torneio) de novo. Ver comentário no schema.prisma sobre por que
+    // isso não é mais uma constraint de banco.
+    const clash = await prisma.season.findFirst({
+      where: { squadId, startYear: input.startYear, competitionId: input.competitionId ?? null },
     });
     if (clash) return { error: "duplicate-year" };
 
@@ -330,6 +341,11 @@ export const seasonService = {
         data: {
           squadId,
           startYear: input.startYear,
+          // Etapa 10.1 — nunca herdado do source implicitamente: duplicar
+          // "Brasil — Copa América 2019" não deve marcar a cópia como
+          // também sendo daquele torneio a menos que o usuário escolha
+          // isso explicitamente na hora de duplicar.
+          competitionId: input.competitionId,
           formation: source.formation,
           // Coach agora é uma entidade compartilhada (§ nova etapa) — a
           // temporada duplicada começa com o MESMO técnico (referência),
@@ -416,7 +432,9 @@ export const seasonService = {
       return { season: (await getSeasonById(season.id))! };
     }
 
-    const season = await prisma.season.create({ data: { squadId, startYear: input.startYear } });
+    const season = await prisma.season.create({
+      data: { squadId, startYear: input.startYear, competitionId: input.competitionId },
+    });
     // Mesma invariante de createInitialSeason/o branch de duplicar acima
     // — toda temporada nasce com pelo menos uma escalação, nunca "zero".
     // "4-3-3" bate com o @default do próprio Season.formation.
