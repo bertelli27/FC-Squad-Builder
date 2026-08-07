@@ -13,12 +13,12 @@ import {
 import { FORMATIONS } from "@/lib/formations";
 
 export function FormationSelector({
-  squadId,
   seasonId,
+  lineupId,
   formation,
 }: {
-  squadId: string;
   seasonId: string;
+  lineupId: string;
   formation: string;
 }) {
   const router = useRouter();
@@ -28,7 +28,7 @@ export function FormationSelector({
     if (!value || value === formation) return;
 
     startTransition(async () => {
-      const res = await fetch(`/api/squads/${squadId}/seasons/${seasonId}`, {
+      const res = await fetch(`/api/seasons/${seasonId}/lineups/${lineupId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ formation: value }),

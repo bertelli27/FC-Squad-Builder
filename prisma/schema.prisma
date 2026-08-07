@@ -151,6 +151,13 @@ model Season {
   // (Squad.seasonCalendar decide o formato — ver lib/season.ts).
   startYear Int
 
+  // Espelha o formation da SquadLineup "padrão" (a de menor `order` — ver
+  // SquadLineup abaixo) desta temporada — usado só pelas telas que
+  // mostram um badge de formação sem entrar na temporada (card do
+  // dashboard, lista de temporadas do clube). Nunca a fonte de verdade
+  // de fato: a escalação em si mora em SquadLineup/SquadLineupStarter,
+  // isso aqui é só um espelho de leitura pra não precisar tocar em várias
+  // telas que só exibem o texto.
   formation String @default("4-3-3")
 
   // Técnico (§ nova etapa): agora uma entidade compartilhada (Coach) — o
@@ -183,6 +190,7 @@ model Season {
   players   SquadPlayer[]
   titles    SeasonTitle[]
   transfers Transfer[]
+  lineups   SquadLineup[]
   // Passagens de carreira (§5 etapa 4) que referenciam esta temporada como
   // "reaproveitar elenco existente" — ver comentário em CareerStint. Uma
   // temporada não sabe nem precisa saber quais carreiras a referenciam
@@ -463,7 +471,15 @@ model SquadPlayer {
   // sobrevive intacto a uma transferência de saída (transferPlayerOut não
   // mexe nele) e é copiado adiante ao duplicar uma temporada/elenco.
   isYouth        Boolean      @default(false)
-  isStarter      Boolean      @default(true) // false = banco de reservas
+  // DEPRECATED (etapa "escalações múltiplas") — "titular" deixou de ser
+  // uma verdade única por temporada: cada SquadLineup agora tem seu
+  // próprio conjunto de titulares (SquadLineupStarter). Este campo (e
+  // positionSlot/xOffset/yOffset logo abaixo) para de ser lido/escrito
+  // pelo app a partir desta etapa; mantido na tabela (nunca dropado —
+  // convenção deste projeto de migração só-aditiva) só pra não quebrar
+  // linhas já existentes. Congelado no valor que tinha no momento da
+  // migração de dados (ver migration.sql desta etapa).
+  isStarter      Boolean      @default(true)
   // jogador observado (fora dos titulares/reserva "oficiais") — só usado
   // quando Squad.baseKind === "nationalTeam"; nunca true por qualquer
   // fluxo de elenco de clube.
@@ -473,21 +489,19 @@ model SquadPlayer {
   // isWatchlist na prática: cada jogador vive em exatamente um balde
   // (titular/banco, extra, ou observado).
   isExtra        Boolean      @default(false)
-  positionSlot   String? // posição na formação, ex: "LW", "CB1"
-  order          Int          @default(0)
-  // Etapa 9 parte 4 (§4) — ajuste fino de posição dentro/ao redor do slot
-  // da formação: um deslocamento em pontos percentuais do campo (mesma
-  // escala de FormationSlot.x/y em lib/formations.ts), somado por cima da
-  // coordenada padrão do slot na hora de desenhar. null = usa a posição
-  // padrão do slot exatamente (comportamento de sempre, nenhuma mudança
-  // visual pra quem nunca arrastou). positionSlot continua sendo a fonte
-  // de verdade pra TUDO que já depende da identidade do slot (titular/
-  // reserva, troca ao arrastar entre slots, contagem de 26 convocados
-  // etc.) — isso só afeta onde dentro da vizinhança do slot o chip é
-  // desenhado. Resetado (null) sempre que o jogador entra num slot novo
-  // (troca de posição, saiu do banco/observados/extras, ou a formação
-  // mudou) — só é preenchido pelo ajuste fino "soltar de volta perto do
-  // mesmo slot" no campo tático.
+  // DEPRECATED (etapa "escalações múltiplas") — mesma razão de isStarter
+  // acima: onde o jogador fica NO CAMPO agora é por SquadLineup, não por
+  // temporada inteira. Ver SquadLineupStarter.positionSlot/xOffset/
+  // yOffset.
+  positionSlot String? // posição na formação, ex: "LW", "CB1"
+  // Ordem de exibição no banco — este campo continua vivo (não é
+  // deprecated como os de cima): o "Elenco" (banco) é uma lista só,
+  // compartilhada por todas as escalações da temporada, então a ordem
+  // dele também é compartilhada — não faz sentido reordenar o banco "só
+  // pra uma escalação".
+  order Int @default(0)
+  // DEPRECATED — ver positionSlot acima. Sucedido por
+  // SquadLineupStarter.xOffset/yOffset.
   xOffset Float?
   yOffset Float?
 
@@ -506,8 +520,60 @@ model SquadPlayer {
   isDeparted Boolean @default(false)
 
   competitionStats PlayerCompetitionStats[]
+  lineupStarts     SquadLineupStarter[]
 
   @@unique([seasonId, cachedPlayerId])
+}
+
+// Uma escalação tática SALVA (etapa "escalações múltiplas") — o
+// equivalente, dentro de uma temporada, a uma "tática"/formação salva do
+// FIFA: nome + formação + quem titulariza e onde, tudo independente das
+// outras escalações da mesma temporada. O ELENCO (SquadPlayer: quem está
+// no time, número, capitão, selo de base, banco/observados/extras) é UM
+// SÓ, compartilhado por todas as escalações — só QUEM TITULARIZA E ONDE
+// varia por escalação (ver SquadLineupStarter). Um jogador não-titular
+// numa escalação está automaticamente no banco dela — não existe uma
+// linha "banco" aqui, é só a ausência de linha em SquadLineupStarter.
+//
+// "Escalação padrão" (mostrada no card do dashboard, na lista de
+// temporadas, e a que abre primeiro ao entrar na temporada) é sempre a
+// de MENOR `order` — sem precisar de um booleano isDefault redundante
+// pra manter em sincronia; excluir a escalação padrão automaticamente
+// promove a próxima (menor order restante) sem lógica extra.
+model SquadLineup {
+  id        String   @id @default(cuid())
+  seasonId  String
+  season    Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  name      String
+  formation String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  starters SquadLineupStarter[]
+
+  @@index([seasonId])
+}
+
+// Um titular de UMA escalação — existência da linha = titular; ausência =
+// banco (nessa escalação). positionSlot/xOffset/yOffset são o que
+// SquadPlayer.positionSlot/xOffset/yOffset costumavam guardar direto na
+// temporada (ver os comentários DEPRECATED lá) — mesmo significado, só
+// que agora por escalação em vez de por temporada inteira.
+model SquadLineupStarter {
+  id            String      @id @default(cuid())
+  lineupId      String
+  lineup        SquadLineup @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  squadPlayerId String
+  squadPlayer   SquadPlayer @relation(fields: [squadPlayerId], references: [id], onDelete: Cascade)
+  positionSlot  String
+  xOffset       Float?
+  yOffset       Float?
+
+  @@unique([lineupId, squadPlayerId])
+  @@unique([lineupId, positionSlot])
+  @@index([lineupId])
+  @@index([squadPlayerId])
 }
 
 // Estatísticas de UM jogador em UMA competição, dentro de UMA temporada

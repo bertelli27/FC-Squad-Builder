@@ -44,6 +44,27 @@ export interface SeasonExportTransfer {
   value: number | null;
 }
 
+/**
+ * Etapa "escalações múltiplas" — um titular identificado por
+ * source+externalId (não por id de banco, que não sobrevive a um
+ * export/import) — a mesma identidade portátil que SquadExportPlayer.player
+ * já usa.
+ */
+export interface SeasonExportLineupStarter {
+  playerSource: string;
+  playerExternalId: string;
+  positionSlot: string;
+  xOffset: number | null;
+  yOffset: number | null;
+}
+
+export interface SeasonExportLineup {
+  name: string;
+  formation: string;
+  order: number;
+  starters: SeasonExportLineupStarter[];
+}
+
 export interface SeasonExportEntry {
   startYear: number;
   formation: string;
@@ -57,6 +78,12 @@ export interface SeasonExportEntry {
   players: SquadExportPlayer[];
   titles: SeasonExportTitle[];
   transfers: SeasonExportTransfer[];
+  // Opcional — arquivos de antes desta etapa não têm isso (`undefined`,
+  // distinto de "temporada tinha zero escalações", que não é um estado
+  // possível). parseEntry normaliza os dois pra `[]` na leitura;
+  // importSquads reconstrói uma escalação a partir dos campos legados
+  // isStarter/positionSlot de cada jogador só quando `undefined`.
+  lineups?: SeasonExportLineup[];
 }
 
 export interface SquadExportEntry {
@@ -71,7 +98,10 @@ export interface SquadExportEntry {
 }
 
 export interface SquadExportFile {
-  version: 2;
+  // 3 = etapa "escalações múltiplas" (adiciona SeasonExportEntry.lineups).
+  // Arquivos versão 2 continuam importáveis normalmente — ver comentário
+  // em SeasonExportEntry.lineups e o fallback em importSquads.
+  version: 2 | 3;
   squads: SquadExportEntry[];
 }
 
@@ -102,6 +132,7 @@ interface ExportableSquad {
 }
 
 interface SeasonPlayerRow {
+  id: string;
   shirtNumber: number | null;
   isCaptain: boolean;
   isYouth: boolean;
@@ -138,10 +169,18 @@ interface SeasonTransferRow {
   value: number | null;
 }
 
+interface SeasonLineupRow {
+  name: string;
+  formation: string;
+  order: number;
+  starters: { squadPlayerId: string; positionSlot: string; xOffset: number | null; yOffset: number | null }[];
+}
+
 interface SeasonExtras {
   players: SeasonPlayerRow[];
   titles: SeasonTitleRow[];
   transfers: SeasonTransferRow[];
+  lineups: SeasonLineupRow[];
 }
 
 function toExportEntry(
@@ -158,6 +197,13 @@ function toExportEntry(
     tags: squad.tags.map((t) => t.name),
     seasons: squad.seasons.map((season) => {
       const extras = seasonExtras.get(season.id);
+      // squadPlayerId (id de banco, não sobrevive ao export) → identidade
+      // portátil do jogador — usado só pra resolver os titulares de cada
+      // escalação abaixo pro mesmo formato source+externalId do resto do
+      // arquivo.
+      const playerKeyBySquadPlayerId = new Map(
+        (extras?.players ?? []).map((p) => [p.id, { source: p.cachedPlayer.source, externalId: p.cachedPlayer.externalId }]),
+      );
       return {
         startYear: season.startYear,
         formation: season.formation,
@@ -177,6 +223,16 @@ function toExportEntry(
           playerName: t.playerName,
           counterpartClub: t.counterpartClub,
           value: t.value,
+        })),
+        lineups: (extras?.lineups ?? []).map((l) => ({
+          name: l.name,
+          formation: l.formation,
+          order: l.order,
+          starters: l.starters.flatMap((s) => {
+            const key = playerKeyBySquadPlayerId.get(s.squadPlayerId);
+            if (!key) return [];
+            return [{ playerSource: key.source, playerExternalId: key.externalId, positionSlot: s.positionSlot, xOffset: s.xOffset, yOffset: s.yOffset }];
+          }),
         })),
         players: (extras?.players ?? []).map((p) => ({
           shirtNumber: p.shirtNumber,
@@ -287,6 +343,40 @@ function parseTransfers(raw: unknown): SeasonExportTransfer[] {
   return transfers;
 }
 
+function parseLineups(raw: unknown): SeasonExportLineup[] | undefined {
+  // undefined (chave ausente) ≠ [] (presente, vazio) — ver comentário em
+  // SeasonExportEntry.lineups. Só `undefined` aciona o fallback legado em
+  // importSquads.
+  if (!Array.isArray(raw)) return undefined;
+  const lineups: SeasonExportLineup[] = [];
+  for (const rawLineup of raw) {
+    if (typeof rawLineup !== "object" || rawLineup === null) continue;
+    const l = rawLineup as Record<string, unknown>;
+    if (typeof l.name !== "string" || l.name.trim() === "") continue;
+    if (typeof l.formation !== "string" || l.formation.trim() === "") continue;
+
+    const starters: SeasonExportLineupStarter[] = [];
+    if (Array.isArray(l.starters)) {
+      for (const rawStarter of l.starters) {
+        if (typeof rawStarter !== "object" || rawStarter === null) continue;
+        const s = rawStarter as Record<string, unknown>;
+        if (typeof s.playerSource !== "string" || typeof s.playerExternalId !== "string") continue;
+        if (typeof s.positionSlot !== "string" || s.positionSlot.trim() === "") continue;
+        starters.push({
+          playerSource: s.playerSource,
+          playerExternalId: s.playerExternalId,
+          positionSlot: s.positionSlot,
+          xOffset: num(s.xOffset),
+          yOffset: num(s.yOffset),
+        });
+      }
+    }
+
+    lineups.push({ name: l.name, formation: l.formation, order: num(l.order) ?? lineups.length, starters });
+  }
+  return lineups;
+}
+
 /**
  * Manually validated (no schema-validation dependency, matching the
  * `optionalStringField`-style parsing already used across the API routes)
@@ -328,6 +418,7 @@ function parseEntry(raw: unknown, index: number): { entry: SquadExportEntry } | 
         players: parsePlayers(s.players),
         titles: parseTitles(s.titles),
         transfers: parseTransfers(s.transfers),
+        lineups: parseLineups(s.lineups),
       });
     }
   } else if (typeof obj.formation === "string" && obj.formation.trim() !== "") {
@@ -392,6 +483,7 @@ async function loadSeasonExtras(squadIds: string[]): Promise<Map<string, SeasonE
       players: { include: { cachedPlayer: true }, orderBy: { order: "asc" } },
       titles: { include: { competition: true } },
       transfers: { orderBy: { order: "asc" } },
+      lineups: { orderBy: { order: "asc" }, include: { starters: true } },
     },
   });
   return new Map(seasons.map((s) => [s.id, s]));
@@ -402,7 +494,7 @@ export const squadTransferService = {
     const squad = await squadService.getSquad(id);
     if (!squad) return null;
     const seasonExtras = await loadSeasonExtras([id]);
-    return { version: 2, squads: [toExportEntry(squad, seasonExtras)] };
+    return { version: 3, squads: [toExportEntry(squad, seasonExtras)] };
   },
 
   async exportAllSquads(): Promise<SquadExportFile> {
@@ -415,7 +507,7 @@ export const squadTransferService = {
       orderBy: { updatedAt: "desc" },
     });
     const seasonExtras = await loadSeasonExtras(squads.map((s) => s.id));
-    return { version: 2, squads: squads.map((s) => toExportEntry(s, seasonExtras)) };
+    return { version: 3, squads: squads.map((s) => toExportEntry(s, seasonExtras)) };
   },
 
   /**
@@ -505,6 +597,12 @@ export const squadTransferService = {
           });
         }
 
+        // source+externalId → SquadPlayer.id novo — pra resolver os
+        // titulares de cada escalação logo abaixo (tanto os do arquivo
+        // quanto os reconstruídos a partir dos campos legados no
+        // fallback).
+        const newSquadPlayerIdByKey = new Map<string, string>();
+
         for (const p of seasonEntry.players) {
           const cached = await cacheRepository.upsertPlayer(p.player.source, p.player.externalId, {
             name: p.player.name,
@@ -521,7 +619,7 @@ export const squadTransferService = {
             expiresAt: defaultExpiresAt(),
           });
 
-          await prisma.squadPlayer.create({
+          const squadPlayer = await prisma.squadPlayer.create({
             data: {
               seasonId: season.id,
               cachedPlayerId: cached.id,
@@ -536,6 +634,41 @@ export const squadTransferService = {
               order: p.order,
             },
           });
+          newSquadPlayerIdByKey.set(`${p.player.source}:${p.player.externalId}`, squadPlayer.id);
+        }
+
+        // Etapa "escalações múltiplas" — arquivo novo (lineups !==
+        // undefined): recria cada escalação salva. Arquivo de antes dessa
+        // etapa (lineups === undefined): não tem esse conceito, então
+        // reconstrói UMA "Formação 1" a partir dos campos legados
+        // isStarter/positionSlot de cada jogador — mesma lógica da
+        // migration que fez esse backfill pros dados que já existiam no
+        // banco, só que agora em cima do que acabou de vir do arquivo.
+        // Uma temporada NUNCA fica sem nenhuma escalação, de nenhum dos
+        // dois jeitos.
+        if (seasonEntry.lineups !== undefined) {
+          for (const lineupEntry of seasonEntry.lineups) {
+            const lineup = await prisma.squadLineup.create({
+              data: { seasonId: season.id, name: lineupEntry.name, formation: lineupEntry.formation, order: lineupEntry.order },
+            });
+            const starterRows = lineupEntry.starters.flatMap((s) => {
+              const squadPlayerId = newSquadPlayerIdByKey.get(`${s.playerSource}:${s.playerExternalId}`);
+              if (!squadPlayerId) return [];
+              return [{ lineupId: lineup.id, squadPlayerId, positionSlot: s.positionSlot, xOffset: s.xOffset, yOffset: s.yOffset }];
+            });
+            if (starterRows.length > 0) await prisma.squadLineupStarter.createMany({ data: starterRows });
+          }
+        } else {
+          const lineup = await prisma.squadLineup.create({
+            data: { seasonId: season.id, name: "Formação 1", formation: seasonEntry.formation, order: 0 },
+          });
+          const starterRows = seasonEntry.players.flatMap((p) => {
+            if (!p.isStarter || !p.positionSlot) return [];
+            const squadPlayerId = newSquadPlayerIdByKey.get(`${p.player.source}:${p.player.externalId}`);
+            if (!squadPlayerId) return [];
+            return [{ lineupId: lineup.id, squadPlayerId, positionSlot: p.positionSlot }];
+          });
+          if (starterRows.length > 0) await prisma.squadLineupStarter.createMany({ data: starterRows });
         }
       }
 

@@ -5,8 +5,6 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 interface PlayerUpdate {
   id: string;
-  positionSlot: string | null;
-  isStarter: boolean;
   isWatchlist: boolean;
   isExtra: boolean;
   shirtNumber: number | null;
@@ -18,8 +16,6 @@ function isValidUpdate(value: unknown): value is PlayerUpdate {
   const v = value as Record<string, unknown>;
   return (
     typeof v.id === "string" &&
-    (v.positionSlot === null || typeof v.positionSlot === "string") &&
-    typeof v.isStarter === "boolean" &&
     typeof v.isWatchlist === "boolean" &&
     typeof v.isExtra === "boolean" &&
     (v.shirtNumber === null || typeof v.shirtNumber === "number") &&

@@ -124,12 +124,15 @@ function buildInitialState(players: SquadPlayerVM[], formation: string): EditorS
 
 export function SquadEditor({
   seasonId,
+  lineupId,
   formation,
   players,
   baseKind,
   ageReference,
 }: {
   seasonId: string;
+  /** Etapa "escalações múltiplas" — a escalação atualmente aberta; é pra ELA que titular/posição são persistidos, não pra temporada inteira. */
+  lineupId: string;
   formation: string;
   players: SquadPlayerVM[];
   baseKind?: string | null;
@@ -187,67 +190,63 @@ export function SquadEditor({
     setActivePlayer(findPlayer(String(event.active.id)));
   }
 
+  /**
+   * Etapa "escalações múltiplas" — o que antes era um PATCH só agora vira
+   * dois, porque a arrumação tática deixou de ser uma verdade única da
+   * temporada: `isWatchlist`/`isExtra`/`shirtNumber`/`order` continuam
+   * globais (compartilhados por toda escalação, endpoint de sempre);
+   * quem-titulariza-e-onde é só desta escalação (`lineupId`), endpoint
+   * novo. As duas requisições sempre saem juntas daqui — nunca uma sem a
+   * outra — então não há janela em que uma escalação fique com os dois
+   * lados dessincronizados.
+   */
   async function persistArrangement(next: EditorState) {
-    const payload = [
+    const globalPayload = [
       ...formationSlots.flatMap((s, i) => {
         const p = next.slots[s.slot];
-        return p
-          ? [
-              {
-                id: p.id,
-                positionSlot: s.slot,
-                isStarter: true,
-                isWatchlist: false,
-                isExtra: false,
-                shirtNumber: p.shirtNumber ?? null,
-                xOffset: p.xOffset ?? null,
-                yOffset: p.yOffset ?? null,
-                order: i,
-              },
-            ]
-          : [];
+        return p ? [{ id: p.id, isWatchlist: false, isExtra: false, shirtNumber: p.shirtNumber ?? null, order: i }] : [];
       }),
       ...next.bench.map((p, i) => ({
         id: p.id,
-        positionSlot: null,
-        isStarter: false,
         isWatchlist: false,
         isExtra: false,
         shirtNumber: p.shirtNumber ?? null,
-        xOffset: null,
-        yOffset: null,
         order: formationSlots.length + i,
       })),
       ...next.watchlist.map((p, i) => ({
         id: p.id,
-        positionSlot: null,
-        isStarter: false,
         isWatchlist: true,
         isExtra: false,
         shirtNumber: p.shirtNumber ?? null,
-        xOffset: null,
-        yOffset: null,
         order: formationSlots.length + next.bench.length + i,
       })),
       ...next.extras.map((p, i) => ({
         id: p.id,
-        positionSlot: null,
-        isStarter: false,
         isWatchlist: false,
         isExtra: true,
         shirtNumber: p.shirtNumber ?? null,
-        xOffset: null,
-        yOffset: null,
         order: formationSlots.length + next.bench.length + next.watchlist.length + i,
       })),
     ];
 
-    const res = await fetch(`/api/seasons/${seasonId}/players`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ players: payload }),
+    const starters = formationSlots.flatMap((s) => {
+      const p = next.slots[s.slot];
+      return p ? [{ squadPlayerId: p.id, positionSlot: s.slot, xOffset: p.xOffset ?? null, yOffset: p.yOffset ?? null }] : [];
     });
-    if (!res.ok) toast.error("Não foi possível salvar a formação.");
+
+    const [globalRes, startersRes] = await Promise.all([
+      fetch(`/api/seasons/${seasonId}/players`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ players: globalPayload }),
+      }),
+      fetch(`/api/seasons/${seasonId}/lineups/${lineupId}/starters`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ starters }),
+      }),
+    ]);
+    if (!globalRes.ok || !startersRes.ok) toast.error("Não foi possível salvar a formação.");
   }
 
   function handleDragEnd(event: DragEndEvent) {

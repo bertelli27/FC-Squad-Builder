@@ -184,6 +184,12 @@ function getSeasonById(id: string) {
       transfers: { orderBy: { order: "asc" } },
       kits: true,
       competitions: { include: { competition: true }, orderBy: { order: "asc" } },
+      // Etapa "escalações múltiplas" — todas as escalações salvas desta
+      // temporada, cada uma com seus próprios titulares. A "padrão"
+      // (mostrada primeiro, usada pro badge de formação fora da
+      // temporada) é sempre a de menor `order` — ver comentário no
+      // schema.
+      lineups: { orderBy: { order: "asc" }, include: { starters: true } },
     },
   });
 }
@@ -229,6 +235,12 @@ export const seasonService = {
     const season = await prisma.season.create({
       data: { squadId, startYear: input.startYear, formation: input.formation },
     });
+    // Etapa "escalações múltiplas" — toda temporada nasce com uma
+    // escalação ("Formação 1"), nunca "sem nenhuma" — é nela que o
+    // starting XI abaixo é registrado.
+    const lineup = await prisma.squadLineup.create({
+      data: { seasonId: season.id, name: "Formação 1", formation: input.formation, order: 0 },
+    });
 
     if (input.players.length > 0) {
       const cachedRows = await Promise.all(
@@ -258,6 +270,21 @@ export const seasonService = {
             order: a.order,
           })),
         });
+
+        const created = await prisma.squadPlayer.findMany({
+          where: { seasonId: season.id },
+          select: { id: true, cachedPlayerId: true },
+        });
+        const idByCachedPlayerId = new Map(created.map((p) => [p.cachedPlayerId, p.id]));
+
+        const starters = assignments
+          .filter((a, i) => i < cap && a.isStarter && a.positionSlot)
+          .map((a) => ({
+            lineupId: lineup.id,
+            squadPlayerId: idByCachedPlayerId.get(a.cachedPlayerId)!,
+            positionSlot: a.positionSlot!,
+          }));
+        if (starters.length > 0) await prisma.squadLineupStarter.createMany({ data: starters });
       }
     }
 
@@ -292,7 +319,10 @@ export const seasonService = {
         // isDeparted: false — duplicar uma temporada carrega o elenco
         // ATUAL adiante; um jogador que já saiu daquela temporada não
         // deve reaparecer como se ainda estivesse lá na nova.
-        include: { players: { where: { isDeparted: false } } },
+        include: {
+          players: { where: { isDeparted: false } },
+          lineups: { orderBy: { order: "asc" }, include: { starters: true } },
+        },
       });
       if (!source) return { error: "source-not-found" };
 
@@ -308,6 +338,13 @@ export const seasonService = {
           coachId: source.coachId,
         },
       });
+
+      // squadPlayerId (na temporada ORIGEM) → cachedPlayerId — a "ponte"
+      // estável pra remapear os titulares de cada escalação copiada
+      // abaixo pro SquadPlayer NOVO do mesmo jogador (cada duplicação gera
+      // ids novos; cachedPlayerId é o que não muda).
+      const sourceIdToCachedPlayerId = new Map(source.players.map((p) => [p.id, p.cachedPlayerId]));
+      let newIdByCachedPlayerId = new Map<string, string>();
 
       if (source.players.length > 0) {
         await prisma.squadPlayer.createMany({
@@ -325,6 +362,12 @@ export const seasonService = {
           })),
         });
 
+        const created = await prisma.squadPlayer.findMany({
+          where: { seasonId: season.id },
+          select: { id: true, cachedPlayerId: true },
+        });
+        newIdByCachedPlayerId = new Map(created.map((p) => [p.cachedPlayerId, p.id]));
+
         // CORREÇÃO — duplicar temporada criava os SquadPlayer diretamente
         // via createMany acima, sem passar por addPlayerToSeason/signPlayer
         // (os únicos dois lugares que chamavam ensureCareerStintForSeason
@@ -336,6 +379,26 @@ export const seasonService = {
         await Promise.all(
           source.players.map((p) => ensureCareerStintForSeason(p.cachedPlayerId, season.id)),
         );
+      }
+
+      // Etapa "escalações múltiplas" — cada escalação da temporada origem
+      // vira uma escalação nova (mesmo nome/formação/ordem), com os
+      // titulares remapeados pros SquadPlayer novos. Um titular cujo
+      // jogador não foi copiado adiante (já tinha saído do clube — filtro
+      // isDeparted acima) simplesmente não entra na escalação nova, em vez
+      // de dar erro.
+      for (const sourceLineup of source.lineups) {
+        const newLineup = await prisma.squadLineup.create({
+          data: { seasonId: season.id, name: sourceLineup.name, formation: sourceLineup.formation, order: sourceLineup.order },
+        });
+
+        const starterRows = sourceLineup.starters.flatMap((st) => {
+          const cachedPlayerId = sourceIdToCachedPlayerId.get(st.squadPlayerId);
+          const newSquadPlayerId = cachedPlayerId ? newIdByCachedPlayerId.get(cachedPlayerId) : undefined;
+          if (!newSquadPlayerId) return [];
+          return [{ lineupId: newLineup.id, squadPlayerId: newSquadPlayerId, positionSlot: st.positionSlot, xOffset: st.xOffset, yOffset: st.yOffset }];
+        });
+        if (starterRows.length > 0) await prisma.squadLineupStarter.createMany({ data: starterRows });
       }
 
       // Kits (§1.5 da etapa) — deliberadamente NÃO copiados pra temporada
@@ -354,13 +417,18 @@ export const seasonService = {
     }
 
     const season = await prisma.season.create({ data: { squadId, startYear: input.startYear } });
+    // Mesma invariante de createInitialSeason/o branch de duplicar acima
+    // — toda temporada nasce com pelo menos uma escalação, nunca "zero".
+    // "4-3-3" bate com o @default do próprio Season.formation.
+    await prisma.squadLineup.create({
+      data: { seasonId: season.id, name: "Formação 1", formation: season.formation, order: 0 },
+    });
     return { season: (await getSeasonById(season.id))! };
   },
 
   async updateSeason(
     id: string,
     data: {
-      formation?: string;
       coachId?: string | null;
       notes?: string | null;
       wins?: number;
@@ -655,6 +723,14 @@ export const seasonService = {
       data: { isDeparted: true, isStarter: false, isWatchlist: false, isExtra: false, positionSlot: null, xOffset: null, yOffset: null },
     });
 
+    // Etapa "escalações múltiplas" — sai do time também tira o jogador de
+    // QUALQUER escalação em que fosse titular (não só a que estava aberta
+    // na hora), senão a linha de SquadLineupStarter ficaria "órfã": a
+    // escalação continuaria achando que ele titulariza ali, mas
+    // getSeasonById já não devolve mais esse jogador (filtro isDeparted:
+    // false), o que faria a tela tentar desenhar um titular sem dados.
+    await prisma.squadLineupStarter.deleteMany({ where: { squadPlayerId, lineup: { seasonId } } });
+
     await mirrorTransferOnCareer(transfer.id, squadPlayer.cachedPlayerId, {
       fromClubName: squadPlayer.season.squad.name,
       toClubName: counterpartClub,
@@ -792,71 +868,23 @@ export const seasonService = {
   },
 
   /**
-   * Switches formation and remaps the current starting XI onto the new
-   * formation's slots (same greedy category match as initial season
-   * creation), preserving who's a starter — captain/number/bench are
-   * untouched. Bench players are left alone.
-   */
-  async changeFormation(seasonId: string, formation: string) {
-    const season = await prisma.season.findUnique({
-      where: { id: seasonId },
-      include: { players: { where: { isDeparted: false }, include: { cachedPlayer: true } } },
-    });
-    if (!season) return null;
-
-    const starters = season.players.filter((p) => p.isStarter);
-    const assignments = assignStartingXI(
-      starters.map((p) => ({
-        cachedPlayerId: p.cachedPlayerId,
-        position: p.cachedPlayer.position ?? undefined,
-        overall: p.cachedPlayer.overall ?? undefined,
-      })),
-      formation,
-    );
-    const byCachedPlayerId = new Map(starters.map((p) => [p.cachedPlayerId, p]));
-
-    await prisma.$transaction([
-      prisma.season.update({ where: { id: seasonId }, data: { formation } }),
-      ...assignments.map((a) => {
-        const original = byCachedPlayerId.get(a.cachedPlayerId)!;
-        return prisma.squadPlayer.update({
-          where: { id: original.id },
-          // §4 — troca de formação recalcula os slots do zero; um ajuste
-          // fino de posição salvo pra formação ANTERIOR não faz sentido na
-          // nova (coordenadas de slot diferentes), então reseta pro padrão.
-          data: {
-            positionSlot: a.positionSlot,
-            isStarter: a.isStarter,
-            order: a.order,
-            xOffset: null,
-            yOffset: null,
-          },
-        });
-      }),
-    ]);
-
-    return getSeasonById(seasonId);
-  },
-
-  /**
-   * Bulk-persists a new field/bench/extras/watchlist arrangement after a
-   * drag-and-drop change. Always includes `shirtNumber` (not just the
-   * bucket/position fields) because a swap that pulls someone in from
-   * extras/watchlist makes them inherit the displaced player's number —
-   * client computes the new value, this just needs to save whatever it's
-   * given (a no-op resend of the same number for plain reordering).
+   * Bulk-persists a new bench/extras/watchlist arrangement after a
+   * drag-and-drop change — the fields that are GLOBAL to the season
+   * (shared by every escalação), not scoped to whichever one is currently
+   * being edited (that's `replaceLineupStarters` below). Always includes
+   * `shirtNumber` (not just the bucket fields) because a swap that pulls
+   * someone in from extras/watchlist makes them inherit the displaced
+   * player's number — client computes the new value, this just needs to
+   * save whatever it's given (a no-op resend of the same number for plain
+   * reordering).
    */
   async updateSeasonPlayers(
     seasonId: string,
     updates: {
       id: string;
-      positionSlot: string | null;
-      isStarter: boolean;
       isWatchlist: boolean;
       isExtra: boolean;
       shirtNumber: number | null;
-      xOffset?: number | null;
-      yOffset?: number | null;
       order: number;
     }[],
   ) {
@@ -865,18 +893,162 @@ export const seasonService = {
         prisma.squadPlayer.update({
           where: { id: u.id, seasonId },
           data: {
-            positionSlot: u.positionSlot,
-            isStarter: u.isStarter,
             isWatchlist: u.isWatchlist,
             isExtra: u.isExtra,
             shirtNumber: u.shirtNumber,
-            xOffset: u.xOffset ?? null,
-            yOffset: u.yOffset ?? null,
             order: u.order,
           },
         }),
       ),
     );
+  },
+
+  /**
+   * Etapa "escalações múltiplas" — cria uma escalação nova pra temporada.
+   * `duplicateFromLineupId` (opcional) copia os titulares da escalação
+   * indicada como ponto de partida (mesma temporada, então os
+   * squadPlayerId já batem direto, sem remapear nada) — usado pelo "+
+   * Nova escalação" da UI, que parte da que está aberta no momento.
+   */
+  async createLineup(
+    seasonId: string,
+    input: { name: string; formation: string; duplicateFromLineupId?: string },
+  ) {
+    const { _max } = await prisma.squadLineup.aggregate({ where: { seasonId }, _max: { order: true } });
+    const lineup = await prisma.squadLineup.create({
+      data: { seasonId, name: input.name, formation: input.formation, order: (_max.order ?? -1) + 1 },
+    });
+
+    if (input.duplicateFromLineupId) {
+      const source = await prisma.squadLineupStarter.findMany({
+        where: { lineupId: input.duplicateFromLineupId, lineup: { seasonId } },
+      });
+      if (source.length > 0) {
+        await prisma.squadLineupStarter.createMany({
+          data: source.map((s) => ({
+            lineupId: lineup.id,
+            squadPlayerId: s.squadPlayerId,
+            positionSlot: s.positionSlot,
+            xOffset: s.xOffset,
+            yOffset: s.yOffset,
+          })),
+        });
+      }
+    }
+
+    return lineup;
+  },
+
+  async renameLineup(seasonId: string, lineupId: string, name: string) {
+    return prisma.squadLineup.update({ where: { id: lineupId, seasonId }, data: { name: name.trim() } });
+  },
+
+  /**
+   * Exclui uma escalação — nunca a última: uma temporada sempre precisa
+   * ter pelo menos uma (não existe "sem escalação nenhuma"). Se a
+   * excluída era a "padrão" (menor order — ver comentário no schema),
+   * ressincroniza Season.formation com a nova padrão (a próxima menor
+   * order que sobrou) na mesma hora, pra nenhuma tela que só exibe
+   * Season.formation (card do dashboard etc.) ficar mostrando a formação
+   * de uma escalação que não existe mais.
+   */
+  async deleteLineup(seasonId: string, lineupId: string): Promise<{ error?: "last-lineup" }> {
+    const count = await prisma.squadLineup.count({ where: { seasonId } });
+    if (count <= 1) return { error: "last-lineup" };
+
+    await prisma.squadLineup.delete({ where: { id: lineupId, seasonId } });
+
+    const newDefault = await prisma.squadLineup.findFirst({ where: { seasonId }, orderBy: { order: "asc" } });
+    if (newDefault) await prisma.season.update({ where: { id: seasonId }, data: { formation: newDefault.formation } });
+
+    return {};
+  },
+
+  /**
+   * Troca a formação de UMA escalação e remapeia os titulares dela pros
+   * slots da formação nova (mesma lógica greedy da criação inicial da
+   * temporada), preservando quem é titular — capitão/número/banco são
+   * globais e não são tocados aqui. Titulares de OUTRAS escalações da
+   * mesma temporada não são afetados.
+   */
+  async changeLineupFormation(seasonId: string, lineupId: string, formation: string) {
+    const lineup = await prisma.squadLineup.findUnique({ where: { id: lineupId, seasonId } });
+    if (!lineup) return null;
+
+    const starters = await prisma.squadLineupStarter.findMany({
+      where: { lineupId },
+      include: { squadPlayer: { include: { cachedPlayer: true } } },
+    });
+    const assignments = assignStartingXI(
+      starters.map((s) => ({
+        cachedPlayerId: s.squadPlayer.cachedPlayerId,
+        position: s.squadPlayer.cachedPlayer.position ?? undefined,
+        overall: s.squadPlayer.cachedPlayer.overall ?? undefined,
+      })),
+      formation,
+    );
+    const squadPlayerIdByCachedPlayerId = new Map(starters.map((s) => [s.squadPlayer.cachedPlayerId, s.squadPlayerId]));
+
+    // §4 — troca de formação recalcula os slots do zero; um ajuste fino de
+    // posição salvo pra formação ANTERIOR não faz sentido na nova
+    // (coordenadas de slot diferentes), então não é preservado.
+    const newStarters = assignments
+      .filter((a) => a.isStarter && a.positionSlot)
+      .map((a) => ({
+        lineupId,
+        squadPlayerId: squadPlayerIdByCachedPlayerId.get(a.cachedPlayerId)!,
+        positionSlot: a.positionSlot!,
+      }));
+
+    await prisma.$transaction([
+      prisma.squadLineup.update({ where: { id: lineupId }, data: { formation } }),
+      prisma.squadLineupStarter.deleteMany({ where: { lineupId } }),
+      ...(newStarters.length > 0 ? [prisma.squadLineupStarter.createMany({ data: newStarters })] : []),
+    ]);
+
+    // A escalação padrão (menor order) é a que outras telas exibem via
+    // Season.formation — mantém os dois em sincronia quando é ela que
+    // mudou.
+    const defaultLineup = await prisma.squadLineup.findFirst({ where: { seasonId }, orderBy: { order: "asc" } });
+    if (defaultLineup?.id === lineupId) {
+      await prisma.season.update({ where: { id: seasonId }, data: { formation } });
+    }
+
+    return getSeasonById(seasonId);
+  },
+
+  /**
+   * Bulk-persiste os titulares (quem + onde) de UMA escalação depois de
+   * um drag-and-drop — substitui a lista inteira (delete-all + recria),
+   * mesmo padrão "reenvia a lista completa" já usado pra reorder do
+   * dashboard, evitando ter que calcular diff.
+   */
+  async replaceLineupStarters(
+    seasonId: string,
+    lineupId: string,
+    starters: { squadPlayerId: string; positionSlot: string; xOffset?: number | null; yOffset?: number | null }[],
+  ) {
+    const lineup = await prisma.squadLineup.findUnique({ where: { id: lineupId, seasonId } });
+    if (!lineup) return { error: "not-found" as const };
+
+    await prisma.$transaction([
+      prisma.squadLineupStarter.deleteMany({ where: { lineupId } }),
+      ...(starters.length > 0
+        ? [
+            prisma.squadLineupStarter.createMany({
+              data: starters.map((s) => ({
+                lineupId,
+                squadPlayerId: s.squadPlayerId,
+                positionSlot: s.positionSlot,
+                xOffset: s.xOffset ?? null,
+                yOffset: s.yOffset ?? null,
+              })),
+            }),
+          ]
+        : []),
+    ]);
+
+    return {};
   },
 
   /** Sets shirt number and/or captain for one player. Setting isCaptain clears any previous captain in the season. */

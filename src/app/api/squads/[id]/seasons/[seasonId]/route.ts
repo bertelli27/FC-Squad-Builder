@@ -24,13 +24,16 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   return NextResponse.json({ season });
 }
 
+// Trocar formação virou uma ação por escalação (PATCH
+// /api/seasons/[id]/lineups/[lineupId], body { formation }) — remapeia só
+// os titulares daquela escalação, não da temporada inteira. Esta rota
+// continua só com os campos que são mesmo da temporada como um todo.
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { seasonId } = await params;
   const existing = await seasonService.getSeason(seasonId);
   if (!existing) return NextResponse.json({ error: "Season not found" }, { status: 404 });
 
   const body = await request.json().catch(() => null);
-  const formation = typeof body?.formation === "string" ? body.formation : undefined;
   const coachId = optionalStringField(body?.coachId);
   const notes = optionalStringField(body?.notes);
   const wins = nonNegativeIntField(body?.wins);
@@ -47,13 +50,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     });
   }
 
-  // Changing formation remaps the starting XI onto the new slot set
-  // (see seasonService.changeFormation), not just a plain field update.
-  const season =
-    formation !== undefined && formation !== existing.formation
-      ? await seasonService.changeFormation(seasonId, formation)
-      : await seasonService.getSeason(seasonId);
-
+  const season = await seasonService.getSeason(seasonId);
   return NextResponse.json({ season });
 }
 

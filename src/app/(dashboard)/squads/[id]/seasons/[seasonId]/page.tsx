@@ -8,6 +8,7 @@ import { SquadEditor } from "@/components/squad-builder/squad-editor";
 import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
 import { FormationSelector } from "@/components/squad-builder/formation-selector";
+import { LineupSwitcher } from "@/components/squad-builder/lineup-switcher";
 import { SeasonSwitcher } from "@/components/squad-builder/season-switcher";
 import { EditSeasonCoachDialog } from "@/components/squad-builder/edit-season-coach-dialog";
 import { CoachCard } from "@/components/squad-builder/coach-card";
@@ -22,15 +23,29 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SeasonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; seasonId: string }>;
+  searchParams: Promise<{ lineup?: string }>;
 }) {
   const { id, seasonId } = await params;
+  const { lineup: lineupParam } = await searchParams;
   const [squad, season] = await Promise.all([
     squadService.getSquad(id),
     seasonService.getSeason(seasonId),
   ]);
   if (!squad || !season || season.squadId !== squad.id) notFound();
+
+  // Etapa "escalações múltiplas" — season.lineups já vem ordenada por
+  // `order` asc (menor = padrão, ver comentário no schema); `?lineup=`
+  // escolhe outra, caindo pra padrão se ausente/inválido (id de uma
+  // temporada diferente, por exemplo). Toda temporada sempre tem pelo
+  // menos uma (createInitialSeason/createSeason garantem isso).
+  const activeLineup = season.lineups.find((l) => l.id === lineupParam) ?? season.lineups[0];
+  // Defensivo: se essa invariante um dia falhar (dado antigo, bug futuro),
+  // isso vira um 404 normal em vez de derrubar a página inteira.
+  if (!activeLineup) notFound();
+  const starterByPlayerId = new Map(activeLineup.starters.map((s) => [s.squadPlayerId, s]));
 
   // Etapa "transferWindow" — jogadores que já saíram (isDeparted) somem do
   // elenco ativo (SquadEditor), então a Transferências card precisa da sua
@@ -78,7 +93,12 @@ export default async function SeasonPage({
                 seasons={squad.seasons.map((s) => ({ id: s.id, startYear: s.startYear }))}
                 currentSeasonId={season.id}
               />
-              <FormationSelector squadId={squad.id} seasonId={season.id} formation={season.formation} />
+              <LineupSwitcher
+                seasonId={season.id}
+                lineups={season.lineups.map((l) => ({ id: l.id, name: l.name, formation: l.formation }))}
+                activeLineupId={activeLineup.id}
+              />
+              <FormationSelector seasonId={season.id} lineupId={activeLineup.id} formation={activeLineup.formation} />
               <EditSeasonCoachDialog squadId={squad.id} seasonId={season.id} coachId={season.coachId} />
             </div>
           </CardContent>
@@ -116,36 +136,45 @@ export default async function SeasonPage({
       />
 
       <SquadEditor
-        key={season.formation}
+        key={activeLineup.id}
         seasonId={season.id}
-        formation={season.formation}
+        lineupId={activeLineup.id}
+        formation={activeLineup.formation}
         baseKind={squad.baseKind}
         ageReference={{ startYear: season.startYear, calendar: squad.seasonCalendar }}
-        players={season.players.map((sp) => ({
-          id: sp.id,
-          cachedPlayerId: sp.cachedPlayer.id,
-          source: sp.cachedPlayer.source,
-          name: sp.cachedPlayer.name,
-          photoUrl: sp.cachedPlayer.photoUrl,
-          position: sp.cachedPlayer.position,
-          secondaryPositions: sp.cachedPlayer.secondaryPositions,
-          nationality: sp.cachedPlayer.nationality,
-          dateOfBirth: sp.cachedPlayer.dateOfBirth?.toISOString() ?? null,
-          club: sp.cachedPlayer.club,
-          overall: sp.cachedPlayer.overall,
-          potential: sp.cachedPlayer.potential,
-          shirtNumber: sp.shirtNumber,
-          isCaptain: sp.isCaptain,
-          isYouth: sp.isYouth,
-          isStarter: sp.isStarter,
-          isWatchlist: sp.isWatchlist,
-          isExtra: sp.isExtra,
-          positionSlot: sp.positionSlot,
-          xOffset: sp.xOffset,
-          yOffset: sp.yOffset,
-          externalLink: sp.cachedPlayer.externalLink,
-          careerId: careerIdByPlayer.get(sp.cachedPlayer.id) ?? null,
-        }))}
+        players={season.players.map((sp) => {
+          // Etapa "escalações múltiplas" — titular/posição/ajuste fino não
+          // são mais colunas diretas de SquadPlayer: vêm de existir (ou
+          // não) uma linha em SquadLineupStarter PRA ESTA escalação. Sem
+          // linha aqui = banco nesta escalação (mesmo jogador pode ser
+          // titular em outra).
+          const starter = starterByPlayerId.get(sp.id);
+          return {
+            id: sp.id,
+            cachedPlayerId: sp.cachedPlayer.id,
+            source: sp.cachedPlayer.source,
+            name: sp.cachedPlayer.name,
+            photoUrl: sp.cachedPlayer.photoUrl,
+            position: sp.cachedPlayer.position,
+            secondaryPositions: sp.cachedPlayer.secondaryPositions,
+            nationality: sp.cachedPlayer.nationality,
+            dateOfBirth: sp.cachedPlayer.dateOfBirth?.toISOString() ?? null,
+            club: sp.cachedPlayer.club,
+            overall: sp.cachedPlayer.overall,
+            potential: sp.cachedPlayer.potential,
+            shirtNumber: sp.shirtNumber,
+            isCaptain: sp.isCaptain,
+            isYouth: sp.isYouth,
+            isStarter: !!starter,
+            isWatchlist: sp.isWatchlist,
+            isExtra: sp.isExtra,
+            positionSlot: starter?.positionSlot ?? null,
+            xOffset: starter?.xOffset ?? null,
+            yOffset: starter?.yOffset ?? null,
+            externalLink: sp.cachedPlayer.externalLink,
+            careerId: careerIdByPlayer.get(sp.cachedPlayer.id) ?? null,
+          };
+        })}
       />
 
       <TransfersCard

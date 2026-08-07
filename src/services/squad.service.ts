@@ -214,7 +214,17 @@ export const squadService = {
   async duplicateSquad(id: string) {
     const original = await prisma.squad.findUnique({
       where: { id },
-      include: { tags: true, seasons: { include: { players: true, titles: true, transfers: true } } },
+      include: {
+        tags: true,
+        seasons: {
+          include: {
+            players: true,
+            titles: true,
+            transfers: true,
+            lineups: { orderBy: { order: "asc" }, include: { starters: true } },
+          },
+        },
+      },
     });
     if (!original) return null;
 
@@ -247,6 +257,12 @@ export const squadService = {
         },
       });
 
+      // squadPlayerId (temporada ORIGEM) → cachedPlayerId, pra remapear os
+      // titulares de cada escalação copiada abaixo pro SquadPlayer novo do
+      // mesmo jogador — mesmo raciocínio de season.service.ts#createSeason.
+      const sourceIdToCachedPlayerId = new Map(season.players.map((p) => [p.id, p.cachedPlayerId]));
+      let newIdByCachedPlayerId = new Map<string, string>();
+
       if (season.players.length > 0) {
         await prisma.squadPlayer.createMany({
           data: season.players.map((p) => ({
@@ -264,6 +280,12 @@ export const squadService = {
           })),
         });
 
+        const created = await prisma.squadPlayer.findMany({
+          where: { seasonId: newSeason.id },
+          select: { id: true, cachedPlayerId: true },
+        });
+        newIdByCachedPlayerId = new Map(created.map((p) => [p.cachedPlayerId, p.id]));
+
         // Mesmo bug/correção já aplicada em season.service.ts#createSeason
         // (duplicar UMA temporada): duplicar o clube INTEIRO também cria
         // SquadPlayer via createMany direto, sem passar por
@@ -272,6 +294,22 @@ export const squadService = {
         await Promise.all(
           season.players.map((p) => ensureCareerStintForSeason(p.cachedPlayerId, newSeason.id)),
         );
+      }
+
+      // Clone completo: toda escalação salva desta temporada também é
+      // clonada (mesmo raciocínio de títulos/transferências abaixo).
+      for (const sourceLineup of season.lineups) {
+        const newLineup = await prisma.squadLineup.create({
+          data: { seasonId: newSeason.id, name: sourceLineup.name, formation: sourceLineup.formation, order: sourceLineup.order },
+        });
+
+        const starterRows = sourceLineup.starters.flatMap((st) => {
+          const cachedPlayerId = sourceIdToCachedPlayerId.get(st.squadPlayerId);
+          const newSquadPlayerId = cachedPlayerId ? newIdByCachedPlayerId.get(cachedPlayerId) : undefined;
+          if (!newSquadPlayerId) return [];
+          return [{ lineupId: newLineup.id, squadPlayerId: newSquadPlayerId, positionSlot: st.positionSlot, xOffset: st.xOffset, yOffset: st.yOffset }];
+        });
+        if (starterRows.length > 0) await prisma.squadLineupStarter.createMany({ data: starterRows });
       }
 
       // This is a full historical clone of the club (unlike duplicating a
