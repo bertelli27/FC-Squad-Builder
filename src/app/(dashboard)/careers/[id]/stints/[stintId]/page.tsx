@@ -7,7 +7,7 @@ import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { CareerStintPageContent } from "@/components/careers/career-stint-page-content";
 import { formatSeasonLabel } from "@/lib/season";
 import { ageAtSeason } from "@/lib/player-age";
-import { countryFlag } from "@/lib/countries";
+import { CountryFlag } from "@/components/ui/country-flag";
 import { POSITIONS } from "@/lib/positions";
 
 export default async function CareerStintPage({
@@ -21,7 +21,6 @@ export default async function CareerStintPage({
 
   const { stint, squadPlayer } = detail;
   const player = stint.career.cachedPlayer;
-  const flag = countryFlag(player?.nationality);
   const age = player?.dateOfBirth ? ageAtSeason(player.dateOfBirth, stint.startYear, stint.calendar) : null;
   const positionLabel = POSITIONS.find((p) => p.value === player?.position)?.label ?? player?.position;
 
@@ -40,7 +39,7 @@ export default async function CareerStintPage({
         <div className="flex flex-1 flex-col">
           <h1 className="font-heading text-2xl font-bold tracking-tight">{stint.career.name}</h1>
           <span className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-sm">
-            {flag && <span>{flag}</span>}
+            <CountryFlag nationality={player?.nationality} />
             {[positionLabel, age != null ? `${age} anos` : null].filter(Boolean).join(" · ")}
           </span>
         </div>

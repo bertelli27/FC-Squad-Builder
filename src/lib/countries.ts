@@ -147,32 +147,3 @@ export function findCountry(nationality?: string | null): Country | undefined {
   if (!nationality) return undefined;
   return BY_LOOKUP.get(nationality.trim().toLowerCase());
 }
-
-/**
- * Regional-indicator flag emoji from an ISO 3166-1 alpha-2 code — no image
- * assets needed. The four home-nation "codes" above (GB-ENG etc.) aren't
- * real ISO2 codes and have no regional-indicator flag, so they fall back to
- * their own dedicated unicode flag sequences (already-standard emoji).
- */
-const SUBDIVISION_FLAGS: Record<string, string> = {
-  "GB-ENG": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
-  "GB-SCT": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-  "GB-WLS": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-  "GB-NIR": "🇬🇧",
-};
-
-export function flagEmoji(iso2: string): string {
-  const subdivision = SUBDIVISION_FLAGS[iso2];
-  if (subdivision) return subdivision;
-  return iso2
-    .toUpperCase()
-    .split("")
-    .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
-    .join("");
-}
-
-/** Flag for a free-text nationality string as already stored on CachedPlayer (e.g. "Brazil", "Holland"). Returns null when unrecognized rather than guessing. */
-export function countryFlag(nationality?: string | null): string | null {
-  const country = findCountry(nationality);
-  return country ? flagEmoji(country.iso2) : null;
-}

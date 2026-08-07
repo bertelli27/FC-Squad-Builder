@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MAIN_ATTRIBUTES, ATTRIBUTE_GROUPS, ATTRIBUTE_LABELS } from "@/lib/attribute-labels";
 import { ratingStyle } from "@/lib/rating-tier";
 import { POSITIONS } from "@/lib/positions";
-import { countryFlag } from "@/lib/countries";
+import { CountryFlag } from "@/components/ui/country-flag";
 import { ageAtSeason, ageToday } from "@/lib/player-age";
 import { cn } from "@/lib/utils";
 import type { Player } from "@/types/domain";
@@ -280,7 +280,6 @@ function ProfileContent({
 }) {
   const attributes = player.attributes;
   const tier = ratingStyle(player.overall);
-  const flag = countryFlag(player.nationality);
   // §5/§19: prefer the season-aware calculation from a stored date of
   // birth; `player.age` (the legacy static field, only ever populated for
   // Kaggle-sourced rows) is a last-resort fallback for players who don't
@@ -307,10 +306,9 @@ function ProfileContent({
           className={cn("ring-2", tier.ring)}
         />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-muted-foreground truncate text-sm">
-            {[player.position, player.club, flag ? `${flag} ${player.nationality}` : player.nationality]
-              .filter(Boolean)
-              .join(" · ")}
+          <span className="text-muted-foreground flex items-center gap-1 truncate text-sm">
+            <CountryFlag nationality={player.nationality} />
+            {[player.position, player.club, player.nationality].filter(Boolean).join(" · ")}
           </span>
           {secondaryLabels && (
             <span className="text-muted-foreground truncate text-xs">Também joga: {secondaryLabels}</span>

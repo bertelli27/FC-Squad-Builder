@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { PlusIcon, PencilIcon, Trash2Icon, ShieldIcon, ExternalLinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { countryFlag } from "@/lib/countries";
+import { CountryFlag } from "@/components/ui/country-flag";
 import { ChampionFormDialog } from "./champion-form-dialog";
 
 export interface ChampionVM {
@@ -89,7 +89,6 @@ export function ChampionsTab({
       ) : (
         <ul className="divide-border flex flex-col divide-y rounded-lg border">
           {champions.map((champion) => {
-            const flag = countryFlag(champion.standaloneCountry);
             return (
               <li key={champion.id} className="hover:bg-accent/30 flex items-center gap-3 p-3">
                 <span className="font-heading w-14 shrink-0 text-sm font-bold">{champion.year}</span>
@@ -107,7 +106,7 @@ export function ChampionsTab({
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 text-sm font-medium">
-                    {flag && <span>{flag}</span>}
+                    <CountryFlag nationality={champion.standaloneCountry} />
                     <span className="truncate">{champion.standaloneName}</span>
                   </div>
                   {champion.season ? (

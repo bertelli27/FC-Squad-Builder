@@ -15,7 +15,7 @@ import { EditPlayerForm, type EditablePlayer as EditablePlayerBase } from "@/com
 import { CreatePlayerDialog } from "./create-player-dialog";
 import { useDeletePlayer } from "@/hooks/use-delete-player";
 import { POSITION_ABBREVIATIONS_PT } from "@/lib/positions";
-import { countryFlag } from "@/lib/countries";
+import { CountryFlag } from "@/components/ui/country-flag";
 
 interface LinkedClub {
   name: string;
@@ -149,7 +149,6 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
           </div>
           <ul className="divide-border flex flex-col divide-y">
             {filtered.map((player) => {
-              const flag = countryFlag(player.nationality);
               // Posição principal + secundárias, todas abreviadas em
               // português — a lista respeita exatamente o que está
               // cadastrado (§A.4), sem inventar nem esconder nenhuma.
@@ -167,7 +166,7 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
                   <div className="min-w-0 flex-1">
                     <div className="font-heading truncate text-base font-bold">{player.name}</div>
                     <div className="flex flex-wrap items-center gap-1 text-xs">
-                      {flag && <span className="text-sm">{flag}</span>}
+                      <CountryFlag nationality={player.nationality} />
                       {positionCodes.length > 0 ? (
                         positionCodes.map((code, i) => (
                           <span

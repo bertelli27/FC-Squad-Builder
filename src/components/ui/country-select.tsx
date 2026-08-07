@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { COUNTRIES, countryFlag } from "@/lib/countries";
+import { COUNTRIES } from "@/lib/countries";
+import { CountryFlag } from "./country-flag";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,7 +28,6 @@ export function CountrySelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
-  const flag = countryFlag(value);
 
   useEffect(() => {
     if (!open) return;
@@ -57,7 +57,7 @@ export function CountrySelect({
         className="border-input bg-background hover:bg-accent/40 flex h-9 w-full items-center justify-between gap-2 rounded-md border px-3 text-sm transition-colors"
       >
         <span className={cn("flex items-center gap-1.5 truncate", !value && "text-muted-foreground")}>
-          {flag && <span>{flag}</span>}
+          <CountryFlag nationality={value} />
           {value ? (COUNTRIES.find((c) => c.enName === value)?.label ?? value) : "Selecione um país"}
         </span>
         <ChevronDown className="text-muted-foreground size-4 shrink-0" />
@@ -87,7 +87,7 @@ export function CountrySelect({
                   }}
                   className="hover:bg-accent flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm"
                 >
-                  <span>{flagEmojiFor(country.enName)}</span>
+                  <CountryFlag nationality={country.enName} />
                   {country.label}
                 </button>
               </li>
@@ -97,8 +97,4 @@ export function CountrySelect({
       )}
     </div>
   );
-}
-
-function flagEmojiFor(enName: string): string {
-  return countryFlag(enName) ?? "";
 }

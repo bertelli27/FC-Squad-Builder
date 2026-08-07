@@ -9,7 +9,7 @@ import { EditPlayerForm, type EditablePlayer } from "@/components/player-card/ed
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDeletePlayer } from "@/hooks/use-delete-player";
 import { Card, CardContent } from "@/components/ui/card";
-import { countryFlag } from "@/lib/countries";
+import { CountryFlag } from "@/components/ui/country-flag";
 import { ageToday } from "@/lib/player-age";
 
 const CUSTOM_SOURCE = "custom";
@@ -25,7 +25,6 @@ export function CareerHeader({ player }: { player: EditablePlayer }) {
   const [current, setCurrent] = useState(player);
   const [editing, setEditing] = useState(false);
   const { requestDelete, deleting, dialog: confirmDialog } = useDeletePlayer();
-  const flag = countryFlag(current.nationality);
   const age = current.dateOfBirth ? ageToday(current.dateOfBirth) : null;
   // Nova etapa — exclusão restrita a jogadores criados pelo usuário
   // (source "custom"), mesma regra do player-profile-dialog.tsx.
@@ -46,14 +45,9 @@ export function CareerHeader({ player }: { player: EditablePlayer }) {
           <PlayerAvatar src={current.photoUrl} name={current.name} size="lg" />
           <div className="flex min-w-0 flex-1 flex-col">
             <h1 className="font-heading text-2xl font-bold tracking-tight">{current.name}</h1>
-            <span className="text-muted-foreground truncate text-sm">
-              {[
-                current.position,
-                flag ? `${flag} ${current.nationality}` : current.nationality,
-                age != null ? `${age} anos` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+            <span className="text-muted-foreground flex items-center gap-1 truncate text-sm">
+              <CountryFlag nationality={current.nationality} />
+              {[current.position, current.nationality, age != null ? `${age} anos` : null].filter(Boolean).join(" · ")}
             </span>
           </div>
           {current.cachedPlayerId && (
