@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PencilIcon, Shield, Palette } from "lucide-react";
+import { PencilIcon, Shield, Palette, IdCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageUrlInput } from "@/components/ui/image-url-input";
 import { ColorPickerInput } from "@/components/ui/color-picker-input";
+import { CountrySelect } from "@/components/ui/country-select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
@@ -21,6 +22,7 @@ import { CategorySelect } from "./category-select";
 import { TagsInput } from "./tags-input";
 import { SEASON_CALENDARS } from "@/lib/season";
 import { isValidHexColor } from "@/lib/club-color";
+import { CONFEDERATIONS } from "@/lib/competition-classification";
 
 export interface EditableSquadData {
   id: string;
@@ -31,7 +33,16 @@ export interface EditableSquadData {
   baseKind?: string | null;
   primaryColor?: string | null;
   seasonCalendar: string;
+  fullName?: string | null;
+  country?: string | null;
+  city?: string | null;
+  foundedYear?: number | null;
+  stadium?: string | null;
+  colors?: string | null;
+  confederation?: string | null;
 }
+
+const CONFEDERATION_NONE = "__none__";
 
 const BASE_KIND_NONE = "__none__";
 
@@ -55,6 +66,13 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
   const [categoryId, setCategoryId] = useState<string | null>(squad.categoryId ?? null);
   const [tagNames, setTagNames] = useState<string[]>(squad.tags?.map((t) => t.name) ?? []);
   const [baseKind, setBaseKind] = useState<string | null>(squad.baseKind ?? null);
+  const [fullName, setFullName] = useState(squad.fullName ?? "");
+  const [country, setCountry] = useState(squad.country ?? "");
+  const [city, setCity] = useState(squad.city ?? "");
+  const [foundedYear, setFoundedYear] = useState(squad.foundedYear?.toString() ?? "");
+  const [stadium, setStadium] = useState(squad.stadium ?? "");
+  const [colors, setColors] = useState(squad.colors ?? "");
+  const [confederation, setConfederation] = useState(squad.confederation ?? "");
   const [saving, setSaving] = useState(false);
 
   function handleSubmit(event: React.FormEvent) {
@@ -80,6 +98,13 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
         categoryId,
         tagNames,
         baseKind,
+        fullName: fullName.trim() || null,
+        country: country.trim() || null,
+        city: city.trim() || null,
+        foundedYear: foundedYear.trim() ? Number(foundedYear) : null,
+        stadium: stadium.trim() || null,
+        colors: colors.trim() || null,
+        confederation: confederation.trim() || null,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -155,6 +180,77 @@ export function EditSquadDialog({ squad }: { squad: EditableSquadData }) {
             <div className="flex flex-col gap-1.5">
               <Label>Tags</Label>
               <TagsInput value={tagNames} onChange={setTagNames} />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t pt-4">
+            <h3 className="text-muted-foreground font-heading flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+              <IdCard className="size-3.5" />
+              Perfil
+            </h3>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="squad-full-name">Nome completo</Label>
+              <Input id="squad-full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>País</Label>
+                <CountrySelect value={country} onChange={setCountry} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="squad-city">Cidade</Label>
+                <Input id="squad-city" value={city} onChange={(e) => setCity(e.target.value)} />
+              </div>
+            </div>
+
+            {baseKind === "nationalTeam" ? (
+              <div className="flex flex-col gap-1.5">
+                <Label>Confederação</Label>
+                <Select
+                  value={confederation || CONFEDERATION_NONE}
+                  onValueChange={(v) => v && setConfederation(v === CONFEDERATION_NONE ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue>{(v: string) => (v === CONFEDERATION_NONE ? "Não definida" : v)}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={CONFEDERATION_NONE}>Não definida</SelectItem>
+                    {CONFEDERATIONS.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="squad-founded">Fundação (ano)</Label>
+                  <Input
+                    id="squad-founded"
+                    type="number"
+                    value={foundedYear}
+                    onChange={(e) => setFoundedYear(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="squad-stadium">Estádio</Label>
+                  <Input id="squad-stadium" value={stadium} onChange={(e) => setStadium(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="squad-colors">Cores</Label>
+              <Input
+                id="squad-colors"
+                value={colors}
+                onChange={(e) => setColors(e.target.value)}
+                placeholder="Ex: Verde e Branco"
+              />
             </div>
           </div>
 

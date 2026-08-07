@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Image from "next/image";
 import { TrophyIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -26,25 +27,27 @@ export function PalmaresCard({ entries }: { entries: PalmaresEntry[] }) {
       <CardContent className="py-4">
         <ul className="flex flex-wrap gap-3">
           {entries.map(({ competition, count }) => (
-            <li
-              key={competition.id}
-              className="bg-muted/40 flex flex-col items-center gap-1.5 rounded-lg border p-3 pt-2"
-            >
-              {competition.trophyImageUrl ? (
-                <Image
-                  src={competition.trophyImageUrl}
-                  alt={competition.name}
-                  width={40}
-                  height={40}
-                  className="size-10 object-contain"
-                  unoptimized
-                />
-              ) : (
-                <TrophyIcon className="text-muted-foreground size-10" strokeWidth={1.25} />
-              )}
-              <span className="font-heading max-w-28 text-center text-xs font-semibold leading-tight">
-                {competition.name} <span className="text-muted-foreground">×{count}</span>
-              </span>
+            <li key={competition.id}>
+              <Link
+                href={`/management/competitions/${competition.id}`}
+                className="bg-muted/40 hover:bg-accent/50 flex flex-col items-center gap-1.5 rounded-lg border p-3 pt-2"
+              >
+                {competition.trophyImageUrl ? (
+                  <Image
+                    src={competition.trophyImageUrl}
+                    alt={competition.name}
+                    width={40}
+                    height={40}
+                    className="size-10 object-contain"
+                    unoptimized
+                  />
+                ) : (
+                  <TrophyIcon className="text-muted-foreground size-10" strokeWidth={1.25} />
+                )}
+                <span className="font-heading max-w-28 text-center text-xs font-semibold leading-tight">
+                  {competition.name} <span className="text-muted-foreground">×{count}</span>
+                </span>
+              </Link>
             </li>
           ))}
         </ul>

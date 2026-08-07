@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { PencilIcon, ArrowRightLeftIcon, UserRoundIcon, Trash2Icon } from "lucide-react";
+import { PencilIcon, ArrowRightLeftIcon, UserRoundIcon, Trash2Icon, IdCardIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -197,6 +197,15 @@ export function PlayerProfileDialog({
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <UserRoundIcon className="size-4" />
+                  </Link>
+                )}
+                {known.cachedPlayerId && (
+                  <Link
+                    href={`/players/${known.cachedPlayerId}`}
+                    aria-label="Ver perfil completo"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <IdCardIcon className="size-4" />
                   </Link>
                 )}
                 {canDelete && (

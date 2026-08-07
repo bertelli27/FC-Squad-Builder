@@ -46,7 +46,9 @@ export default async function CompetitionDetailPage({ params }: { params: Promis
               competition.kind ? KIND_LABELS[competition.kind] : null,
               competition.scope ? SCOPE_LABELS[competition.scope] : null,
               competition.organizer,
-              competition.scope === "national" ? (findCountry(competition.country)?.label ?? competition.country) : null,
+              competition.scope === "national" || competition.scope === "state"
+                ? (findCountry(competition.country)?.label ?? competition.country)
+                : null,
             ]
               .filter(Boolean)
               .join(" · ") || "Não classificada"}

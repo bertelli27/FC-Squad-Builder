@@ -89,7 +89,7 @@ export function EditCompetitionForm({
       toast.error("Escolha a confederação organizadora.");
       return;
     }
-    if (scope === "national" && !country.trim()) {
+    if ((scope === "national" || scope === "state") && !country.trim()) {
       toast.error("Escolha o país.");
       return;
     }
@@ -102,8 +102,12 @@ export function EditCompetitionForm({
       kind: kind === NONE ? null : kind,
       scope: scope === NONE ? null : scope,
       organizer:
-        scope === "world" ? WORLD_ORGANIZER : scope === "continental" || scope === "national" ? organizer.trim() || null : null,
-      country: scope === "national" ? country || null : null,
+        scope === "world"
+          ? WORLD_ORGANIZER
+          : scope === "continental" || scope === "national" || scope === "state"
+            ? organizer.trim() || null
+            : null,
+      country: scope === "national" || scope === "state" ? country || null : null,
       description: description || null,
     };
     fetch(`/api/competitions/${competition.id}`, {
@@ -207,14 +211,16 @@ export function EditCompetitionForm({
         </div>
       )}
 
-      {scope === "national" && (
+      {(scope === "national" || scope === "state") && (
         <>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="edit-competition-country">País</Label>
             <CountrySelect id="edit-competition-country" value={country} onChange={setCountry} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-competition-organizer">Organização (federação nacional)</Label>
+            <Label htmlFor="edit-competition-organizer">
+              Organização ({scope === "state" ? "federação estadual" : "federação nacional"})
+            </Label>
             <OrganizerInput id="edit-competition-organizer" value={organizer} onChange={setOrganizer} />
           </div>
         </>

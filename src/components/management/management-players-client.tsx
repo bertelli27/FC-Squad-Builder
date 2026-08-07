@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Search, PencilIcon, Trash2Icon, ShieldIcon } from "lucide-react";
+import { Search, PencilIcon, Trash2Icon, ShieldIcon, IdCardIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -207,6 +208,13 @@ export function ManagementPlayersClient({ players: initialPlayers }: { players: 
                       )}
                     </div>
                   )}
+                  <Link
+                    href={`/players/${player.cachedPlayerId}`}
+                    aria-label={`Ver perfil de ${player.name}`}
+                    className="text-muted-foreground hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-full"
+                  >
+                    <IdCardIcon className="size-4" />
+                  </Link>
                   <button
                     type="button"
                     onClick={() => setEditing(player)}

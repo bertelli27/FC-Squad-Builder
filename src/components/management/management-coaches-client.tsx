@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
-import { Search, PencilIcon, Trash2Icon, ShieldIcon } from "lucide-react";
+import { Search, PencilIcon, Trash2Icon, ShieldIcon, IdCardIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
@@ -90,6 +91,13 @@ export function ManagementCoachesClient({ coaches: initialCoaches }: { coaches: 
                   )}
                 </div>
               )}
+              <Link
+                href={`/coaches/${coach.id}`}
+                aria-label={`Ver perfil de ${coach.name}`}
+                className="text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-full"
+              >
+                <IdCardIcon className="size-4" />
+              </Link>
               <button
                 type="button"
                 onClick={() => setEditing(coach)}

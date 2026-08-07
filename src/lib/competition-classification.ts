@@ -23,6 +23,7 @@ export const SCOPE_OPTIONS_BY_KIND: Record<CompetitionKind, { value: string; lab
     { value: "world", label: "🌐 Mundial" },
     { value: "continental", label: "🌍 Continental" },
     { value: "national", label: "🇧🇷 Nacional" },
+    { value: "state", label: "🏟️ Estadual" },
   ],
 };
 
@@ -30,6 +31,7 @@ export const SCOPE_LABELS: Record<string, string> = {
   world: "🌐 Mundial",
   continental: "🌍 Continental",
   national: "🇧🇷 Nacional",
+  state: "🏟️ Estadual",
 };
 
 /** Confederações — únicas opções válidas de `organizer` quando scope === "continental", pra qualquer Tipo. */

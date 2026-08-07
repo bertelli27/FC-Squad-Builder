@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRightLeftIcon, ArrowDownCircle, ArrowUpCircle, ChartNoAxesColumnIcon, XIcon } from "lucide-react";
@@ -22,6 +23,8 @@ export interface TransferVM {
   value: number | null;
   dealType?: string; // "permanent" | "loan" — undefined on pre-etapa-7 rows
   transferWindow?: string | null; // "start" | "mid" | null — não informado
+  /** Etapa 10.2 — FK real (Transfer.cachedPlayerId, existe desde a etapa 7); linka o nome pro perfil do jogador quando presente. */
+  cachedPlayerId?: string | null;
   /**
    * Só presente quando o jogador desta transferência está atualmente
    * isDeparted (saiu do elenco ativo desta temporada, independente de esta
@@ -232,7 +235,13 @@ function TransferList({
           >
             <div className="min-w-0 flex-1">
               <div className="truncate font-medium">
-                {t.playerName}
+                {t.cachedPlayerId ? (
+                  <Link href={`/players/${t.cachedPlayerId}`} className="hover:underline">
+                    {t.playerName}
+                  </Link>
+                ) : (
+                  t.playerName
+                )}
                 {meta && <span className="text-muted-foreground ml-1.5 text-xs font-normal">({meta})</span>}
               </div>
               {t.counterpartClub && (

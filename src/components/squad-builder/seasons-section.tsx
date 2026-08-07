@@ -22,6 +22,7 @@ export interface SeasonCardData {
   id: string;
   startYear: number;
   formation: string;
+  coachId: string | null;
   coachName: string | null;
   playerCount: number;
   /** Etapa 10.1 (§7/§8) — torneio pra qual esta temporada é a convocação, quando definido. */
@@ -44,25 +45,28 @@ export function SeasonsSection({
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateFrom, setDuplicateFrom] = useState<DuplicateFromSeason | null>(null);
   const existingSeasons = seasons.map((s) => ({ startYear: s.startYear, competitionId: s.competitionId }));
+  const sectionLabel = isNationalTeam ? "Convocações" : "Temporadas";
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold tracking-tight">
-          Temporadas {seasons.length > 0 && <span className="text-muted-foreground text-sm font-normal">({seasons.length})</span>}
+          {sectionLabel} {seasons.length > 0 && <span className="text-muted-foreground text-sm font-normal">({seasons.length})</span>}
         </h2>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           <CalendarPlus className="size-4" />
-          Nova temporada
+          Nova {isNationalTeam ? "convocação" : "temporada"}
         </Button>
       </div>
 
       {seasons.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-12 text-center">
-          <p className="text-muted-foreground">Este clube ainda não tem nenhuma temporada.</p>
+          <p className="text-muted-foreground">
+            {isNationalTeam ? "Esta seleção ainda não tem nenhuma convocação." : "Este clube ainda não tem nenhuma temporada."}
+          </p>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <CalendarPlus className="size-4" />
-            Criar a primeira temporada
+            Criar {isNationalTeam ? "a primeira convocação" : "a primeira temporada"}
           </Button>
         </div>
       ) : (
@@ -192,7 +196,13 @@ function SeasonCard({
           {season.coachName && (
             <span className="text-muted-foreground flex items-center gap-1 truncate">
               <UserRound className="size-3.5 shrink-0" />
-              {season.coachName}
+              {season.coachId ? (
+                <Link href={`/coaches/${season.coachId}`} className="relative z-10 hover:underline">
+                  {season.coachName}
+                </Link>
+              ) : (
+                season.coachName
+              )}
             </span>
           )}
         </CardContent>

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { SquadPicker, type SquadOption } from "./squad-picker";
 import { POSITIONS, MAX_SECONDARY_POSITIONS } from "@/lib/positions";
+import { PREFERRED_FOOT_OPTIONS } from "@/lib/player-body";
 import type { EditablePlayer } from "@/components/player-card/edit-player-form";
 
 /**
@@ -39,6 +40,9 @@ export function CreatePlayerDialog({ onCreated }: { onCreated: (player: Editable
   const [potential, setPotential] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [externalLink, setExternalLink] = useState("");
+  const [heightCm, setHeightCm] = useState("");
+  const [weightKg, setWeightKg] = useState("");
+  const [preferredFoot, setPreferredFoot] = useState("");
   const [currentClub, setCurrentClub] = useState<SquadOption | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +58,9 @@ export function CreatePlayerDialog({ onCreated }: { onCreated: (player: Editable
     setPotential("");
     setPhotoUrl("");
     setExternalLink("");
+    setHeightCm("");
+    setWeightKg("");
+    setPreferredFoot("");
     setCurrentClub(null);
   }
 
@@ -83,6 +90,9 @@ export function CreatePlayerDialog({ onCreated }: { onCreated: (player: Editable
         photoUrl: photoUrl || undefined,
         externalLink: externalLink || undefined,
         currentClubId: currentClub?.id || undefined,
+        heightCm: heightCm ? Number(heightCm) : undefined,
+        weightKg: weightKg ? Number(weightKg) : undefined,
+        preferredFoot: preferredFoot || undefined,
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -235,6 +245,34 @@ export function CreatePlayerDialog({ onCreated }: { onCreated: (player: Editable
                 value={potential}
                 onChange={(e) => setPotential(e.target.value)}
               />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label htmlFor="create-player-height">Altura (cm)</Label>
+              <Input id="create-player-height" type="number" min={100} max={230} value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label htmlFor="create-player-weight">Peso (kg)</Label>
+              <Input id="create-player-weight" type="number" min={30} max={150} value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label htmlFor="create-player-foot">Pé dominante</Label>
+              <Select value={preferredFoot} onValueChange={(v) => setPreferredFoot(v ?? "")}>
+                <SelectTrigger id="create-player-foot">
+                  <SelectValue placeholder="Selecione">
+                    {(v: string) => PREFERRED_FOOT_OPTIONS.find((f) => f.value === v)?.label ?? v}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {PREFERRED_FOOT_OPTIONS.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

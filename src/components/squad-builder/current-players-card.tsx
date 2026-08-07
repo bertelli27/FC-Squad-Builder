@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { UsersRoundIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
@@ -33,7 +34,11 @@ export function CurrentPlayersCard({ players }: { players: CurrentPlayerData[] }
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-2 py-4 sm:grid-cols-2 lg:grid-cols-3">
         {players.map((player) => (
-          <div key={player.id} className="flex items-center gap-2 rounded-lg border p-2">
+          <Link
+            key={player.id}
+            href={`/players/${player.id}`}
+            className="hover:bg-accent/30 flex items-center gap-2 rounded-lg border p-2"
+          >
             <PlayerAvatar src={player.photoUrl} name={player.name} size="sm" />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold">{player.name}</div>
@@ -43,7 +48,7 @@ export function CurrentPlayersCard({ players }: { players: CurrentPlayerData[] }
               </div>
             </div>
             <OverallBadge overall={player.overall} />
-          </div>
+          </Link>
         ))}
       </CardContent>
     </Card>

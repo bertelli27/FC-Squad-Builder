@@ -50,6 +50,9 @@ export async function POST(request: NextRequest) {
     potential: typeof body.potential === "number" ? body.potential : undefined,
     externalLink: typeof body.externalLink === "string" ? body.externalLink : undefined,
     currentClubId: typeof body.currentClubId === "string" ? body.currentClubId : undefined,
+    heightCm: typeof body.heightCm === "number" ? body.heightCm : undefined,
+    weightKg: typeof body.weightKg === "number" ? body.weightKg : undefined,
+    preferredFoot: typeof body.preferredFoot === "string" ? body.preferredFoot : undefined,
   });
 
   return NextResponse.json({ player }, { status: 201 });

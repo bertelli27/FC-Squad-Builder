@@ -3,9 +3,13 @@ import { playerDataService } from "@/services/player-data.service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Etapa 10.1 (§3) — clube atual do jogador, buscado à parte pelo EditPlayerForm ao abrir (não faz parte do DTO genérico Player). */
+/**
+ * Etapa 10.1 (§3) / Etapa 10.2 — campos que o EditPlayerForm busca à parte
+ * ao abrir (clube atual + altura/peso/pé), nenhum deles fazendo parte do
+ * DTO genérico Player/EditablePlayer.
+ */
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
-  const currentClub = await playerDataService.getCurrentClub(id);
-  return NextResponse.json({ currentClub });
+  const extras = await playerDataService.getEditExtras(id);
+  return NextResponse.json(extras);
 }

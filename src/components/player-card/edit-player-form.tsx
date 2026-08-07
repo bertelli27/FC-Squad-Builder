@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { SquadPicker, type SquadOption } from "@/components/management/squad-picker";
 import { POSITIONS, MAX_SECONDARY_POSITIONS } from "@/lib/positions";
+import { PREFERRED_FOOT_OPTIONS } from "@/lib/player-body";
 
 export interface EditablePlayer {
   cachedPlayerId: string;
@@ -32,6 +33,10 @@ export interface EditablePlayer {
   overall?: number | null;
   potential?: number | null;
   externalLink?: string | null;
+  /** Etapa 10.2 — "quando existir": nenhuma fonte preenche, só edição manual. */
+  heightCm?: number | null;
+  weightKg?: number | null;
+  preferredFoot?: string | null;
 }
 
 /**
@@ -60,19 +65,28 @@ export function EditPlayerForm({
   const [overall, setOverall] = useState(player.overall != null ? String(player.overall) : "");
   const [potential, setPotential] = useState(player.potential != null ? String(player.potential) : "");
   const [externalLink, setExternalLink] = useState(player.externalLink ?? "");
+  const [heightCm, setHeightCm] = useState(player.heightCm != null ? String(player.heightCm) : "");
+  const [weightKg, setWeightKg] = useState(player.weightKg != null ? String(player.weightKg) : "");
+  const [preferredFoot, setPreferredFoot] = useState(player.preferredFoot ?? "");
   const [currentClub, setCurrentClub] = useState<SquadOption | null>(null);
   const [loadingCurrentClub, setLoadingCurrentClub] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Etapa 10.1 (§3) — buscado à parte (não vem em `player`) pra não ter
-  // que colocar esse campo no DTO genérico que todo caller de
-  // EditPlayerForm precisaria passar a montar.
+  // Etapa 10.1 (§3) / Etapa 10.2 — buscado à parte (não vem em `player`)
+  // pra não ter que colocar esses campos no DTO genérico que todo caller de
+  // EditPlayerForm precisaria passar a montar. Só sobrescreve altura/peso/
+  // pé se o form ainda não tiver algo digitado (evita perder o que o
+  // usuário já está editando quando essa resposta chega depois).
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/players/${player.cachedPlayerId}/current-club`)
-      .then((res) => (res.ok ? res.json() : { currentClub: null }))
+      .then((res) => (res.ok ? res.json() : { currentClub: null, heightCm: null, weightKg: null, preferredFoot: null }))
       .then((data) => {
-        if (!cancelled) setCurrentClub(data.currentClub);
+        if (cancelled) return;
+        setCurrentClub(data.currentClub);
+        setHeightCm((prev) => (prev === "" && data.heightCm != null ? String(data.heightCm) : prev));
+        setWeightKg((prev) => (prev === "" && data.weightKg != null ? String(data.weightKg) : prev));
+        setPreferredFoot((prev) => (prev === "" && data.preferredFoot ? data.preferredFoot : prev));
       })
       .catch(() => {})
       .finally(() => {
@@ -119,6 +133,9 @@ export function EditPlayerForm({
       potential: potential === "" ? null : Number(potential),
       externalLink: externalLink || null,
       currentClubId: currentClub?.id ?? null,
+      heightCm: heightCm === "" ? null : Number(heightCm),
+      weightKg: weightKg === "" ? null : Number(weightKg),
+      preferredFoot: preferredFoot || null,
     };
     fetch(`/api/players/${player.cachedPlayerId}`, {
       method: "PATCH",
@@ -243,6 +260,34 @@ export function EditPlayerForm({
             value={potential}
             onChange={(e) => setPotential(e.target.value)}
           />
+        </div>
+      </div>
+
+      <div className="flex gap-3">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Label htmlFor="edit-player-height">Altura (cm)</Label>
+          <Input id="edit-player-height" type="number" min={100} max={230} value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Label htmlFor="edit-player-weight">Peso (kg)</Label>
+          <Input id="edit-player-weight" type="number" min={30} max={150} value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Label htmlFor="edit-player-foot">Pé dominante</Label>
+          <Select value={preferredFoot} onValueChange={(v) => setPreferredFoot(v ?? "")}>
+            <SelectTrigger id="edit-player-foot">
+              <SelectValue placeholder="Selecione">
+                {(v: string) => PREFERRED_FOOT_OPTIONS.find((f) => f.value === v)?.label ?? v}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {PREFERRED_FOOT_OPTIONS.map((f) => (
+                <SelectItem key={f.value} value={f.value}>
+                  {f.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

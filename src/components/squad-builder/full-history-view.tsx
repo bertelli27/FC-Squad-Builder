@@ -1,10 +1,11 @@
+import Link from "next/link";
 import { Footprints, Users, TrendingUp, TrendingDown } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { formatSeasonLabel, formatMoney } from "@/lib/season";
 
 interface PlayerRankEntry {
-  cachedPlayer: { name: string; photoUrl: string | null };
+  cachedPlayer: { id: string; name: string; photoUrl: string | null };
   appearances: number;
   goals: number;
   assists: number;
@@ -100,13 +101,15 @@ function PlayerRankSection({
         ) : (
           <ol className="divide-border flex flex-col divide-y">
             {entries.map((entry, i) => (
-              <li key={i} className="flex items-center gap-3 py-2">
-                <span className="text-muted-foreground w-6 shrink-0 text-right text-sm">{i + 1}.</span>
-                <PlayerAvatar src={entry.cachedPlayer.photoUrl} name={entry.cachedPlayer.name} size="default" />
-                <span className="min-w-0 flex-1 truncate text-sm">{entry.cachedPlayer.name}</span>
-                <span className="text-muted-foreground shrink-0 text-sm font-medium">
-                  {entry[statKey]} {statLabel}
-                </span>
+              <li key={i}>
+                <Link href={`/players/${entry.cachedPlayer.id}`} className="hover:bg-accent/30 flex items-center gap-3 py-2">
+                  <span className="text-muted-foreground w-6 shrink-0 text-right text-sm">{i + 1}.</span>
+                  <PlayerAvatar src={entry.cachedPlayer.photoUrl} name={entry.cachedPlayer.name} size="default" />
+                  <span className="min-w-0 flex-1 truncate text-sm">{entry.cachedPlayer.name}</span>
+                  <span className="text-muted-foreground shrink-0 text-sm font-medium">
+                    {entry[statKey]} {statLabel}
+                  </span>
+                </Link>
               </li>
             ))}
           </ol>

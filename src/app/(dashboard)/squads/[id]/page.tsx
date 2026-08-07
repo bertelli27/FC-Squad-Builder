@@ -3,20 +3,33 @@ import { squadService } from "@/services/squad.service";
 import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { EditSquadDialog } from "@/components/squad-builder/edit-squad-dialog";
 import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
-import { SeasonsSection } from "@/components/squad-builder/seasons-section";
-import { PalmaresCard } from "@/components/squad-builder/palmares-card";
-import { HistoryCard } from "@/components/squad-builder/history-card";
-import { CurrentPlayersCard } from "@/components/squad-builder/current-players-card";
+import { SquadProfileTabs } from "@/components/squad-builder/squad-profile-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [squad, palmares, historicalStats, topTransfers, currentPlayers] = await Promise.all([
+  const [
+    squad,
+    palmares,
+    historicalStats,
+    topTransfers,
+    currentPlayers,
+    allPlayers,
+    coachesUsed,
+    allTransfers,
+    competitionsPlayed,
+    convocationTree,
+  ] = await Promise.all([
     squadService.getSquad(id),
     squadService.getPalmares(id),
-    squadService.getHistoricalStats(id, 3),
-    squadService.getTopTransfers(id, 3),
+    squadService.getHistoricalStats(id),
+    squadService.getTopTransfers(id),
     squadService.listCurrentPlayers(id),
+    squadService.listAllPlayers(id),
+    squadService.listCoachesUsed(id),
+    squadService.listAllTransfers(id),
+    squadService.listCompetitionsPlayed(id),
+    squadService.listConvocationTree(id),
   ]);
   if (!squad) notFound();
 
@@ -38,38 +51,53 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
               baseKind: squad.baseKind,
               primaryColor: squad.primaryColor,
               seasonCalendar: squad.seasonCalendar,
+              fullName: squad.fullName,
+              country: squad.country,
+              city: squad.city,
+              foundedYear: squad.foundedYear,
+              stadium: squad.stadium,
+              colors: squad.colors,
+              confederation: squad.confederation,
             }}
           />
         </CardContent>
       </Card>
 
-      <PalmaresCard entries={palmares} />
-
-      <CurrentPlayersCard players={currentPlayers} />
-
-      <HistoryCard
+      <SquadProfileTabs
         squadId={squad.id}
-        topScorers={historicalStats.topScorers}
-        topAssists={historicalStats.topAssists}
-        mostAppearances={historicalStats.mostAppearances}
-        topBuys={topTransfers.topBuys}
-        topSales={topTransfers.topSales}
+        baseKind={squad.baseKind}
         seasonCalendar={squad.seasonCalendar}
-      />
-
-      <SeasonsSection
-        squadId={squad.id}
-        seasonCalendar={squad.seasonCalendar}
-        isNationalTeam={squad.baseKind === "nationalTeam"}
+        overview={{
+          fullName: squad.fullName,
+          country: squad.country,
+          city: squad.city,
+          foundedYear: squad.foundedYear,
+          stadium: squad.stadium,
+          colors: squad.colors,
+          confederation: squad.confederation,
+          category: squad.category,
+          baseKind: squad.baseKind,
+          seasonCalendar: squad.seasonCalendar,
+        }}
         seasons={squad.seasons.map((season) => ({
           id: season.id,
           startYear: season.startYear,
           formation: season.formation,
+          coachId: season.coach?.id ?? null,
           coachName: season.coach?.name ?? null,
           playerCount: season._count.players,
           competitionId: season.competitionId,
           competitionName: season.competition?.name ?? null,
         }))}
+        palmares={palmares}
+        currentPlayers={currentPlayers}
+        allPlayers={allPlayers}
+        coachesUsed={coachesUsed}
+        allTransfers={allTransfers}
+        competitionsPlayed={competitionsPlayed}
+        convocationTree={convocationTree}
+        historicalStats={historicalStats}
+        topTransfers={topTransfers}
       />
     </ClubThemeScope>
   );

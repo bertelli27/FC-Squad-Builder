@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
 import { TrophyIcon, XIcon } from "lucide-react";
@@ -71,25 +72,30 @@ export function SeasonTitlesCard({
                   type="button"
                   onClick={() => handleRemove(title)}
                   aria-label={`Remover título de ${title.competition.name}`}
-                  className="text-muted-foreground hover:text-destructive absolute top-1 right-1 flex size-5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover/title:opacity-100"
+                  className="text-muted-foreground hover:text-destructive absolute top-1 right-1 z-10 flex size-5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover/title:opacity-100"
                 >
                   <XIcon className="size-3.5" />
                 </button>
-                {title.competition.trophyImageUrl ? (
-                  <Image
-                    src={title.competition.trophyImageUrl}
-                    alt={title.competition.name}
-                    width={40}
-                    height={40}
-                    className="size-10 object-contain"
-                    unoptimized
-                  />
-                ) : (
-                  <TrophyIcon className="text-muted-foreground size-10" strokeWidth={1.25} />
-                )}
-                <span className="font-heading max-w-28 text-center text-xs font-semibold leading-tight">
-                  {title.competition.name}
-                </span>
+                <Link
+                  href={`/management/competitions/${title.competition.id}`}
+                  className="flex flex-col items-center gap-1.5 hover:underline"
+                >
+                  {title.competition.trophyImageUrl ? (
+                    <Image
+                      src={title.competition.trophyImageUrl}
+                      alt={title.competition.name}
+                      width={40}
+                      height={40}
+                      className="size-10 object-contain"
+                      unoptimized
+                    />
+                  ) : (
+                    <TrophyIcon className="text-muted-foreground size-10" strokeWidth={1.25} />
+                  )}
+                  <span className="font-heading max-w-28 text-center text-xs font-semibold leading-tight">
+                    {title.competition.name}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

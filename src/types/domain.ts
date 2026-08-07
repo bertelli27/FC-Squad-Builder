@@ -15,6 +15,9 @@ export interface Player {
   secondaryPositions?: string[]; // até 3, além de `position` (§2, etapa 6)
   attributes?: Record<string, number>; // crossing, dribbling, etc.
   externalLink?: string; // link externo (ex: ogol, transfermarket), informado manualmente para jogadores "custom"
+  heightCm?: number; // "quando existir" — nenhuma fonte hoje preenche, só edição manual (§ etapa 10.2)
+  weightKg?: number;
+  preferredFoot?: string; // "left" | "right" | "both"
 }
 
 export interface Club {

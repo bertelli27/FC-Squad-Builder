@@ -33,6 +33,19 @@ export const coachService = {
     });
   },
 
+  /** Etapa 10.2 — perfil do técnico (/coaches/[id]): temporadas em que atuou, mais recente primeiro, cada uma linkando pra /squads/[squadId]/seasons/[seasonId]. */
+  async getCoachDetail(id: string) {
+    return prisma.coach.findUnique({
+      where: { id },
+      include: {
+        seasons: {
+          include: { squad: { select: { id: true, name: true, logoUrl: true, seasonCalendar: true } } },
+          orderBy: { startYear: "desc" },
+        },
+      },
+    });
+  },
+
   /**
    * Plain create — used by the season's "Técnico" editor's "+ Novo
    * técnico" (EditSeasonCoachDialog already lists every existing coach to

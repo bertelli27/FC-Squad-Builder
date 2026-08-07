@@ -106,6 +106,7 @@ export default async function SeasonPage({
           {season.coach && (
             <CardContent className="border-t py-3">
               <CoachCard
+                coachId={season.coach.id}
                 coachName={season.coach.name}
                 coachPhotoUrl={season.coach.photoUrl}
                 coachExternalLink={season.coach.externalLink}
@@ -191,6 +192,7 @@ export default async function SeasonPage({
             value: t.value,
             dealType: t.dealType,
             transferWindow: t.transferWindow,
+            cachedPlayerId: t.cachedPlayerId,
             departedPlayer: departed
               ? {
                   squadPlayerId: departed.id,

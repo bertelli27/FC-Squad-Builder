@@ -168,6 +168,114 @@ export const squadService = {
   },
 
   /**
+   * Etapa 10.2 — todo `cachedPlayerId` que já passou por algum `SquadPlayer`
+   * deste clube (não só os "atuais", que é o que listCurrentPlayers já
+   * cobre) — alimenta a aba "Jogadores" (histórico) do perfil.
+   */
+  async listAllPlayers(squadId: string) {
+    const rows = await prisma.squadPlayer.findMany({
+      where: { season: { squadId } },
+      select: {
+        cachedPlayerId: true,
+        cachedPlayer: { select: { id: true, name: true, photoUrl: true, position: true, nationality: true, overall: true } },
+        season: { select: { startYear: true } },
+      },
+    });
+
+    const byPlayer = new Map<string, { cachedPlayer: (typeof rows)[number]["cachedPlayer"]; years: Set<number> }>();
+    for (const row of rows) {
+      const entry = byPlayer.get(row.cachedPlayerId) ?? { cachedPlayer: row.cachedPlayer, years: new Set<number>() };
+      entry.years.add(row.season.startYear);
+      byPlayer.set(row.cachedPlayerId, entry);
+    }
+
+    return [...byPlayer.values()]
+      .map((entry) => ({ ...entry.cachedPlayer, years: [...entry.years].sort((a, b) => b - a) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  /** Etapa 10.2 — técnicos distintos que já passaram pelo clube (via Season.coachId), com os anos de cada um. Alimenta a aba "Técnicos". */
+  async listCoachesUsed(squadId: string) {
+    const seasons = await prisma.season.findMany({
+      where: { squadId, coachId: { not: null } },
+      select: { startYear: true, coach: { select: { id: true, name: true, photoUrl: true, externalLink: true } } },
+      orderBy: { startYear: "desc" },
+    });
+
+    const byCoach = new Map<string, { coach: NonNullable<(typeof seasons)[number]["coach"]>; years: number[] }>();
+    for (const season of seasons) {
+      if (!season.coach) continue;
+      const entry = byCoach.get(season.coach.id) ?? { coach: season.coach, years: [] };
+      entry.years.push(season.startYear);
+      byCoach.set(season.coach.id, entry);
+    }
+
+    return [...byCoach.values()];
+  },
+
+  /** Etapa 10.2 — toda transferência do clube, cronológica, sem o corte "top 3" de getTopTransfers. Alimenta a aba "Transferências". */
+  async listAllTransfers(squadId: string) {
+    return prisma.transfer.findMany({
+      where: { season: { squadId } },
+      include: {
+        season: { select: { startYear: true } },
+        cachedPlayer: { select: { id: true, name: true, photoUrl: true } },
+      },
+      orderBy: [{ season: { startYear: "desc" } }, { order: "asc" }],
+    });
+  },
+
+  /** Etapa 10.2 — competições distintas via SeasonCompetition, com os anos disputados. Alimenta a aba "Competições" (clube). */
+  async listCompetitionsPlayed(squadId: string) {
+    const rows = await prisma.seasonCompetition.findMany({
+      where: { season: { squadId } },
+      select: { competition: true, season: { select: { startYear: true } } },
+    });
+
+    const byCompetition = new Map<string, { competition: (typeof rows)[number]["competition"]; years: number[] }>();
+    for (const row of rows) {
+      const entry = byCompetition.get(row.competition.id) ?? { competition: row.competition, years: [] };
+      entry.years.push(row.season.startYear);
+      byCompetition.set(row.competition.id, entry);
+    }
+
+    return [...byCompetition.values()]
+      .map((entry) => ({ ...entry, years: entry.years.sort((a, b) => b - a) }))
+      .sort((a, b) => a.competition.name.localeCompare(b.competition.name));
+  },
+
+  /**
+   * Etapa 10.2 — `Season` com `competitionId` setado (uma convocação, §
+   * etapa 10.1), agrupadas por competição. Alimenta a árvore Seleção→
+   * Competição→Convocação da aba "Competições" (seleção); cada convocação
+   * já linka pra /squads/[id]/seasons/[seasonId] existente.
+   */
+  async listConvocationTree(squadId: string) {
+    const seasons = await prisma.season.findMany({
+      where: { squadId, competitionId: { not: null } },
+      include: {
+        competition: true,
+        coach: true,
+        _count: { select: { players: { where: { isWatchlist: false, isExtra: false, isDeparted: false } } } },
+      },
+      orderBy: { startYear: "desc" },
+    });
+
+    const byCompetition = new Map<
+      string,
+      { competition: NonNullable<(typeof seasons)[number]["competition"]>; convocations: typeof seasons }
+    >();
+    for (const season of seasons) {
+      if (!season.competition) continue;
+      const entry = byCompetition.get(season.competition.id) ?? { competition: season.competition, convocations: [] };
+      entry.convocations.push(season);
+      byCompetition.set(season.competition.id, entry);
+    }
+
+    return [...byCompetition.values()];
+  },
+
+  /**
    * Creates a club and its first season, optionally auto-loading the
    * season's base roster (§1: "carregando o elenco base automaticamente")
    * from a real club/national team.
@@ -224,6 +332,14 @@ export const squadService = {
       primaryColor?: string | null;
       /** "brasileiro" | "europeu" — how this club's seasons are labeled. */
       seasonCalendar?: string;
+      /** Etapa 10.2 — campos cadastrais pro perfil (aba "Visão Geral"), todos opcionais. */
+      fullName?: string | null;
+      country?: string | null;
+      city?: string | null;
+      foundedYear?: number | null;
+      stadium?: string | null;
+      colors?: string | null;
+      confederation?: string | null;
     },
   ) {
     const { tagNames, ...rest } = data;

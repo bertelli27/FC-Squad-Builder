@@ -5,7 +5,7 @@ import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { formatSeasonLabel, formatMoney } from "@/lib/season";
 
 interface PlayerRankEntry {
-  cachedPlayer: { name: string; photoUrl: string | null };
+  cachedPlayer: { id: string; name: string; photoUrl: string | null };
   appearances: number;
   goals: number;
   assists: number;
@@ -132,13 +132,15 @@ function PlayerRankList({
       ) : (
         <ol className="flex flex-col gap-1">
           {entries.map((entry, i) => (
-            <li key={i} className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">{i + 1}.</span>
-              <PlayerAvatar src={entry.cachedPlayer.photoUrl} name={entry.cachedPlayer.name} size="sm" />
-              <span className="min-w-0 flex-1 truncate">{entry.cachedPlayer.name}</span>
-              <span className="text-muted-foreground shrink-0 text-xs">
-                {entry[statKey]} {statLabel}
-              </span>
+            <li key={i}>
+              <Link href={`/players/${entry.cachedPlayer.id}`} className="hover:bg-accent/30 flex items-center gap-2 rounded-md text-sm">
+                <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">{i + 1}.</span>
+                <PlayerAvatar src={entry.cachedPlayer.photoUrl} name={entry.cachedPlayer.name} size="sm" />
+                <span className="min-w-0 flex-1 truncate">{entry.cachedPlayer.name}</span>
+                <span className="text-muted-foreground shrink-0 text-xs">
+                  {entry[statKey]} {statLabel}
+                </span>
+              </Link>
             </li>
           ))}
         </ol>

@@ -50,6 +50,14 @@ model CachedPlayer {
   currentClubId String?
   currentClub   Squad?  @relation("SquadCurrentPlayers", fields: [currentClubId], references: [id], onDelete: SetNull)
 
+  // Etapa 10.2 — dados físicos pro perfil (aba "Visão Geral"), opcionais
+  // ("quando existir"): nenhuma fonte hoje preenche isso automaticamente,
+  // só edição manual. Protegidos pelo mesmo guard de manuallyEdited que os
+  // outros campos cadastrais (cachePlayer() em player-data.service.ts).
+  heightCm       Int?
+  weightKg       Int?
+  preferredFoot  String? // "left" | "right" | "both"
+
   rawData      Json // payload bruto, para reprocessar sem rechamar a API
   fetchedAt    DateTime @default(now())
   expiresAt    DateTime
@@ -123,6 +131,19 @@ model Squad {
   seasonCalendar String @default("brasileiro")
 
   isFavorite Boolean @default(false)
+
+  // Etapa 10.2 — campos cadastrais pro perfil (aba "Visão Geral"), todos
+  // opcionais e sem valor padrão nenhum: a grande maioria dos elencos
+  // "do zero" nunca vai preencher isso, e tudo bem. `confederation` só faz
+  // sentido/é mostrado na UI quando baseKind === "nationalTeam" (sem
+  // constraint no banco, só gate de UI).
+  fullName     String? // nome completo, ex: "Coritiba Foot Ball Club"
+  country      String?
+  city         String?
+  foundedYear  Int?
+  stadium      String?
+  colors       String? // texto livre, ex: "Verde e Branco" — distinto de primaryColor (hex do tema visual)
+  confederation String? // ex: "CONMEBOL" — só usado quando baseKind === "nationalTeam"
 
   // categoryId nulo = "Outros" na UI; não existe uma categoria "Outros" de
   // verdade no banco, então excluir uma Category some sozinha daqui

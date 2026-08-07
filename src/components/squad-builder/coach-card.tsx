@@ -1,10 +1,13 @@
+import Link from "next/link";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 
 export function CoachCard({
+  coachId,
   coachName,
   coachPhotoUrl,
   coachExternalLink,
 }: {
+  coachId?: string | null;
   coachName?: string | null;
   coachPhotoUrl?: string | null;
   coachExternalLink?: string | null;
@@ -16,7 +19,13 @@ export function CoachCard({
       <PlayerAvatar src={coachPhotoUrl} name={coachName} />
       <div className="flex flex-col">
         <span className="text-muted-foreground text-xs">Técnico</span>
-        <span className="font-heading text-sm font-bold">{coachName}</span>
+        {coachId ? (
+          <Link href={`/coaches/${coachId}`} className="font-heading text-sm font-bold hover:underline">
+            {coachName}
+          </Link>
+        ) : (
+          <span className="font-heading text-sm font-bold">{coachName}</span>
+        )}
       </div>
       {coachExternalLink && (
         <a

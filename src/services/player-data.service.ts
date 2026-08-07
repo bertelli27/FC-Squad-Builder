@@ -52,6 +52,13 @@ export async function cachePlayer(player: Player): Promise<void> {
     age: player.age,
     dateOfBirth: player.dateOfBirth ? new Date(player.dateOfBirth) : undefined,
     externalLink: player.externalLink,
+    // Etapa 10.2 — nenhuma fonte externa preenche isso hoje (só edição
+    // manual), mas entram no mesmo guard de manuallyEdited por segurança:
+    // se um dia uma fonte passar a mandar esses campos, um re-fetch não
+    // deve apagar o que o usuário já digitou.
+    heightCm: player.heightCm,
+    weightKg: player.weightKg,
+    preferredFoot: player.preferredFoot,
   };
   const bookkeeping = {
     club: player.club,
@@ -139,6 +146,10 @@ export const playerDataService = {
     externalLink?: string;
     /** Etapa 10.1 (§3) — clube atual, opcional; ver comentário em CachedPlayer.currentClubId no schema. */
     currentClubId?: string;
+    /** Etapa 10.2 — dados físicos, opcionais ("quando existir"). */
+    heightCm?: number;
+    weightKg?: number;
+    preferredFoot?: string;
   }) {
     const externalId = crypto.randomUUID();
     const player = await cacheRepository.upsertPlayer(CUSTOM_PLAYER_SOURCE, externalId, {
@@ -157,10 +168,19 @@ export const playerDataService = {
 
     // Feito à parte de upsertPlayer de propósito — esse helper é
     // compartilhado com os providers externos (Kaggle/API-Football/
-    // TheSportsDB), que nunca têm um clube-atual pra mandar; misturar
-    // esse campo no tipo de entrada dele afetaria todo mundo que o chama.
-    if (input.currentClubId) {
-      await prisma.cachedPlayer.update({ where: { id: player.id }, data: { currentClubId: input.currentClubId } });
+    // TheSportsDB), que nunca têm um clube-atual/dados físicos pra mandar;
+    // misturar esses campos no tipo de entrada dele afetaria todo mundo que
+    // o chama.
+    if (input.currentClubId || input.heightCm || input.weightKg || input.preferredFoot) {
+      await prisma.cachedPlayer.update({
+        where: { id: player.id },
+        data: {
+          ...(input.currentClubId && { currentClubId: input.currentClubId }),
+          ...(input.heightCm !== undefined && { heightCm: input.heightCm }),
+          ...(input.weightKg !== undefined && { weightKg: input.weightKg }),
+          ...(input.preferredFoot !== undefined && { preferredFoot: input.preferredFoot }),
+        },
+      });
     }
 
     return player;
@@ -269,6 +289,10 @@ export const playerDataService = {
       externalLink?: string | null;
       /** Etapa 10.1 (§3) — null limpa (o jogador ficou sem clube atual), undefined não mexe. */
       currentClubId?: string | null;
+      /** Etapa 10.2 — dados físicos, null limpa, undefined não mexe. */
+      heightCm?: number | null;
+      weightKg?: number | null;
+      preferredFoot?: string | null;
     },
   ): Promise<Player | null> {
     const secondaryPositions = patch.secondaryPositions
@@ -289,6 +313,9 @@ export const playerDataService = {
           ...(patch.potential !== undefined && { potential: patch.potential }),
           ...(patch.externalLink !== undefined && { externalLink: patch.externalLink }),
           ...(patch.currentClubId !== undefined && { currentClubId: patch.currentClubId }),
+          ...(patch.heightCm !== undefined && { heightCm: patch.heightCm }),
+          ...(patch.weightKg !== undefined && { weightKg: patch.weightKg }),
+          ...(patch.preferredFoot !== undefined && { preferredFoot: patch.preferredFoot }),
           manuallyEdited: true,
         },
       })
@@ -297,13 +324,29 @@ export const playerDataService = {
     return row ? cachedPlayerToDomain(row) : null;
   },
 
-  /** Etapa 10.1 (§3) — clube atual do jogador, pro EditPlayerForm mostrar o valor já selecionado ao abrir. */
-  async getCurrentClub(cachedPlayerId: string) {
+  /**
+   * Etapa 10.1 (§3) / Etapa 10.2 — campos que o EditPlayerForm precisa
+   * mostrar já preenchidos ao abrir mas que não fazem parte do DTO genérico
+   * `Player`/`EditablePlayer` (currentClubId é uma relação; heightCm/
+   * weightKg/preferredFoot são novos e ninguém mais precisa deles no
+   * caminho normal de exibição, então evitar espalhar no tipo largo).
+   */
+  async getEditExtras(cachedPlayerId: string) {
     const player = await prisma.cachedPlayer.findUnique({
       where: { id: cachedPlayerId },
-      select: { currentClub: { select: { id: true, name: true, logoUrl: true } } },
+      select: {
+        currentClub: { select: { id: true, name: true, logoUrl: true } },
+        heightCm: true,
+        weightKg: true,
+        preferredFoot: true,
+      },
     });
-    return player?.currentClub ?? null;
+    return {
+      currentClub: player?.currentClub ?? null,
+      heightCm: player?.heightCm ?? null,
+      weightKg: player?.weightKg ?? null,
+      preferredFoot: player?.preferredFoot ?? null,
+    };
   },
 
   /**

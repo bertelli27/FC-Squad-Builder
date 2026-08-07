@@ -30,6 +30,12 @@ function seasonCalendarField(value: unknown): string | undefined {
   return value === "brasileiro" || value === "europeu" ? value : undefined;
 }
 
+function optionalIntField(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return typeof value === "number" && Number.isInteger(value) ? value : undefined;
+}
+
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   const squad = await squadService.getSquad(id);
@@ -53,6 +59,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const baseKind = baseKindField(body?.baseKind);
   const primaryColor = primaryColorField(body?.primaryColor);
   const seasonCalendar = seasonCalendarField(body?.seasonCalendar);
+  const fullName = optionalStringField(body?.fullName);
+  const country = optionalStringField(body?.country);
+  const city = optionalStringField(body?.city);
+  const foundedYear = optionalIntField(body?.foundedYear);
+  const stadium = optionalStringField(body?.stadium);
+  const colors = optionalStringField(body?.colors);
+  const confederation = optionalStringField(body?.confederation);
 
   if (
     name !== undefined ||
@@ -62,7 +75,14 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     tagNames !== undefined ||
     baseKind !== undefined ||
     primaryColor !== undefined ||
-    seasonCalendar !== undefined
+    seasonCalendar !== undefined ||
+    fullName !== undefined ||
+    country !== undefined ||
+    city !== undefined ||
+    foundedYear !== undefined ||
+    stadium !== undefined ||
+    colors !== undefined ||
+    confederation !== undefined
   ) {
     await squadService.updateSquad(id, {
       name,
@@ -73,6 +93,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       baseKind,
       primaryColor,
       seasonCalendar,
+      fullName,
+      country,
+      city,
+      foundedYear,
+      stadium,
+      colors,
+      confederation,
     });
   }
 
