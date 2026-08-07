@@ -47,6 +47,8 @@ export interface SquadPlayerVM {
   potential?: number | null;
   shirtNumber?: number | null;
   isCaptain: boolean;
+  /** Jogador da base (categoria de base do clube) — toggle manual, mesmo tratamento de isCaptain. */
+  isYouth: boolean;
   isStarter: boolean;
   isWatchlist: boolean;
   isExtra: boolean;
@@ -421,6 +423,16 @@ export function SquadEditor({
     if (!res.ok) toast.error("Não foi possível definir o capitão.");
   }
 
+  async function handleYouthToggle(playerId: string, isYouth: boolean) {
+    updatePlayerLocal(playerId, { isYouth });
+    const res = await fetch(`/api/seasons/${seasonId}/players/${playerId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isYouth }),
+    });
+    if (!res.ok) toast.error("Não foi possível marcar como jogador da base.");
+  }
+
   function removePlayerLocal(playerId: string) {
     setState((prev) => {
       const slots = { ...prev.slots };
@@ -513,6 +525,7 @@ export function SquadEditor({
   const chipHandlers = {
     onNumberChange: handleNumberChange,
     onCaptainToggle: handleCaptainToggle,
+    onYouthToggle: handleYouthToggle,
     onRemove: handleRemove,
     onUpdated: updatePlayerLocal,
     onTransferredOut: handleTransferredOut,
@@ -702,6 +715,7 @@ function DroppableSlot({
   ageReference,
   onNumberChange,
   onCaptainToggle,
+  onYouthToggle,
   onRemove,
   onUpdated,
   onTransferredOut,
@@ -717,6 +731,7 @@ function DroppableSlot({
   ageReference?: { startYear: number; calendar: string };
   onNumberChange: (id: string, value: number | null) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
+  onYouthToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
@@ -743,6 +758,7 @@ function DroppableSlot({
           ageReference={ageReference}
           onNumberChange={onNumberChange}
           onCaptainToggle={onCaptainToggle}
+          onYouthToggle={onYouthToggle}
           onRemove={onRemove}
           onUpdated={onUpdated}
           onTransferredOut={onTransferredOut}
@@ -786,6 +802,7 @@ function PlayerChip({
   ageReference,
   onNumberChange,
   onCaptainToggle,
+  onYouthToggle,
   onRemove,
   onUpdated,
   onTransferredOut,
@@ -797,6 +814,7 @@ function PlayerChip({
   ageReference?: { startYear: number; calendar: string };
   onNumberChange: (id: string, value: number | null) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
+  onYouthToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
@@ -833,6 +851,21 @@ function PlayerChip({
       )}
     >
       C
+    </button>
+  );
+
+  const youthButton = (
+    <button
+      type="button"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={() => onYouthToggle(player.id, !player.isYouth)}
+      aria-label={player.isYouth ? "Remover marcação de jogador da base" : "Marcar como jogador da base"}
+      className={cn(
+        "flex size-4 items-center justify-center rounded-full text-[10px] font-bold backdrop-blur-sm",
+        player.isYouth ? "bg-sky-400 text-sky-950" : "bg-black/35 text-white",
+      )}
+    >
+      B
     </button>
   );
 
@@ -902,6 +935,7 @@ function PlayerChip({
         </PlayerProfileDialog>
         <div className="absolute -top-1 -right-1">{captainButton}</div>
         <div className="absolute -top-1 -left-1">{removeButton}</div>
+        <div className="absolute -bottom-1 -right-1">{youthButton}</div>
       </div>
       {numberInput}
       {/* Plain text, not another profile trigger: Base UI's DialogTrigger

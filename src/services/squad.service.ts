@@ -254,6 +254,7 @@ export const squadService = {
             cachedPlayerId: p.cachedPlayerId,
             shirtNumber: p.shirtNumber,
             isCaptain: p.isCaptain,
+            isYouth: p.isYouth,
             isStarter: p.isStarter,
             isWatchlist: p.isWatchlist,
             isExtra: p.isExtra,

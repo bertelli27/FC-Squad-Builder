@@ -456,6 +456,13 @@ model SquadPlayer {
   cachedPlayer   CachedPlayer @relation(fields: [cachedPlayerId], references: [id])
   shirtNumber    Int?
   isCaptain      Boolean      @default(false)
+  // Jogador da base (categoria de base do clube) — marcado/desmarcado
+  // manualmente pelo usuário, não vem de nenhuma fonte externa. Mesmo
+  // tratamento de isCaptain/shirtNumber (não isWatchlist/isExtra): é "como
+  // esse jogador é registrado", não um balde de elenco — por isso
+  // sobrevive intacto a uma transferência de saída (transferPlayerOut não
+  // mexe nele) e é copiado adiante ao duplicar uma temporada/elenco.
+  isYouth        Boolean      @default(false)
   isStarter      Boolean      @default(true) // false = banco de reservas
   // jogador observado (fora dos titulares/reserva "oficiais") — só usado
   // quando Squad.baseKind === "nationalTeam"; nunca true por qualquer

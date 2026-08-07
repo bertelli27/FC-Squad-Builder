@@ -9,6 +9,7 @@ import { coachService } from "./coach.service";
 export interface SquadExportPlayer {
   shirtNumber: number | null;
   isCaptain: boolean;
+  isYouth: boolean;
   isStarter: boolean;
   isWatchlist: boolean;
   isExtra: boolean;
@@ -103,6 +104,7 @@ interface ExportableSquad {
 interface SeasonPlayerRow {
   shirtNumber: number | null;
   isCaptain: boolean;
+  isYouth: boolean;
   isStarter: boolean;
   isWatchlist: boolean;
   isExtra: boolean;
@@ -179,6 +181,7 @@ function toExportEntry(
         players: (extras?.players ?? []).map((p) => ({
           shirtNumber: p.shirtNumber,
           isCaptain: p.isCaptain,
+          isYouth: p.isYouth,
           isStarter: p.isStarter,
           isWatchlist: p.isWatchlist,
           isExtra: p.isExtra,
@@ -228,6 +231,7 @@ function parsePlayers(raw: unknown): SquadExportPlayer[] {
     players.push({
       shirtNumber: num(p.shirtNumber),
       isCaptain: p.isCaptain === true,
+      isYouth: p.isYouth === true,
       isStarter: p.isStarter !== false,
       isWatchlist: p.isWatchlist === true,
       isExtra: p.isExtra === true,
@@ -523,6 +527,7 @@ export const squadTransferService = {
               cachedPlayerId: cached.id,
               shirtNumber: p.shirtNumber,
               isCaptain: p.isCaptain,
+              isYouth: p.isYouth,
               isStarter: p.isStarter,
               isWatchlist: p.isWatchlist,
               isExtra: p.isExtra,

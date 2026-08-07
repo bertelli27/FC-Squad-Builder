@@ -48,6 +48,7 @@ export function PlayerRowContent({
 interface RosterHandlers {
   onNumberChange: (id: string, value: number | null) => void;
   onCaptainToggle: (id: string, value: boolean) => void;
+  onYouthToggle: (id: string, value: boolean) => void;
   onRemove: (id: string) => void;
   onUpdated: (id: string, patch: Partial<SquadPlayerVM>) => void;
   onTransferredOut: (id: string, playerName: string, counterpartClub: string) => void;
@@ -107,6 +108,7 @@ export function RosterTable({
               <th className="w-11 px-1 py-2 text-center font-semibold">#</th>
               <th className="w-7"></th>
               <th className="w-7"></th>
+              <th className="w-7"></th>
             </tr>
           </thead>
           <tbody>
@@ -146,7 +148,7 @@ function RosterGroup({
     <>
       <tr className="bg-muted/30">
         <td
-          colSpan={6}
+          colSpan={7}
           className="text-muted-foreground font-heading border-primary/40 border-l-2 px-2 py-1 text-[10px] font-semibold tracking-wide uppercase"
         >
           {group}
@@ -173,6 +175,7 @@ function RosterRow({
   ageReference,
   onNumberChange,
   onCaptainToggle,
+  onYouthToggle,
   onRemove,
   onUpdated,
   onTransferredOut,
@@ -295,6 +298,19 @@ function RosterRow({
           )}
         >
           C
+        </button>
+      </td>
+      <td className="text-center">
+        <button
+          type="button"
+          onClick={() => onYouthToggle(player.id, !player.isYouth)}
+          aria-label={player.isYouth ? "Remover marcação de jogador da base" : "Marcar como jogador da base"}
+          className={cn(
+            "mx-auto flex size-6 items-center justify-center rounded-full text-[10px] font-bold",
+            player.isYouth ? "bg-sky-400 text-sky-950" : "bg-muted text-muted-foreground",
+          )}
+        >
+          B
         </button>
       </td>
       <td className="text-center">

@@ -316,6 +316,7 @@ export const seasonService = {
             cachedPlayerId: p.cachedPlayerId,
             shirtNumber: p.shirtNumber,
             isCaptain: p.isCaptain,
+            isYouth: p.isYouth,
             isStarter: p.isStarter,
             isWatchlist: p.isWatchlist,
             isExtra: p.isExtra,
@@ -882,7 +883,7 @@ export const seasonService = {
   async updateSeasonPlayer(
     seasonId: string,
     playerId: string,
-    data: { shirtNumber?: number | null; isCaptain?: boolean },
+    data: { shirtNumber?: number | null; isCaptain?: boolean; isYouth?: boolean },
   ) {
     if (data.isCaptain) {
       await prisma.squadPlayer.updateMany({

@@ -136,6 +136,7 @@ export default async function SeasonPage({
           potential: sp.cachedPlayer.potential,
           shirtNumber: sp.shirtNumber,
           isCaptain: sp.isCaptain,
+          isYouth: sp.isYouth,
           isStarter: sp.isStarter,
           isWatchlist: sp.isWatchlist,
           isExtra: sp.isExtra,

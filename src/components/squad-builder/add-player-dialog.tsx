@@ -41,6 +41,7 @@ function squadPlayerVMFromResponse(sp: {
   id: string;
   shirtNumber: number | null;
   isCaptain: boolean;
+  isYouth: boolean;
   isStarter: boolean;
   isWatchlist: boolean;
   isExtra: boolean;
@@ -75,6 +76,7 @@ function squadPlayerVMFromResponse(sp: {
     potential: sp.cachedPlayer.potential,
     shirtNumber: sp.shirtNumber,
     isCaptain: sp.isCaptain,
+    isYouth: sp.isYouth,
     isStarter: sp.isStarter,
     isWatchlist: sp.isWatchlist,
     isExtra: sp.isExtra,

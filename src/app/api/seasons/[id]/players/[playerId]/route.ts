@@ -16,12 +16,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       ? body.shirtNumber
       : undefined;
   const isCaptain = typeof body?.isCaptain === "boolean" ? body.isCaptain : undefined;
+  const isYouth = typeof body?.isYouth === "boolean" ? body.isYouth : undefined;
 
-  if (shirtNumber === undefined && isCaptain === undefined) {
-    return NextResponse.json({ error: "Provide 'shirtNumber' and/or 'isCaptain'" }, { status: 400 });
+  if (shirtNumber === undefined && isCaptain === undefined && isYouth === undefined) {
+    return NextResponse.json({ error: "Provide 'shirtNumber', 'isCaptain' and/or 'isYouth'" }, { status: 400 });
   }
 
-  await seasonService.updateSeasonPlayer(id, playerId, { shirtNumber, isCaptain });
+  await seasonService.updateSeasonPlayer(id, playerId, { shirtNumber, isCaptain, isYouth });
 
   const player = await seasonService.getSeasonPlayer(id, playerId);
   return NextResponse.json({ player });
