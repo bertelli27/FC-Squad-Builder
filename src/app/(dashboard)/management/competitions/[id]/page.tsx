@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ShieldIcon } from "lucide-react";
 import { competitionService } from "@/services/competition.service";
+import { timelineService } from "@/services/timeline.service";
 import { CompetitionDetailTabs } from "@/components/management/competition-detail-tabs";
 import { ProfileHeader } from "@/components/ui/profile-header";
 import { KIND_OPTIONS, SCOPE_LABELS } from "@/lib/competition-classification";
@@ -14,7 +15,10 @@ const KIND_LABELS = Object.fromEntries(KIND_OPTIONS.map((o) => [o.value, o.label
 
 export default async function CompetitionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const competition = await competitionService.getCompetition(id);
+  const [competition, timelineEvents] = await Promise.all([
+    competitionService.getCompetition(id),
+    timelineService.getCompetitionTimeline(id),
+  ]);
   if (!competition) notFound();
 
   return (
@@ -72,6 +76,7 @@ export default async function CompetitionDetailPage({ params }: { params: Promis
           standaloneCountry: c.standaloneCountry,
           season: c.season ? { id: c.season.id, squadId: c.season.squadId, startYear: c.season.startYear } : null,
         }))}
+        timelineEvents={timelineEvents}
       />
     </div>
   );

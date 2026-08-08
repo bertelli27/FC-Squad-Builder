@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { squadService } from "@/services/squad.service";
+import { timelineService } from "@/services/timeline.service";
 import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { EditSquadDialog } from "@/components/squad-builder/edit-squad-dialog";
 import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
@@ -10,7 +11,7 @@ import { findCountry } from "@/lib/countries";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [squad, palmares, historicalStats, topTransfers, currentPlayers, coachesUsed, convocationTree] =
+  const [squad, palmares, historicalStats, topTransfers, currentPlayers, coachesUsed, convocationTree, timelineEvents] =
     await Promise.all([
       squadService.getSquad(id),
       squadService.getPalmares(id),
@@ -19,6 +20,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
       squadService.listCurrentPlayers(id),
       squadService.listCoachesUsed(id),
       squadService.listConvocationTree(id),
+      timelineService.getSquadTimeline(id),
     ]);
   if (!squad) notFound();
 
@@ -83,6 +85,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
         convocationTree={convocationTree}
         historicalStats={historicalStats}
         topTransfers={topTransfers}
+        timelineEvents={timelineEvents}
       />
     </ClubThemeScope>
   );

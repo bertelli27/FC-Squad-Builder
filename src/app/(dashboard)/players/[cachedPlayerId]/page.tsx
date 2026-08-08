@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { playerProfileService } from "@/services/player-profile.service";
+import { timelineService } from "@/services/timeline.service";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { OverallBadge } from "@/components/player-card/overall-badge";
 import { PlayerProfileTabs } from "@/components/player-card/player-profile-tabs";
@@ -14,13 +15,14 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
   const player = await playerProfileService.getProfile(cachedPlayerId);
   if (!player) notFound();
 
-  const [career, stats, seasons, callups, transfers, titles] = await Promise.all([
+  const [career, stats, seasons, callups, transfers, titles, timelineEvents] = await Promise.all([
     player.careerId ? playerProfileService.getCareerSummary(player.careerId) : Promise.resolve(null),
     playerProfileService.getStats(cachedPlayerId),
     playerProfileService.getSeasons(cachedPlayerId),
     playerProfileService.getNationalTeamCallups(cachedPlayerId),
     playerProfileService.getTransfers(cachedPlayerId),
     playerProfileService.getTitles(cachedPlayerId),
+    timelineService.getPlayerTimeline(cachedPlayerId),
   ]);
 
   const age = player.dateOfBirth ? ageToday(player.dateOfBirth) : null;
@@ -43,6 +45,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
       />
 
       <PlayerProfileTabs
+        cachedPlayerId={cachedPlayerId}
         overview={{
           heightCm: player.heightCm,
           weightKg: player.weightKg,
@@ -81,6 +84,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
           season: { startYear: t.season.startYear, squad: t.season.squad },
         }))}
         titles={titles}
+        timelineEvents={timelineEvents}
       />
     </div>
   );

@@ -6,14 +6,18 @@ import { EditCompetitionForm, type EditableCompetition } from "./edit-competitio
 import { ChampionsTab, type ChampionVM } from "./champions-tab";
 import { CompetitionOverviewTab } from "./competition-overview-tab";
 import { CompetitionStatsTab } from "./competition-stats-tab";
+import { TimelineView } from "@/components/timeline/timeline-view";
+import type { TimelineEventVM } from "@/lib/timeline";
 
-/** Etapa 9 (§38) — página própria da competição, com abas em vez de um modal de edição. Etapa 10.2: +Visão Geral/+Estatísticas. */
+/** Etapa 9 (§38) — página própria da competição, com abas em vez de um modal de edição. Etapa 10.2: +Visão Geral/+Estatísticas. Etapa 10.4: +História. */
 export function CompetitionDetailTabs({
   competition: initialCompetition,
   champions,
+  timelineEvents,
 }: {
   competition: EditableCompetition;
   champions: ChampionVM[];
+  timelineEvents: TimelineEventVM[];
 }) {
   const [tab, setTab] = useState("overview");
   const [competition, setCompetition] = useState(initialCompetition);
@@ -25,6 +29,7 @@ export function CompetitionDetailTabs({
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="info">Informações</TabsTrigger>
           <TabsTrigger value="champions">🏆 Campeões</TabsTrigger>
+          <TabsTrigger value="timeline">História</TabsTrigger>
           <TabsTrigger value="stats">Estatísticas</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -38,6 +43,9 @@ export function CompetitionDetailTabs({
       )}
       {tab === "champions" && (
         <ChampionsTab competitionId={competition.id} champions={champions} />
+      )}
+      {tab === "timeline" && (
+        <TimelineView events={timelineEvents} entityType="competition" entityId={competition.id} />
       )}
       {tab === "stats" && <CompetitionStatsTab />}
     </div>

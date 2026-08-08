@@ -9,6 +9,8 @@ import { PlayerSeasonsTab, type PlayerSeasonData } from "./player-seasons-tab";
 import { PlayerTransfersTab, type PlayerTransferData } from "./player-transfers-tab";
 import { PlayerCallupsTab } from "./player-callups-tab";
 import { PlayerTitlesTab, type PlayerTitleData } from "./player-titles-tab";
+import { TimelineView } from "@/components/timeline/timeline-view";
+import type { TimelineEventVM } from "@/lib/timeline";
 
 interface StatBlock {
   appearances: number;
@@ -18,6 +20,7 @@ interface StatBlock {
 
 /** Etapa 10.2 — orquestrador de abas do perfil de jogador; tudo já vem pronto da página (mesmo padrão de squad-profile-tabs.tsx). */
 export function PlayerProfileTabs({
+  cachedPlayerId,
   overview,
   careerId,
   career,
@@ -26,7 +29,9 @@ export function PlayerProfileTabs({
   callups,
   transfers,
   titles,
+  timelineEvents,
 }: {
+  cachedPlayerId: string;
   overview: PlayerOverviewData;
   careerId: string | null;
   career: CareerSummaryData | null;
@@ -35,6 +40,7 @@ export function PlayerProfileTabs({
   callups: PlayerSeasonData[];
   transfers: PlayerTransferData[];
   titles: { club: PlayerTitleData[]; nationalTeam: PlayerTitleData[] };
+  timelineEvents: TimelineEventVM[];
 }) {
   const [tab, setTab] = useState("overview");
 
@@ -49,6 +55,7 @@ export function PlayerProfileTabs({
           <TabsTrigger value="transfers">Transferências</TabsTrigger>
           <TabsTrigger value="callups">Seleções</TabsTrigger>
           <TabsTrigger value="titles">Títulos</TabsTrigger>
+          <TabsTrigger value="timeline">História</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -59,6 +66,7 @@ export function PlayerProfileTabs({
       {tab === "transfers" && <PlayerTransfersTab transfers={transfers} />}
       {tab === "callups" && <PlayerCallupsTab callups={callups} />}
       {tab === "titles" && <PlayerTitlesTab club={titles.club} nationalTeam={titles.nationalTeam} />}
+      {tab === "timeline" && <TimelineView events={timelineEvents} entityType="cachedPlayer" entityId={cachedPlayerId} />}
     </div>
   );
 }

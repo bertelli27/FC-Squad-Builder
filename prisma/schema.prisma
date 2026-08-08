@@ -65,6 +65,8 @@ model CachedPlayer {
   squadPlayers SquadPlayer[]
   careers      PlayerCareer[]
   transfers    Transfer[]
+  // Etapa 10.4 — eventos manuais da Timeline deste jogador.
+  timelineEvents TimelineEvent[]
 
   @@unique([source, externalId])
   @@index([name])
@@ -174,6 +176,8 @@ model Squad {
   // Etapa 10.3 — transferências (de qualquer clube/temporada) que
   // escolheram este Squad como clube de origem/destino real.
   counterpartTransfers Transfer[] @relation("TransferCounterpartSquad")
+  // Etapa 10.4 — eventos manuais da Timeline deste clube/seleção.
+  timelineEvents TimelineEvent[]
 }
 
 // Uma fotografia independente do clube num período: elenco, técnico e
@@ -396,6 +400,8 @@ model Competition {
   // competição", N-pra-N): isto é "esta temporada FOI a convocação pra
   // tal torneio", 1-pra-N, só relevante pra seleção.
   seasonsAsConvocation Season[]
+  // Etapa 10.4 — eventos manuais da Timeline desta competição.
+  timelineEvents TimelineEvent[]
 }
 
 // Histórico de campeões de UMA edição/ano de uma competição (etapa 9) —
@@ -870,4 +876,52 @@ model CareerTransfer {
   sourceTransfer   Transfer? @relation(fields: [sourceTransferId], references: [id])
 
   @@index([careerId])
+}
+
+// Etapa 10.4 — Timeline/História Oficial. Guarda SÓ eventos MANUAIS
+// (fundação, títulos antigos anteriores ao que foi cadastrado, marcos
+// livres). Evento AUTOMÁTICO (temporada, título já cadastrado,
+// transferência, troca de técnico) nunca vira linha aqui — é montado em
+// memória a cada carregamento direto de Season/SeasonTitle/Transfer/
+// CompetitionChampion/Season.coachId (ver timeline.service.ts), no mesmo
+// formato de VM que os manuais. Isso evita duplicar dado (§1) e mantém a
+// Timeline sempre sincronizada com a origem sem nenhuma cópia pra
+// atualizar (editar a Transfer já reflete no próximo load, §22).
+model TimelineEvent {
+  id String @id @default(cuid())
+
+  // Exatamente um dos três é preenchido — reforçado na rota da API, não
+  // por constraint de banco (mesmo padrão de outras invariantes do
+  // projeto, que vivem na camada de serviço).
+  squadId String?
+  squad   Squad? @relation(fields: [squadId], references: [id], onDelete: Cascade)
+
+  cachedPlayerId String?
+  cachedPlayer   CachedPlayer? @relation(fields: [cachedPlayerId], references: [id], onDelete: Cascade)
+
+  competitionId String?
+  competition   Competition? @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  // "foundation" | "title" | "season" | "competition" | "transfer" |
+  // "coach" | "player" | "record" | "campaign" | "stadium" | "crest" |
+  // "kit" | "history" | "other" — texto livre, validado só na UI
+  // (src/lib/timeline.ts) pra permitir novas categorias sem migration.
+  type        String
+  title       String
+  description String?
+  year        Int // obrigatório — a Timeline funciona só com o ano, nunca inventa data
+  month       Int?
+  day         Int?
+  order       Int     @default(0) // desempate determinístico dentro do mesmo ano
+  highlight   Boolean @default(false)
+  imageUrl    String?
+  metadata    Json? // escape hatch pra campos futuros sem migration nova
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([squadId])
+  @@index([cachedPlayerId])
+  @@index([competitionId])
+  @@index([year])
 }

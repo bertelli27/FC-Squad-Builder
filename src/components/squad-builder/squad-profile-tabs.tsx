@@ -9,6 +9,8 @@ import { ClubCoachesTab, type CoachUsedData } from "./club-coaches-tab";
 import { NationalTeamCompetitionsTab, type ConvocationNodeData } from "./national-team-competitions-tab";
 import { PalmaresCard, type PalmaresEntry } from "./palmares-card";
 import { FullHistoryView } from "./full-history-view";
+import { TimelineView } from "@/components/timeline/timeline-view";
+import type { TimelineEventVM } from "@/lib/timeline";
 import type { CurrentPlayerData } from "./current-players-card";
 
 interface PlayerRankEntry {
@@ -48,6 +50,7 @@ export function SquadProfileTabs({
   convocationTree,
   historicalStats,
   topTransfers,
+  timelineEvents,
 }: {
   squadId: string;
   baseKind: string | null;
@@ -59,6 +62,7 @@ export function SquadProfileTabs({
   convocationTree: ConvocationNodeData[];
   historicalStats: { topScorers: PlayerRankEntry[]; topAssists: PlayerRankEntry[]; mostAppearances: PlayerRankEntry[] };
   topTransfers: { topBuys: TransferRankEntry[]; topSales: TransferRankEntry[] };
+  timelineEvents: TimelineEventVM[];
 }) {
   const isNationalTeam = baseKind === "nationalTeam";
   const [tab, setTab] = useState("overview");
@@ -75,6 +79,7 @@ export function SquadProfileTabs({
           <TabsTrigger value="seasons">{isNationalTeam ? "Convocações" : "Temporadas"}</TabsTrigger>
           <TabsTrigger value="coaches">Técnicos</TabsTrigger>
           {!isNationalTeam && <TabsTrigger value="titles">Títulos</TabsTrigger>}
+          <TabsTrigger value="timeline">História</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -106,6 +111,8 @@ export function SquadProfileTabs({
       {tab === "coaches" && <ClubCoachesTab coaches={coachesUsed} />}
 
       {tab === "titles" && !isNationalTeam && <PalmaresCard entries={palmares} />}
+
+      {tab === "timeline" && <TimelineView events={timelineEvents} entityType="squad" entityId={squadId} />}
 
       {tab === "history" && (
         <FullHistoryView
