@@ -1,11 +1,9 @@
-import Link from "next/link";
-import { UserRoundIcon, TrophyIcon, UsersRoundIcon, ChevronRightIcon, ShieldIcon, FlagIcon } from "lucide-react";
+import { UserRoundIcon, TrophyIcon, UsersRoundIcon, ShieldIcon, FlagIcon } from "lucide-react";
 import { playerDataService } from "@/services/player-data.service";
 import { competitionService } from "@/services/competition.service";
 import { coachService } from "@/services/coach.service";
 import { squadService } from "@/services/squad.service";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { DashboardCard } from "@/components/ui/dashboard-card";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +23,7 @@ export default async function ManagementPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ManagementCard
+        <DashboardCard
           href="/management/clubs"
           icon={<ShieldIcon className="text-primary size-5" />}
           title="Clubes"
@@ -33,7 +31,7 @@ export default async function ManagementPage() {
           count={`${clubs.length} ${clubs.length === 1 ? "clube" : "clubes"}`}
           actionLabel="Ver clubes"
         />
-        <ManagementCard
+        <DashboardCard
           href="/management/national-teams"
           icon={<FlagIcon className="text-primary size-5" />}
           title="Seleções"
@@ -41,7 +39,7 @@ export default async function ManagementPage() {
           count={`${nationalTeams.length} ${nationalTeams.length === 1 ? "seleção" : "seleções"}`}
           actionLabel="Ver seleções"
         />
-        <ManagementCard
+        <DashboardCard
           href="/management/players"
           icon={<UserRoundIcon className="text-primary size-5" />}
           title="Jogadores"
@@ -49,7 +47,7 @@ export default async function ManagementPage() {
           count={`${players.length} ${players.length === 1 ? "jogador" : "jogadores"}`}
           actionLabel="Gerenciar jogadores"
         />
-        <ManagementCard
+        <DashboardCard
           href="/management/competitions"
           icon={<TrophyIcon className="text-primary size-5" />}
           title="Competições"
@@ -57,7 +55,7 @@ export default async function ManagementPage() {
           count={`${competitions.length} ${competitions.length === 1 ? "competição" : "competições"}`}
           actionLabel="Gerenciar competições"
         />
-        <ManagementCard
+        <DashboardCard
           href="/management/coaches"
           icon={<UsersRoundIcon className="text-primary size-5" />}
           title="Técnicos"
@@ -67,49 +65,5 @@ export default async function ManagementPage() {
         />
       </div>
     </div>
-  );
-}
-
-function ManagementCard({
-  href,
-  icon,
-  title,
-  description,
-  count,
-  actionLabel,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  count: string;
-  actionLabel: string;
-}) {
-  return (
-    <Card className="gap-0 py-0">
-      <CardHeader className="border-b py-4 [.border-b]:pb-4">
-        <CardTitle className="flex items-center gap-2 text-base">
-          {icon}
-          {title}
-        </CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="py-4">
-        <span className="text-muted-foreground text-sm">{count}</span>
-      </CardContent>
-      <CardFooter className="border-t py-3 [.border-t]:pt-3">
-        <Button
-          render={
-            <Link href={href}>
-              {actionLabel}
-              <ChevronRightIcon className="size-4" />
-            </Link>
-          }
-          nativeButton={false}
-          variant="outline"
-          className="w-full justify-between"
-        />
-      </CardFooter>
-    </Card>
   );
 }

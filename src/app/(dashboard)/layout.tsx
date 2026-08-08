@@ -14,7 +14,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               FC Squad Builder
             </span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <MainNav />
             <ThemeToggle />
           </div>

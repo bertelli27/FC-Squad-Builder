@@ -3,6 +3,8 @@ import { clubDataService } from "./club-data.service";
 import { nationalTeamDataService } from "./national-team-data.service";
 import { tagService } from "./tag.service";
 import { seasonService, ensureCareerStintForSeason } from "./season.service";
+import { statisticsService } from "./statistics.service";
+import { sortPlayerAggregates } from "@/lib/statistics";
 import type { Player } from "@/types/domain";
 
 export interface CreateSquadInput {
@@ -507,36 +509,25 @@ export const squadService = {
     });
   },
 
+  /**
+   * Etapa 10.5 — wrapper fino sobre statisticsService.getPlayerAggregates
+   * (o mesmo motor de agregação global do Centro de Estatísticas, só
+   * filtrado por squadId): mesma assinatura e mesmo formato de retorno
+   * de sempre, ninguém que já chama isso precisa mudar. Evita ter duas
+   * implementações fazendo a mesma soma de PlayerCompetitionStats — uma
+   * "por clube" e outra "global" (§14 da etapa 10.5).
+   */
   async getHistoricalStats(squadId: string, limit?: number) {
-    const rows = await prisma.playerCompetitionStats.findMany({
-      where: { squadPlayer: { season: { squadId } } },
-      include: { squadPlayer: { include: { cachedPlayer: true } } },
-    });
+    const all = await statisticsService.getPlayerAggregates({ squadId });
 
-    const byPlayer = new Map<
-      string,
-      { cachedPlayer: (typeof rows)[number]["squadPlayer"]["cachedPlayer"]; appearances: number; goals: number; assists: number }
-    >();
-    for (const row of rows) {
-      const key = row.squadPlayer.cachedPlayerId;
-      const entry = byPlayer.get(key) ?? {
-        cachedPlayer: row.squadPlayer.cachedPlayer,
-        appearances: 0,
-        goals: 0,
-        assists: 0,
-      };
-      entry.appearances += row.appearances;
-      entry.goals += row.goals;
-      entry.assists += row.assists;
-      byPlayer.set(key, entry);
-    }
-
-    const all = [...byPlayer.values()];
-    // Etapa 9 parte 4 (§8.1/§8.4): `limit` indefinido = sem corte (página
-    // completa) — a visão geral principal passa 3, nunca limitando o que
-    // fica armazenado, só quantos entram na resposta.
-    const topN = (key: "appearances" | "goals" | "assists") => {
-      const sorted = all.filter((p) => p[key] > 0).sort((a, b) => b[key] - a[key]);
+    // Mesmo desempate de lib/statistics.ts#sortPlayerAggregates (métrica
+    // DESC, jogos DESC, nome ASC) — achado pelo QA: antes esta função
+    // ordenava só pela métrica principal, sem desempate, então a ordem
+    // podia divergir da página global pra jogadores empatados mesmo os
+    // números batendo. Reaproveita a mesma função em vez de reimplementar
+    // o desempate aqui.
+    const topN = (metric: "goals" | "assists" | "appearances") => {
+      const sorted = sortPlayerAggregates(all, metric);
       return limit === undefined ? sorted : sorted.slice(0, limit);
     };
 
@@ -547,21 +538,11 @@ export const squadService = {
     };
   },
 
-  /** §7/§8: maiores compras e vendas do clube, considerando transferências de todas as temporadas. `limit` indefinido = todos os registros (§8.3). */
+  /** Etapa 10.5 — wrapper fino sobre statisticsService.getBiggestPurchases/getBiggestSales, mesma assinatura/retorno de sempre. */
   async getTopTransfers(squadId: string, limit?: number) {
     const [topBuys, topSales] = await Promise.all([
-      prisma.transfer.findMany({
-        where: { season: { squadId }, type: "in", value: { not: null } },
-        orderBy: { value: "desc" },
-        take: limit,
-        include: { season: { select: { startYear: true } } },
-      }),
-      prisma.transfer.findMany({
-        where: { season: { squadId }, type: "out", value: { not: null } },
-        orderBy: { value: "desc" },
-        take: limit,
-        include: { season: { select: { startYear: true } } },
-      }),
+      statisticsService.getBiggestPurchases({ squadId, limit }),
+      statisticsService.getBiggestSales({ squadId, limit }),
     ]);
     return { topBuys, topSales };
   },
