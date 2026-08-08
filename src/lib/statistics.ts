@@ -7,6 +7,14 @@ export interface PlayerAggregateRow {
   lastYear: number | null;
 }
 
+/** Etapa 10.6 — "jogador com mais títulos" (Museu, §2/§23): contagem de SeasonTitle em que o jogador fez parte do elenco. */
+export interface PlayerTitleCountRow {
+  cachedPlayer: { id: string; name: string; photoUrl: string | null };
+  count: number;
+  lastSquad: { id: string; name: string; logoUrl: string | null } | null;
+  lastYear: number | null;
+}
+
 export type PlayerRankingMetric = "goals" | "assists" | "appearances" | "contributions";
 
 /**

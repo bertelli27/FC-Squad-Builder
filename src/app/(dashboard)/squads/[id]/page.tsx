@@ -1,6 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { StarIcon } from "lucide-react";
 import { squadService } from "@/services/squad.service";
 import { timelineService } from "@/services/timeline.service";
+import { hallOfFameService } from "@/services/hall-of-fame.service";
 import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { EditSquadDialog } from "@/components/squad-builder/edit-squad-dialog";
 import { ClubThemeScope } from "@/components/squad-builder/club-theme-scope";
@@ -11,7 +14,7 @@ import { findCountry } from "@/lib/countries";
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [squad, palmares, historicalStats, topTransfers, currentPlayers, coachesUsed, convocationTree, timelineEvents] =
+  const [squad, palmares, historicalStats, topTransfers, currentPlayers, coachesUsed, convocationTree, timelineEvents, hallOfFameCount] =
     await Promise.all([
       squadService.getSquad(id),
       squadService.getPalmares(id),
@@ -21,6 +24,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
       squadService.listCoachesUsed(id),
       squadService.listConvocationTree(id),
       timelineService.getSquadTimeline(id),
+      hallOfFameService.countBySquad(id),
     ]);
   if (!squad) notFound();
 
@@ -41,6 +45,12 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
           !isNationalTeam && squad.city,
           isNationalTeam ? squad.confederation : squad.foundedYear && `Fundado em ${squad.foundedYear}`,
           !isNationalTeam && squad.stadium,
+          hallOfFameCount > 0 && (
+            <Link href={`/museum/hall-of-fame?squadId=${squad.id}`} className="hover:text-primary flex items-center gap-1 hover:underline">
+              <StarIcon className="size-3.5" />
+              {hallOfFameCount} no Hall da Fama
+            </Link>
+          ),
         ]}
         action={
           <EditSquadDialog

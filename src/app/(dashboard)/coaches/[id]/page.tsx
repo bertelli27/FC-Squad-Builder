@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { UserRoundIcon, CalendarIcon } from "lucide-react";
+import { UserRoundIcon, CalendarIcon, StarIcon } from "lucide-react";
 import { coachService } from "@/services/coach.service";
+import { hallOfFameService } from "@/services/hall-of-fame.service";
 import { PlayerAvatar } from "@/components/player-card/player-avatar";
 import { ClubBadge } from "@/components/squad-builder/club-badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProfileHeader } from "@/components/ui/profile-header";
+import { Badge } from "@/components/ui/badge";
 import { formatSeasonLabel } from "@/lib/season";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +16,7 @@ export const dynamic = "force-dynamic";
 /** Etapa 10.2 — perfil leve do técnico: nome/foto/link + toda temporada em que atuou. Sem abas (não pedido em detalhe). */
 export default async function CoachProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const coach = await coachService.getCoachDetail(id);
+  const [coach, hallOfFameEntries] = await Promise.all([coachService.getCoachDetail(id), hallOfFameService.listByCoach(id)]);
   if (!coach) notFound();
 
   return (
@@ -22,6 +24,15 @@ export default async function CoachProfilePage({ params }: { params: Promise<{ i
       <ProfileHeader
         avatar={<PlayerAvatar src={coach.photoUrl} name={coach.name} size="lg" />}
         title={coach.name}
+        facts={[
+          hallOfFameEntries.length > 0 && (
+            <Badge className="gap-1">
+              <StarIcon className="size-3" />
+              Hall da Fama
+              {hallOfFameEntries.length === 1 ? ` (${hallOfFameEntries[0].squad?.name ?? "Global"})` : ` (${hallOfFameEntries.length})`}
+            </Badge>
+          ),
+        ]}
         action={
           coach.externalLink && (
             <a

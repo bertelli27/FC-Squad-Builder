@@ -67,6 +67,8 @@ model CachedPlayer {
   transfers    Transfer[]
   // Etapa 10.4 — eventos manuais da Timeline deste jogador.
   timelineEvents TimelineEvent[]
+  // Etapa 10.6 — reconhecimentos oficiais do Hall da Fama deste jogador.
+  hallOfFameEntries HallOfFameEntry[]
 
   @@unique([source, externalId])
   @@index([name])
@@ -178,6 +180,8 @@ model Squad {
   counterpartTransfers Transfer[] @relation("TransferCounterpartSquad")
   // Etapa 10.4 — eventos manuais da Timeline deste clube/seleção.
   timelineEvents TimelineEvent[]
+  // Etapa 10.6 — reconhecimentos do Hall da Fama com contexto neste clube/seleção.
+  hallOfFameEntries HallOfFameEntry[]
 }
 
 // Uma fotografia independente do clube num período: elenco, técnico e
@@ -345,6 +349,8 @@ model Coach {
   createdAt    DateTime @default(now())
 
   seasons Season[]
+  // Etapa 10.6 — reconhecimentos oficiais do Hall da Fama deste técnico.
+  hallOfFameEntries HallOfFameEntry[]
 }
 
 // Uma competição/torneio (Brasileirão, Paranaense, Copa do Brasil...) —
@@ -924,4 +930,42 @@ model TimelineEvent {
   @@index([cachedPlayerId])
   @@index([competitionId])
   @@index([year])
+}
+
+// Etapa 10.6 — Museu + Hall da Fama. Guarda SÓ o reconhecimento oficial em
+// si (quem, onde, que título, que ano, que justificativa) — nunca uma
+// estatística: gols/jogos/títulos exibidos junto de uma entrada são sempre
+// consultados ao vivo em statisticsService/playerProfileService, nunca
+// copiados pra cá. Exatamente um de cachedPlayerId/coachId é preenchido
+// (reforçado no service, mesmo padrão de TimelineEvent "exatamente uma
+// entidade dona" reforçado na rota) — cachedPlayerId/coachId usam Cascade
+// porque são o DONO do reconhecimento (sem eles a linha não faz sentido,
+// mesmo princípio de TimelineEvent.cachedPlayerId). squadId é só CONTEXTO
+// (em qual clube/seleção a pessoa é lenda; null = reconhecimento global) —
+// por isso SetNull, o mesmo papel/onDelete que CachedPlayer.currentClubId e
+// Transfer.counterpartSquadId já têm: apagar um clube não pode apagar um
+// reconhecimento histórico curado à mão, só perder o contexto dele.
+model HallOfFameEntry {
+  id String @id @default(cuid())
+
+  cachedPlayerId String?
+  cachedPlayer   CachedPlayer? @relation(fields: [cachedPlayerId], references: [id], onDelete: Cascade)
+
+  coachId String?
+  coach   Coach? @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  squadId String?
+  squad   Squad? @relation(fields: [squadId], references: [id], onDelete: SetNull)
+
+  title       String // ex: "Lenda do Clube", "Ídolo Histórico"
+  description String? // justificativa livre
+  year        Int
+  imageUrl    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cachedPlayerId])
+  @@index([coachId])
+  @@index([squadId])
 }

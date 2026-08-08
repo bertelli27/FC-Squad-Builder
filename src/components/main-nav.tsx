@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldHalfIcon, UserRoundIcon, SettingsIcon, ChartColumnIcon } from "lucide-react";
+import { ShieldHalfIcon, UserRoundIcon, SettingsIcon, ChartColumnIcon, LandmarkIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,14 +12,18 @@ import { cn } from "@/lib/utils";
  * switch, not a tab nested under either section. Etapa 10.5: "Estatísticas"
  * (Centro de Estatísticas) entra como um quarto contexto de topo — é uma
  * área de leitura/análise, diferente de Gerenciamento (CRUD de entidades
- * próprias), merece nav própria em vez de ficar escondida lá dentro.
+ * próprias), merece nav própria em vez de ficar escondida lá dentro. Etapa
+ * 10.6: "Museu" entra como um 5º contexto de topo — camada de preservação
+ * histórica (recordes/momentos/Hall da Fama), distinta de Estatísticas
+ * (rankings brutos) e de Gerenciamento (CRUD).
  */
 export function MainNav() {
   const pathname = usePathname();
   const isCareers = pathname?.startsWith("/careers");
   const isManagement = pathname?.startsWith("/management");
   const isStatistics = pathname?.startsWith("/statistics");
-  const isClubs = !isCareers && !isManagement && !isStatistics;
+  const isMuseum = pathname?.startsWith("/museum");
+  const isClubs = !isCareers && !isManagement && !isStatistics && !isMuseum;
 
   return (
     <nav className="flex min-w-0 items-center gap-1 overflow-x-auto">
@@ -62,6 +66,16 @@ export function MainNav() {
       >
         <ChartColumnIcon className="size-4" />
         Estatísticas
+      </Link>
+      <Link
+        href="/museum"
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+          isMuseum ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <LandmarkIcon className="size-4" />
+        Museu
       </Link>
     </nav>
   );

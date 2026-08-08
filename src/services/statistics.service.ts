@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { sortPlayerAggregates, type PlayerAggregateRow } from "@/lib/statistics";
+import { sortPlayerAggregates, type PlayerAggregateRow, type PlayerTitleCountRow } from "@/lib/statistics";
 
-export type { PlayerAggregateRow } from "@/lib/statistics";
+export type { PlayerAggregateRow, PlayerTitleCountRow } from "@/lib/statistics";
 
 export interface PlayerStatsFilters {
   /** "club" | "nationalTeam" | undefined (todos). Mesmo padrão NULL-safe de squadService.listForManagement — baseKind null conta como clube. */
@@ -201,6 +201,52 @@ export const statisticsService = {
   },
   async getBiggestSales(filters?: { squadId?: string; fromYear?: number; toYear?: number; limit?: number }) {
     return this.getBiggestTransfers({ ...filters, type: "out" });
+  },
+
+  /**
+   * Etapa 10.6 (Museu §2/§23) — "jogador com mais títulos": todo `SquadPlayer`
+   * da temporada campeã ganha crédito pelo título (mesmo critério "fez parte
+   * do elenco" já usado por `PlayerCompetitionStats`, não distingue titular/
+   * reserva). Fonte é `SeasonTitle→Season→SquadPlayer` — nunca `CareerTitle`
+   * (dado de carreira solto/manual, sem `PlayerCompetitionStats`
+   * correspondente), mesma regra de não-dupla-contagem da §10.5.
+   */
+  async getPlayerTitleCounts(filters: PlayerStatsFilters = {}): Promise<PlayerTitleCountRow[]> {
+    const titles = await prisma.seasonTitle.findMany({
+      where: {
+        ...(filters.competitionId && { competitionId: filters.competitionId }),
+        season: {
+          ...(filters.squadId && { squadId: filters.squadId }),
+          ...(yearRangeWhere(filters.fromYear, filters.toYear) && { startYear: yearRangeWhere(filters.fromYear, filters.toYear) }),
+          ...(filters.kind && { squad: squadKindWhere(filters.kind) }),
+        },
+      },
+      select: {
+        season: {
+          select: {
+            startYear: true,
+            squad: { select: { id: true, name: true, logoUrl: true } },
+            players: { select: { cachedPlayer: { select: { id: true, name: true, photoUrl: true } } } },
+          },
+        },
+      },
+    });
+
+    const byPlayer = new Map<string, PlayerTitleCountRow>();
+    for (const title of titles) {
+      for (const squadPlayer of title.season.players) {
+        const cp = squadPlayer.cachedPlayer;
+        const entry = byPlayer.get(cp.id) ?? { cachedPlayer: cp, count: 0, lastSquad: null, lastYear: null };
+        entry.count += 1;
+        const year = title.season.startYear;
+        if (entry.lastYear === null || year > entry.lastYear) {
+          entry.lastYear = year;
+          entry.lastSquad = title.season.squad;
+        }
+        byPlayer.set(cp.id, entry);
+      }
+    }
+    return [...byPlayer.values()].sort((a, b) => b.count - a.count || a.cachedPlayer.name.localeCompare(b.cachedPlayer.name));
   },
 
   /** Competições com mais títulos registrados (§9). */
